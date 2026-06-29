@@ -113,6 +113,19 @@ class ProgramGenerator:
             random.choice(self.config.pipeline_stages_choices)
             if loop_kind == LoopKind.PIPELINED else 1
         )
+        # Re-validate with actual num_stages (generate_valid_params uses stages=1 default)
+        if loop_kind == LoopKind.PIPELINED and num_stages > 1:
+            from src.constraints.constraints import (
+                tilelang_check_shared_memory, triton_check_shared_memory,
+            )
+            check_fn = tilelang_check_shared_memory if self.backend == "tilelang" else triton_check_shared_memory
+            if not check_fn(params["block_M"], params["block_N"], params["block_K"], dtype, num_stages):
+                for ns in sorted(self.config.pipeline_stages_choices):
+                    if check_fn(params["block_M"], params["block_N"], params["block_K"], dtype, ns):
+                        num_stages = ns
+                        break
+                else:
+                    num_stages = 1
         params["loop_kind"] = loop_kind.value
         params["num_stages"] = num_stages
         params["name"] = "kernel_0"
@@ -137,6 +150,25 @@ class ProgramGenerator:
         # Structural variation
         loop_kind = random.choice([LoopKind.PIPELINED, LoopKind.SERIAL])
         num_stages = random.choice(self.config.pipeline_stages_choices) if loop_kind == LoopKind.PIPELINED else 1
+
+        # Re-validate shared memory with the actual num_stages.
+        # generate_valid_params checks with num_stages=1 by default, but the
+        # actual num_stages may be larger and require more shared memory.
+        if loop_kind == LoopKind.PIPELINED and num_stages > 1:
+            from src.constraints.constraints import (
+                tilelang_check_shared_memory, triton_check_shared_memory,
+                tilelang_valid_block_k, triton_valid_block_sizes,
+            )
+            check_fn = tilelang_check_shared_memory if self.backend == "tilelang" else triton_check_shared_memory
+            valid_k = tilelang_valid_block_k(dtype) if self.backend == "tilelang" else [16, 32, 64, 128]
+            if not check_fn(params["block_M"], params["block_N"], params["block_K"], dtype, num_stages):
+                # Reduce num_stages until shared memory fits
+                for ns in sorted(self.config.pipeline_stages_choices):
+                    if check_fn(params["block_M"], params["block_N"], params["block_K"], dtype, ns):
+                        num_stages = ns
+                        break
+                else:
+                    num_stages = 1  # fallback to single stage
 
         # SOFTMAX and REDUCE ops process one full row per block.
         # N must equal block_N so there is exactly one block per row —

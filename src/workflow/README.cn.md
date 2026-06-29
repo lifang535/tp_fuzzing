@@ -1,6 +1,19 @@
 # 工作流模块说明
 
-本目录包含 TileSmith 模糊测试的核心工作流组件，按功能划分为 5 个子模块。
+本目录包含 TileSmith 的核心工作流组件。TileSmith 是一个**通用的 tile 程序模糊测试框架**——它在后端无关的抽象 IR 层生成和变异程序，然后通过不同的 emitter 翻译到具体后端（TileLang、Triton 等）。
+
+**核心设计原则**：
+- **IR 层**（`src/ir/`）定义计算语义，与任何具体后端无关
+- **Emitter 层**（`workflow/emitter/`）将 IR 翻译为后端特定代码，是唯一接触后端 API 的地方
+- **约束层**（`src/constraints/`）检查硬件限制，按后端分开实现
+- 新增后端只需加一个 emitter + 约束文件，生成器/变异器/oracle 无需改动
+
+支持的后端：
+- **TileLang**：tile-level DSL，基于 TVM，使用 `T.gemm`/`T.copy`/`T.Parallel` 等原语
+- **Triton**：OpenAI 的 tile-level DSL，使用 `tl.dot`/`tl.load`/`tl.store` 等原语
+- **（可扩展）**：CUTLASS、Hidet 等其他 tile 编译器
+
+按功能划分为 5 个子模块。
 
 ---
 
@@ -58,9 +71,19 @@ workflow/
 
 **三种嵌套结构（类比 MLIRSmith 的 scf.if / scf.for）：**
 
-- **`if_epilogue`**（类比 `scf.if`）：在 `T.Parallel` 中对每个元素做条件分支，`x > threshold` 时走路径 A（如 exp），否则走路径 B（如 sqrt），测试 TileLang 对条件计算的代码生成
-- **`double_pipeline`**（类比嵌套 `affine.for`）：两个独立的 K 维度 GEMM 循环，结果相加；测试多个 pipeline 并发写同一输出 tile 时的正确性
-- **`accumulate_reduce`**（类比 `scf.for` + reduce）：reduce → broadcast 回来的数据流（`x[i,j] -= row_max[i]`），是 online softmax 的核心模式，测试 reduce 结果如何正确广播回 2D fragment
+这些嵌套结构是**后端无关**的——由 IR 层定义语义，由各后端的 emitter 分别翻译为 TileLang / Triton 语法：
+
+- **`if_epilogue`**（类比 `scf.if`）：对 tile 内每个元素做条件分支（`x > threshold ? path_A : path_B`）。测试编译器对**条件计算**的代码生成，如分支预测和掩码处理。
+  - TileLang 实现：`T.Parallel` 中的 if/else
+  - Triton 实现：`tl.where(condition, a, b)`
+
+- **`double_pipeline`**（类比嵌套 `affine.for`）：两个**独立的 K 维度 GEMM 循环**，各自累加到不同 fragment，最后相加。测试编译器对**多个并发 pipeline 写同一输出 tile** 的正确性。
+  - TileLang 实现：两套独立的 alloc_shared + Pipelined 循环 + gemm
+  - Triton 实现：两段独立的 K-loop + tl.dot，结果 acc1 + acc2
+
+- **`accumulate_reduce`**（类比 `scf.for` + reduce）：先对 tile 做行级 reduce（max 或 sum），再将结果**广播回 2D fragment**（如 `x[i,j] -= row_max[i]`）。这是 online softmax 和 layer normalization 的核心模式，测试 **reduce → broadcast 数据流**是否正确。
+  - TileLang 实现：`T.reduce_max/sum` + `T.Parallel` 逐元素操作
+  - Triton 实现：`tl.max/sum(axis=1)` + 广播减/除
 
 ---
 
@@ -106,20 +129,34 @@ workflow/
 subprocess.run([python3, tmp_file], timeout=compile_timeout + execute_timeout)
 ```
 
-错误分类（10种 root_cause）：
+错误分类（按 root_cause，后端通用 + 后端特定）：
+
+**通用分类（所有 tile 编译器均可能触发）：**
+
+| 分类 | 含义 | 真实 bug? |
+|---|---|---|
+| `wrong_result` | kernel 计算结果与参考实现不一致 | ✅ |
+| `dtype_mismatch` | 编译器内部类型推断与用户声明不一致 | ✅ |
+| `shared_memory_overflow` | tile 参数组合超出 GPU shared memory 限制 | ❌ 硬件限制 |
+| `gpu_oom` | GPU 显存不足 (transient) | ❌ 环境问题 |
+| `segfault` | 编译器 segfault | ✅ |
+| `ptx_async_boundary` | 异步拷贝指令在边界 tile 产生非法字节宽度 | ✅ |
+| `tilelang_codegen_error` | 编译器 codegen 内部 assertion 失败 | ✅ |
+
+**TileLang 特定：**
 
 | 分类 | 含义 |
 |---|---|
-| `wrong_result` | 计算结果与参考不一致 |
-| `dtype_mismatch` | 编译器内部类型推断与声明不一致 |
-| `warp_partition` | warp 分区无法满足 block 大小 |
-| `shared_memory_overflow` | shared memory 超出硬件限制 |
-| `layout_inference` | TileLang layout inference 找不到可用布局 |
+| `warp_partition` | MMA warp 分区无法匹配 block 大小 |
+| `layout_inference` | layout inference 找不到合法的内存布局 |
+| `alignment` | block 大小不满足 MMA 对齐要求 |
+
+**Triton 特定：**
+
+| 分类 | 含义 |
+|---|---|
 | `dtype_unsupported_op` | 算子不支持指定类型（如 tl.sqrt 不支持 fp16） |
-| `codegen_duplicate_arg` | 代码生成的 kernel 参数重复 |
-| `triton_compile_error` | Triton 编译阶段报错 |
-| `segfault` | 编译器 segfault |
-| `other` | 其他未分类错误 |
+| `triton_compile_error` | Triton compiler 报错 |
 
 ---
 

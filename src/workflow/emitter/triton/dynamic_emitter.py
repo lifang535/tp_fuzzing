@@ -168,6 +168,61 @@ class TritonDynamicEmitter:
                 body_lines_done = True
                 break
 
+            # ── Nested structure ops ────────────────────────────────────────
+            elif step.op_kind == "if_epilogue":
+                # Conditional branching: if acc > threshold → branch_a, else → branch_b
+                threshold = step.attrs.get("threshold", 0.0)
+                branch_a = step.attrs.get("branch_a", "exp")
+                branch_b = step.attrs.get("branch_b", "sqrt")
+
+                def _triton_branch_expr(op, val):
+                    if op == "exp": return f"tl.exp({val})"
+                    if op == "sqrt": return f"tl.sqrt(tl.abs({val}))"
+                    if op == "neg": return f"-{val}"
+                    if op == "scale": return f"{val} * 0.5"
+                    if op == "abs": return f"tl.abs({val})"
+                    return val
+
+                a_expr = _triton_branch_expr(branch_a, "acc")
+                b_expr = _triton_branch_expr(branch_b, "acc")
+                body_lines.append(f"{sp}# if_epilogue: {branch_a} if x>{threshold} else {branch_b}")
+                body_lines.append(f"{sp}acc = tl.where(acc > {threshold}, {a_expr}, {b_expr})")
+
+            elif step.op_kind == "double_pipeline":
+                # Second independent K-loop, results added to acc
+                body_lines.append(f"{sp}# double_pipeline: second K-loop")
+                body_lines.append(f"{sp}acc2 = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)")
+                if seq.loop_kind == "pipelined":
+                    body_lines.append(f"{sp}for k2 in tl.range(0, K, BLOCK_K, num_stages={seq.num_stages}):")
+                else:
+                    body_lines.append(f"{sp}for k2 in range(0, K, BLOCK_K):")
+                body_lines.append(f"{sp}    a2_ptrs = a_ptr + (offs_m[:, None] * stride_am + (k2 + offs_k[None, :]) * stride_ak)")
+                body_lines.append(f"{sp}    a2 = tl.load(a2_ptrs, mask=(offs_m[:, None] < M) & ((k2 + offs_k[None, :]) < K), other=0.0).to({tld})")
+                body_lines.append(f"{sp}    b2_ptrs = b_ptr + ((k2 + offs_k[:, None]) * stride_bk + offs_n[None, :] * stride_bn)")
+                body_lines.append(f"{sp}    b2 = tl.load(b2_ptrs, mask=((k2 + offs_k[:, None]) < K) & (offs_n[None, :] < N), other=0.0).to({tld})")
+                body_lines.append(f"{sp}    acc2 += tl.dot(a2, b2)")
+                body_lines.append(f"{sp}acc = acc + acc2")
+
+            elif step.op_kind == "accumulate_reduce":
+                # Reduce → broadcast pattern (online softmax / normalization)
+                mode = step.attrs.get("mode", "subtract_max")
+                if mode == "subtract_max":
+                    body_lines.append(f"{sp}# accumulate_reduce: subtract row max")
+                    body_lines.append(f"{sp}row_max = tl.max(acc, axis=1)[:, None]")
+                    body_lines.append(f"{sp}acc = acc - row_max")
+                else:  # divide_sum
+                    body_lines.append(f"{sp}# accumulate_reduce: divide by row sum")
+                    body_lines.append(f"{sp}row_sum = tl.sum(acc, axis=1)[:, None]")
+                    body_lines.append(f"{sp}acc = acc / (row_sum + 1e-6)")
+
+            # ── Memory ops (skip in Triton — handled differently) ──────────
+            elif step.op_kind in ("copy_g2s", "copy_s2f"):
+                pass  # Triton has no explicit shared memory; skip
+            elif step.op_kind == "copy_f2g":
+                pass  # Write-back handled at the end
+            elif step.op_kind == "gemm":
+                pass  # GEMM already handled at the start
+
         # Write-back (if not already handled by reduce)
         if not body_lines_done:
             if has_terminal_softmax:

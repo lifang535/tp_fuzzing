@@ -74,7 +74,6 @@ class KernelStep:
     inputs: List[TileBuffer]
     outputs: List[TileBuffer]
     attrs: dict
-    tilelang_code: List[str]
     torch_ref_update: str  # Description of what changed (for documentation)
 
 
@@ -179,7 +178,6 @@ class GemmOpGen(OpGenBase):
         n = counter.get("gemm", 0) + 1
         counter["gemm"] = n
 
-        sp = "                "
         block_M = params["block_M"]
         block_N = params["block_N"]
         block_K = params["block_K"]
@@ -190,22 +188,6 @@ class GemmOpGen(OpGenBase):
         a_shared = f"A_shared_{n}"
         b_shared = f"B_shared_{n}"
         c_local = f"C_local_{n}"
-
-        if loop_kind == "pipelined":
-            loop_stmt = f"for k in T.Pipelined(T.ceildiv(K, block_K), num_stages={num_stages}):"
-        else:
-            loop_stmt = f"for k in T.serial(T.ceildiv(K, block_K)):"
-
-        code = [
-            f"{sp}{a_shared} = T.alloc_shared((block_M, block_K), dtype)",
-            f"{sp}{b_shared} = T.alloc_shared((block_K, block_N), dtype)",
-            f"{sp}{c_local} = T.alloc_fragment((block_M, block_N), accum_dtype)",
-            f"{sp}T.clear({c_local})",
-            f"{sp}{loop_stmt}",
-            f"{sp}    T.copy(A[by * block_M, k * block_K], {a_shared})",
-            f"{sp}    T.copy(B[k * block_K, bx * block_N], {b_shared})",
-            f"{sp}    T.gemm({a_shared}, {b_shared}, {c_local})",
-        ]
 
         torch_ref = f"({A.torch_ref}) @ ({B.torch_ref})"
 
@@ -222,8 +204,16 @@ class GemmOpGen(OpGenBase):
             op_kind="gemm",
             inputs=[A, B],
             outputs=[out_buf],
-            attrs={"num_stages": num_stages},
-            tilelang_code=code,
+            attrs={
+                "a_shared": a_shared,
+                "b_shared": b_shared,
+                "c_local": c_local,
+                "loop_kind": loop_kind,
+                "num_stages": num_stages,
+                "block_M": block_M,
+                "block_N": block_N,
+                "block_K": block_K,
+            },
             torch_ref_update=f"{c_local} = A @ B",
         )
 
@@ -261,17 +251,11 @@ class CopyG2SOpGen(OpGenBase):
         if not candidates:
             return None
         src = random.choice(candidates)
-        sp = "                "
         block_M = params["block_M"]
         block_N = params["block_N"]
 
         self._next_name(counter, "g2s_shared")
         shared_name = f"X_shared_{counter['g2s_shared']}"
-
-        code = [
-            f"{sp}{shared_name} = T.alloc_shared((block_M, block_N), dtype)",
-            f"{sp}T.copy({src.name}[by * block_M, bx * block_N], {shared_name})",
-        ]
 
         out_buf = TileBuffer(
             name=shared_name,
@@ -286,8 +270,7 @@ class CopyG2SOpGen(OpGenBase):
             op_kind="copy_g2s",
             inputs=[src],
             outputs=[out_buf],
-            attrs={},
-            tilelang_code=code,
+            attrs={"shared_name": shared_name, "src_name": src.name},
             torch_ref_update=f"{shared_name} = {src.name}[tile]",
         )
 
@@ -302,15 +285,9 @@ class CopyS2FOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         src = random.choice(pool.shared)
-        sp = "                "
 
         n = self._next_name(counter, "s2f_frag")
         frag_name = f"X_frag_{counter['s2f_frag']}"
-
-        code = [
-            f"{sp}{frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
-            f"{sp}T.copy({src.name}, {frag_name})",
-        ]
 
         out_buf = TileBuffer(
             name=frag_name,
@@ -325,8 +302,7 @@ class CopyS2FOpGen(OpGenBase):
             op_kind="copy_s2f",
             inputs=[src],
             outputs=[out_buf],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag_name, "src_name": src.name},
             torch_ref_update=f"{frag_name} = {src.name}",
         )
 
@@ -341,33 +317,22 @@ class CopyF2GOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]  # Use most recently produced fragment
-        sp = "                "
-
-        code = [
-            f"{sp}T.copy({frag.name}, C[by * block_M, bx * block_N])",
-        ]
 
         return KernelStep(
             op_kind="copy_f2g",
             inputs=[frag],
             outputs=[],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name},
             torch_ref_update=f"C = {frag.name}",
         )
 
     def _force_apply(self, frag: TileBuffer, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         """Force a write-back of a specific fragment."""
-        sp = "                "
-        code = [
-            f"{sp}T.copy({frag.name}, C[by * block_M, bx * block_N])",
-        ]
         return KernelStep(
             op_kind="copy_f2g",
             inputs=[frag],
             outputs=[],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name},
             torch_ref_update=f"C = {frag.name}",
         )
 
@@ -383,14 +348,7 @@ class ScaleOpGen(OpGenBase):
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
         alpha = round(random.uniform(params.get("scale_alpha_min", 0.1), params.get("scale_alpha_max", 10.0)), 4)
-        sp = "                "
 
-        code = [
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag.name}[i, j] = {frag.name}[i, j] * {alpha}",
-        ]
-
-        # Update torch_ref in-place
         old_ref = frag.torch_ref
         frag.torch_ref = f"({old_ref}) * {alpha}"
 
@@ -398,8 +356,7 @@ class ScaleOpGen(OpGenBase):
             op_kind="scale",
             inputs=[frag],
             outputs=[frag],
-            attrs={"alpha": alpha},
-            tilelang_code=code,
+            attrs={"alpha": alpha, "frag_name": frag.name},
             torch_ref_update=f"{frag.name} *= {alpha}",
         )
 
@@ -414,12 +371,6 @@ class ExpOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
-
-        code = [
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag.name}[i, j] = T.exp(T.cast({frag.name}[i, j], T.float32))",
-        ]
 
         old_ref = frag.torch_ref
         frag.torch_ref = f"torch.exp(({old_ref}).float())"
@@ -428,8 +379,7 @@ class ExpOpGen(OpGenBase):
             op_kind="exp",
             inputs=[frag],
             outputs=[frag],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name},
             torch_ref_update=f"{frag.name} = exp({frag.name})",
         )
 
@@ -444,12 +394,6 @@ class SqrtOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
-
-        code = [
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag.name}[i, j] = T.sqrt(T.abs({frag.name}[i, j]))",
-        ]
 
         old_ref = frag.torch_ref
         frag.torch_ref = f"torch.sqrt(({old_ref}).float().abs())"
@@ -458,8 +402,7 @@ class SqrtOpGen(OpGenBase):
             op_kind="sqrt",
             inputs=[frag],
             outputs=[frag],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name},
             torch_ref_update=f"{frag.name} = sqrt(abs({frag.name}))",
         )
 
@@ -477,18 +420,12 @@ class ElemwiseAddOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         fragA = pool.fragment[-1]
-        sp = "                "
         block_M = params["block_M"]
         block_N = params["block_N"]
         dtype = params.get("dtype", "float16")
 
         if len(pool.fragment) >= 2:
-            # Use second-to-last fragment
             fragB = pool.fragment[-2]
-            code = [
-                f"{sp}for i, j in T.Parallel(block_M, block_N):",
-                f"{sp}    {fragA.name}[i, j] = {fragA.name}[i, j] + {fragB.name}[i, j]",
-            ]
             old_ref_a = fragA.torch_ref
             old_ref_b = fragB.torch_ref
             fragA.torch_ref = f"({old_ref_a}).float() + ({old_ref_b}).float()"
@@ -496,17 +433,14 @@ class ElemwiseAddOpGen(OpGenBase):
                 op_kind="elemwise_add",
                 inputs=[fragA, fragB],
                 outputs=[fragA],
-                attrs={"use_global": False},
-                tilelang_code=code,
+                attrs={"use_global": False, "frag_a_name": fragA.name, "frag_b_name": fragB.name},
                 torch_ref_update=f"{fragA.name} += {fragB.name}",
             )
         else:
-            # Add a new global input D
-            d_idx = len(pool.global_in)  # will be 2, 3, ...
+            d_idx = len(pool.global_in)
             d_name = f"D{d_idx}"
             d_frag_name = f"D{d_idx}_local"
 
-            # Add the new global buffer to the pool
             d_global = TileBuffer(
                 name=d_name,
                 shape=(params["M"], params["N"]),
@@ -516,21 +450,6 @@ class ElemwiseAddOpGen(OpGenBase):
             )
             pool.add("global_in", d_global)
 
-            d_frag = TileBuffer(
-                name=d_frag_name,
-                shape=(block_M, block_N),
-                dtype=dtype,
-                scope="fragment",
-                torch_ref=f"{d_name}.float()",
-            )
-
-            code = [
-                f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
-                f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
-                f"{sp}for i, j in T.Parallel(block_M, block_N):",
-                f"{sp}    {fragA.name}[i, j] = {fragA.name}[i, j] + {d_frag_name}[i, j]",
-            ]
-
             old_ref_a = fragA.torch_ref
             fragA.torch_ref = f"({old_ref_a}).float() + {d_name}.float()"
 
@@ -538,8 +457,7 @@ class ElemwiseAddOpGen(OpGenBase):
                 op_kind="elemwise_add",
                 inputs=[fragA, d_global],
                 outputs=[fragA],
-                attrs={"use_global": True, "d_idx": d_idx, "d_frag_name": d_frag_name},
-                tilelang_code=code,
+                attrs={"use_global": True, "d_idx": d_idx, "d_name": d_name, "d_frag_name": d_frag_name, "frag_a_name": fragA.name},
                 torch_ref_update=f"{fragA.name} += {d_name}",
             )
 
@@ -554,17 +472,12 @@ class ElemwiseMulOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         fragA = pool.fragment[-1]
-        sp = "                "
         block_M = params["block_M"]
         block_N = params["block_N"]
         dtype = params.get("dtype", "float16")
 
         if len(pool.fragment) >= 2:
             fragB = pool.fragment[-2]
-            code = [
-                f"{sp}for i, j in T.Parallel(block_M, block_N):",
-                f"{sp}    {fragA.name}[i, j] = {fragA.name}[i, j] * {fragB.name}[i, j]",
-            ]
             old_ref_a = fragA.torch_ref
             old_ref_b = fragB.torch_ref
             fragA.torch_ref = f"({old_ref_a}).float() * ({old_ref_b}).float()"
@@ -572,8 +485,7 @@ class ElemwiseMulOpGen(OpGenBase):
                 op_kind="elemwise_mul",
                 inputs=[fragA, fragB],
                 outputs=[fragA],
-                attrs={"use_global": False},
-                tilelang_code=code,
+                attrs={"use_global": False, "frag_a_name": fragA.name, "frag_b_name": fragB.name},
                 torch_ref_update=f"{fragA.name} *= {fragB.name}",
             )
         else:
@@ -590,21 +502,6 @@ class ElemwiseMulOpGen(OpGenBase):
             )
             pool.add("global_in", d_global)
 
-            d_frag = TileBuffer(
-                name=d_frag_name,
-                shape=(block_M, block_N),
-                dtype=dtype,
-                scope="fragment",
-                torch_ref=f"{d_name}.float()",
-            )
-
-            code = [
-                f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
-                f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
-                f"{sp}for i, j in T.Parallel(block_M, block_N):",
-                f"{sp}    {fragA.name}[i, j] = {fragA.name}[i, j] * {d_frag_name}[i, j]",
-            ]
-
             old_ref_a = fragA.torch_ref
             fragA.torch_ref = f"({old_ref_a}).float() * {d_name}.float()"
 
@@ -612,8 +509,7 @@ class ElemwiseMulOpGen(OpGenBase):
                 op_kind="elemwise_mul",
                 inputs=[fragA, d_global],
                 outputs=[fragA],
-                attrs={"use_global": True, "d_idx": d_idx, "d_frag_name": d_frag_name},
-                tilelang_code=code,
+                attrs={"use_global": True, "d_idx": d_idx, "d_name": d_name, "d_frag_name": d_frag_name, "frag_a_name": fragA.name},
                 torch_ref_update=f"{fragA.name} *= {d_name}",
             )
 
@@ -628,7 +524,6 @@ class ElemwiseMaxOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         fragA = pool.fragment[-1]
-        sp = "                "
         block_M = params["block_M"]
         block_N = params["block_N"]
         dtype = params.get("dtype", "float16")
@@ -646,13 +541,6 @@ class ElemwiseMaxOpGen(OpGenBase):
         )
         pool.add("global_in", d_global)
 
-        code = [
-            f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
-            f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {fragA.name}[i, j] = {fragA.name}[i, j] if {fragA.name}[i, j] > {d_frag_name}[i, j] else {d_frag_name}[i, j]",
-        ]
-
         old_ref_a = fragA.torch_ref
         fragA.torch_ref = f"torch.maximum(({old_ref_a}).float(), {d_name}.float())"
 
@@ -660,8 +548,7 @@ class ElemwiseMaxOpGen(OpGenBase):
             op_kind="elemwise_max",
             inputs=[fragA, d_global],
             outputs=[fragA],
-            attrs={"d_idx": d_idx, "d_frag_name": d_frag_name},
-            tilelang_code=code,
+            attrs={"d_idx": d_idx, "d_name": d_name, "d_frag_name": d_frag_name, "frag_a_name": fragA.name},
             torch_ref_update=f"{fragA.name} = max({fragA.name}, {d_name})",
         )
 
@@ -677,19 +564,6 @@ class SoftmaxOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
-        acc_dtype = "float32" if params.get("dtype", "float16") == "float16" else params.get("dtype", "float32")
-
-        code = [
-            f"{sp}max_local = T.alloc_fragment((block_M,), accum_dtype)",
-            f"{sp}sum_local = T.alloc_fragment((block_M,), accum_dtype)",
-            f"{sp}T.reduce_max({frag.name}, max_local, dim=1, clear=True)",
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag.name}[i, j] = T.exp({frag.name}[i, j] - max_local[i])",
-            f"{sp}T.reduce_sum({frag.name}, sum_local, dim=1, clear=True)",
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag.name}[i, j] = {frag.name}[i, j] / sum_local[i]",
-        ]
 
         old_ref = frag.torch_ref
         frag.torch_ref = f"torch.softmax(({old_ref}).float(), dim=-1)"
@@ -698,8 +572,7 @@ class SoftmaxOpGen(OpGenBase):
             op_kind="softmax",
             inputs=[frag],
             outputs=[frag],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name},
             torch_ref_update=f"{frag.name} = softmax({frag.name})",
         )
 
@@ -714,20 +587,12 @@ class ReduceSumOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
         acc_dtype = "float32" if params.get("dtype", "float16") == "float16" else params.get("dtype", "float32")
 
         n = self._next_name(counter, "reduce")
         reduce_name = f"C_reduce_{counter['reduce']}"
 
-        code = [
-            f"{sp}{reduce_name} = T.alloc_fragment((block_M,), accum_dtype)",
-            f"{sp}T.reduce_sum({frag.name}, {reduce_name}, dim=1, clear=True)",
-            f"{sp}T.copy({reduce_name}, C[by * block_M])",
-        ]
-
         old_ref = frag.torch_ref
-        # Create a new reduced fragment buffer
         reduced_buf = TileBuffer(
             name=reduce_name,
             shape=(params["block_M"],),
@@ -735,15 +600,13 @@ class ReduceSumOpGen(OpGenBase):
             scope="fragment",
             torch_ref=f"({old_ref}).float().sum(dim=-1)",
         )
-        # Replace the fragment in pool
         pool.fragment[-1] = reduced_buf
 
         return KernelStep(
             op_kind="reduce_sum",
             inputs=[frag],
             outputs=[reduced_buf],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name, "reduce_name": reduce_name},
             torch_ref_update=f"{reduce_name} = sum({frag.name})",
         )
 
@@ -758,17 +621,10 @@ class ReduceMaxOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
         acc_dtype = "float32" if params.get("dtype", "float16") == "float16" else params.get("dtype", "float32")
 
         n = self._next_name(counter, "reduce")
         reduce_name = f"C_reduce_{counter['reduce']}"
-
-        code = [
-            f"{sp}{reduce_name} = T.alloc_fragment((block_M,), accum_dtype)",
-            f"{sp}T.reduce_max({frag.name}, {reduce_name}, dim=1, clear=True)",
-            f"{sp}T.copy({reduce_name}, C[by * block_M])",
-        ]
 
         old_ref = frag.torch_ref
         reduced_buf = TileBuffer(
@@ -784,8 +640,7 @@ class ReduceMaxOpGen(OpGenBase):
             op_kind="reduce_max",
             inputs=[frag],
             outputs=[reduced_buf],
-            attrs={},
-            tilelang_code=code,
+            attrs={"frag_name": frag.name, "reduce_name": reduce_name},
             torch_ref_update=f"{reduce_name} = max({frag.name})",
         )
 
@@ -811,7 +666,6 @@ class IfEpilogueOpGen(OpGenBase):
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         import random
         frag = pool.fragment[-1]
-        sp = "                "
 
         # Randomly pick two different branch ops to create variety
         branch_pairs = [
@@ -822,15 +676,6 @@ class IfEpilogueOpGen(OpGenBase):
         ]
         a_op, b_op, a_desc, b_desc = random.choice(branch_pairs)
 
-        # Map op name to TileLang expression
-        def tl_expr(op, val):
-            if op == "exp":  return f"T.exp(T.cast({val}, T.float32))"
-            if op == "sqrt": return f"T.sqrt(T.abs({val}))"
-            if op == "neg":  return f"-{val}"
-            if op == "scale": return f"{val} * 0.5"
-            if op == "abs":  return f"T.abs({val})"
-            return val
-
         def torch_expr(op, val):
             if op == "exp":  return f"torch.exp({val}.clamp(-80,80))"
             if op == "sqrt": return f"torch.sqrt({val}.abs())"
@@ -840,16 +685,6 @@ class IfEpilogueOpGen(OpGenBase):
             return val
 
         threshold = round(random.uniform(-1.0, 1.0), 3)
-        v = frag.name
-
-        code = [
-            f"{sp}# if_epilogue: {a_desc} if x>{threshold} else {b_desc}",
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    if {v}[i, j] > {threshold}:",
-            f"{sp}        {v}[i, j] = {tl_expr(a_op, v + '[i, j]')}",
-            f"{sp}    else:",
-            f"{sp}        {v}[i, j] = {tl_expr(b_op, v + '[i, j]')}",
-        ]
 
         old_ref = frag.torch_ref
         frag.torch_ref = (
@@ -862,8 +697,7 @@ class IfEpilogueOpGen(OpGenBase):
             op_kind="if_epilogue",
             inputs=[frag],
             outputs=[frag],
-            attrs={"threshold": threshold, "branch_a": a_op, "branch_b": b_op},
-            tilelang_code=code,
+            attrs={"threshold": threshold, "branch_a": a_op, "branch_b": b_op, "frag_name": frag.name},
             torch_ref_update=f"{frag.name} = if({a_op},{b_op})",
         )
 
@@ -887,28 +721,13 @@ class DoublePipelineOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
         n = self._next_name(counter, "dp")
         c2 = f"C2_{counter['dp']}"
         a2 = f"A2_{counter['dp']}"
         b2 = f"B2_{counter['dp']}"
         acc_dtype = params.get("acc_dtype", "float32")
         num_stages = params.get("num_stages", 2)
-
-        code = [
-            f"{sp}# double_pipeline: second K-loop over latter half of K",
-            f"{sp}{a2} = T.alloc_shared((block_M, block_K), dtype)",
-            f"{sp}{b2} = T.alloc_shared((block_K, block_N), dtype)",
-            f"{sp}{c2} = T.alloc_fragment((block_M, block_N), accum_dtype)",
-            f"{sp}T.clear({c2})",
-            f"{sp}for k in T.Pipelined(T.ceildiv(K, block_K), num_stages={num_stages}):",
-            f"{sp}    T.copy(A[by * block_M, k * block_K], {a2})",
-            f"{sp}    T.copy(B[k * block_K, bx * block_N], {b2})",
-            f"{sp}    T.gemm({a2}, {b2}, {c2})",
-            f"{sp}# add second pipeline result to first",
-            f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag.name}[i, j] = {frag.name}[i, j] + {c2}[i, j]",
-        ]
+        loop_kind = params.get("loop_kind", "pipelined")
 
         old_ref = frag.torch_ref
         A_ref = pool.global_in[0].torch_ref
@@ -923,8 +742,12 @@ class DoublePipelineOpGen(OpGenBase):
             op_kind="double_pipeline",
             inputs=[frag],
             outputs=[frag],
-            attrs={},
-            tilelang_code=code,
+            attrs={
+                "a2_name": a2, "b2_name": b2, "c2_name": c2,
+                "frag_name": frag.name,
+                "num_stages": num_stages,
+                "loop_kind": loop_kind,
+            },
             torch_ref_update=f"{frag.name} += second_gemm",
         )
 
@@ -949,37 +772,19 @@ class AccumulateReduceOpGen(OpGenBase):
 
     def apply(self, pool: TileValuePool, params: dict, counter: dict) -> Optional[KernelStep]:
         frag = pool.fragment[-1]
-        sp = "                "
-        acc_dtype = params.get("acc_dtype", "float32")
         n = self._next_name(counter, "ar")
         row_stat = f"row_stat_{counter['ar']}"
 
-        # Randomly pick: subtract row_max (online softmax numerics) or divide by row_sum
         import random
         mode = random.choice(["subtract_max", "divide_sum"])
 
+        old_ref = frag.torch_ref
         if mode == "subtract_max":
-            code = [
-                f"{sp}# accumulate_reduce: subtract row max (online softmax pattern)",
-                f"{sp}{row_stat} = T.alloc_fragment((block_M,), accum_dtype)",
-                f"{sp}T.reduce_max({frag.name}, {row_stat}, dim=1, clear=True)",
-                f"{sp}for i, j in T.Parallel(block_M, block_N):",
-                f"{sp}    {frag.name}[i, j] = {frag.name}[i, j] - {row_stat}[i]",
-            ]
-            old_ref = frag.torch_ref
             frag.torch_ref = (
                 f"(({old_ref}).float() - "
                 f"({old_ref}).float().max(dim=-1, keepdim=True).values)"
             )
         else:  # divide_sum
-            code = [
-                f"{sp}# accumulate_reduce: divide by row sum (normalization pattern)",
-                f"{sp}{row_stat} = T.alloc_fragment((block_M,), accum_dtype)",
-                f"{sp}T.reduce_sum({frag.name}, {row_stat}, dim=1, clear=True)",
-                f"{sp}for i, j in T.Parallel(block_M, block_N):",
-                f"{sp}    {frag.name}[i, j] = {frag.name}[i, j] / ({row_stat}[i] + 1e-6)",
-            ]
-            old_ref = frag.torch_ref
             frag.torch_ref = (
                 f"(({old_ref}).float() / "
                 f"({old_ref}).float().sum(dim=-1, keepdim=True).clamp(min=1e-6))"
@@ -989,8 +794,7 @@ class AccumulateReduceOpGen(OpGenBase):
             op_kind="accumulate_reduce",
             inputs=[frag],
             outputs=[frag],
-            attrs={"mode": mode},
-            tilelang_code=code,
+            attrs={"mode": mode, "row_stat_name": row_stat, "frag_name": frag.name},
             torch_ref_update=f"{frag.name} = {mode}",
         )
 

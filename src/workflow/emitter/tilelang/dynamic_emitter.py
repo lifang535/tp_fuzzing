@@ -1,5 +1,8 @@
 """
 TileLang Dynamic Sequence Emitter — Translates DynamicSequence IR to TileLang executable code.
+
+Code generation is driven entirely by step.op_kind + step.attrs + step.inputs/outputs,
+keeping the IR layer (src/ir/dynamic_seq.py) backend-agnostic.
 """
 
 from src.ir import DynamicSequence, TileBuffer, KernelStep
@@ -33,6 +36,288 @@ class TileLangDynamicEmitter:
         lines.append(f"    print('{seq.name} PASSED')")
         lines.append("    print('ALL PASSED')")
         return "\n".join(lines)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Step-level code generation
+    # ─────────────────────────────────────────────────────────────────────────
+
+    def _emit_step_code(self, step: KernelStep, seq: DynamicSequence) -> list:
+        """Dispatch to per-op emitter based on step.op_kind."""
+        sp = "                "
+        kind = step.op_kind
+        if kind == "gemm":
+            return self._emit_gemm(step, sp)
+        elif kind == "copy_g2s":
+            return self._emit_copy_g2s(step, sp)
+        elif kind == "copy_s2f":
+            return self._emit_copy_s2f(step, sp)
+        elif kind == "copy_f2g":
+            return self._emit_copy_f2g(step, sp)
+        elif kind == "scale":
+            return self._emit_scale(step, sp)
+        elif kind == "exp":
+            return self._emit_exp(step, sp)
+        elif kind == "sqrt":
+            return self._emit_sqrt(step, sp)
+        elif kind == "elemwise_add":
+            return self._emit_elemwise_add(step, sp)
+        elif kind == "elemwise_mul":
+            return self._emit_elemwise_mul(step, sp)
+        elif kind == "elemwise_max":
+            return self._emit_elemwise_max(step, sp)
+        elif kind == "softmax":
+            return self._emit_softmax(step, sp)
+        elif kind == "reduce_sum":
+            return self._emit_reduce_sum(step, sp)
+        elif kind == "reduce_max":
+            return self._emit_reduce_max(step, sp)
+        elif kind == "if_epilogue":
+            return self._emit_if_epilogue(step, sp)
+        elif kind == "double_pipeline":
+            return self._emit_double_pipeline(step, sp)
+        elif kind == "accumulate_reduce":
+            return self._emit_accumulate_reduce(step, sp)
+        else:
+            return [f"{sp}# unknown op: {kind}"]
+
+    def _emit_gemm(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        a_shared = a["a_shared"]
+        b_shared = a["b_shared"]
+        c_local = a["c_local"]
+        loop_kind = a["loop_kind"]
+        num_stages = a["num_stages"]
+
+        lines = [
+            f"{sp}{a_shared} = T.alloc_shared((block_M, block_K), dtype)",
+            f"{sp}{b_shared} = T.alloc_shared((block_K, block_N), dtype)",
+            f"{sp}{c_local} = T.alloc_fragment((block_M, block_N), accum_dtype)",
+            f"{sp}T.clear({c_local})",
+        ]
+        if loop_kind == "pipelined":
+            lines.append(f"{sp}for k in T.Pipelined(T.ceildiv(K, block_K), num_stages={num_stages}):")
+        else:
+            lines.append(f"{sp}for k in T.serial(T.ceildiv(K, block_K)):")
+        lines += [
+            f"{sp}    T.copy(A[by * block_M, k * block_K], {a_shared})",
+            f"{sp}    T.copy(B[k * block_K, bx * block_N], {b_shared})",
+            f"{sp}    T.gemm({a_shared}, {b_shared}, {c_local})",
+        ]
+        return lines
+
+    def _emit_copy_g2s(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        shared_name = a["shared_name"]
+        src_name = a["src_name"]
+        return [
+            f"{sp}{shared_name} = T.alloc_shared((block_M, block_N), dtype)",
+            f"{sp}T.copy({src_name}[by * block_M, bx * block_N], {shared_name})",
+        ]
+
+    def _emit_copy_s2f(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        frag_name = a["frag_name"]
+        src_name = a["src_name"]
+        return [
+            f"{sp}{frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
+            f"{sp}T.copy({src_name}, {frag_name})",
+        ]
+
+    def _emit_copy_f2g(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        frag_name = a["frag_name"]
+        return [
+            f"{sp}T.copy({frag_name}, C[by * block_M, bx * block_N])",
+        ]
+
+    def _emit_scale(self, step: KernelStep, sp: str) -> list:
+        frag = step.attrs["frag_name"]
+        alpha = step.attrs["alpha"]
+        return [
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag}[i, j] = {frag}[i, j] * {alpha}",
+        ]
+
+    def _emit_exp(self, step: KernelStep, sp: str) -> list:
+        frag = step.attrs["frag_name"]
+        return [
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag}[i, j] = T.exp(T.cast({frag}[i, j], T.float32))",
+        ]
+
+    def _emit_sqrt(self, step: KernelStep, sp: str) -> list:
+        frag = step.attrs["frag_name"]
+        return [
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag}[i, j] = T.sqrt(T.abs({frag}[i, j]))",
+        ]
+
+    def _emit_elemwise_add(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        if not a.get("use_global", False):
+            frag_a = a["frag_a_name"]
+            frag_b = a["frag_b_name"]
+            return [
+                f"{sp}for i, j in T.Parallel(block_M, block_N):",
+                f"{sp}    {frag_a}[i, j] = {frag_a}[i, j] + {frag_b}[i, j]",
+            ]
+        else:
+            frag_a = a["frag_a_name"]
+            d_name = a["d_name"]
+            d_frag_name = a["d_frag_name"]
+            return [
+                f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
+                f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
+                f"{sp}for i, j in T.Parallel(block_M, block_N):",
+                f"{sp}    {frag_a}[i, j] = {frag_a}[i, j] + {d_frag_name}[i, j]",
+            ]
+
+    def _emit_elemwise_mul(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        if not a.get("use_global", False):
+            frag_a = a["frag_a_name"]
+            frag_b = a["frag_b_name"]
+            return [
+                f"{sp}for i, j in T.Parallel(block_M, block_N):",
+                f"{sp}    {frag_a}[i, j] = {frag_a}[i, j] * {frag_b}[i, j]",
+            ]
+        else:
+            frag_a = a["frag_a_name"]
+            d_name = a["d_name"]
+            d_frag_name = a["d_frag_name"]
+            return [
+                f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
+                f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
+                f"{sp}for i, j in T.Parallel(block_M, block_N):",
+                f"{sp}    {frag_a}[i, j] = {frag_a}[i, j] * {d_frag_name}[i, j]",
+            ]
+
+    def _emit_elemwise_max(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        frag_a = a["frag_a_name"]
+        d_name = a["d_name"]
+        d_frag_name = a["d_frag_name"]
+        return [
+            f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
+            f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag_a}[i, j] = {frag_a}[i, j] if {frag_a}[i, j] > {d_frag_name}[i, j] else {d_frag_name}[i, j]",
+        ]
+
+    def _emit_softmax(self, step: KernelStep, sp: str) -> list:
+        frag = step.attrs["frag_name"]
+        return [
+            f"{sp}max_local = T.alloc_fragment((block_M,), accum_dtype)",
+            f"{sp}sum_local = T.alloc_fragment((block_M,), accum_dtype)",
+            f"{sp}T.reduce_max({frag}, max_local, dim=1, clear=True)",
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag}[i, j] = T.exp({frag}[i, j] - max_local[i])",
+            f"{sp}T.reduce_sum({frag}, sum_local, dim=1, clear=True)",
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag}[i, j] = {frag}[i, j] / sum_local[i]",
+        ]
+
+    def _emit_reduce_sum(self, step: KernelStep, sp: str) -> list:
+        frag = step.attrs["frag_name"]
+        reduce_name = step.attrs["reduce_name"]
+        return [
+            f"{sp}{reduce_name} = T.alloc_fragment((block_M,), accum_dtype)",
+            f"{sp}T.reduce_sum({frag}, {reduce_name}, dim=1, clear=True)",
+            f"{sp}T.copy({reduce_name}, C[by * block_M])",
+        ]
+
+    def _emit_reduce_max(self, step: KernelStep, sp: str) -> list:
+        frag = step.attrs["frag_name"]
+        reduce_name = step.attrs["reduce_name"]
+        return [
+            f"{sp}{reduce_name} = T.alloc_fragment((block_M,), accum_dtype)",
+            f"{sp}T.reduce_max({frag}, {reduce_name}, dim=1, clear=True)",
+            f"{sp}T.copy({reduce_name}, C[by * block_M])",
+        ]
+
+    def _emit_if_epilogue(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        threshold = a["threshold"]
+        branch_a = a["branch_a"]
+        branch_b = a["branch_b"]
+        v = a["frag_name"]
+
+        def tl_expr(op, val):
+            if op == "exp":  return f"T.exp(T.cast({val}, T.float32))"
+            if op == "sqrt": return f"T.sqrt(T.abs({val}))"
+            if op == "neg":  return f"-{val}"
+            if op == "scale": return f"{val} * 0.5"
+            if op == "abs":  return f"T.abs({val})"
+            return val
+
+        a_desc = {"exp": "exp(x)", "sqrt": "sqrt(|x|)", "neg": "-x", "scale": "x*0.5", "abs": "|x|"}.get(branch_a, branch_a)
+        b_desc = {"exp": "exp(x)", "sqrt": "sqrt(|x|)", "neg": "-x", "scale": "x*0.5", "abs": "|x|"}.get(branch_b, branch_b)
+
+        return [
+            f"{sp}# if_epilogue: {a_desc} if x>{threshold} else {b_desc}",
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    if {v}[i, j] > {threshold}:",
+            f"{sp}        {v}[i, j] = {tl_expr(branch_a, v + '[i, j]')}",
+            f"{sp}    else:",
+            f"{sp}        {v}[i, j] = {tl_expr(branch_b, v + '[i, j]')}",
+        ]
+
+    def _emit_double_pipeline(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        a2 = a["a2_name"]
+        b2 = a["b2_name"]
+        c2 = a["c2_name"]
+        frag = a["frag_name"]
+        num_stages = a["num_stages"]
+        loop_kind = a.get("loop_kind", "pipelined")
+
+        lines = [
+            f"{sp}# double_pipeline: second K-loop over latter half of K",
+            f"{sp}{a2} = T.alloc_shared((block_M, block_K), dtype)",
+            f"{sp}{b2} = T.alloc_shared((block_K, block_N), dtype)",
+            f"{sp}{c2} = T.alloc_fragment((block_M, block_N), accum_dtype)",
+            f"{sp}T.clear({c2})",
+        ]
+        if loop_kind == "pipelined":
+            lines.append(f"{sp}for k in T.Pipelined(T.ceildiv(K, block_K), num_stages={num_stages}):")
+        else:
+            lines.append(f"{sp}for k in T.serial(T.ceildiv(K, block_K)):")
+        lines += [
+            f"{sp}    T.copy(A[by * block_M, k * block_K], {a2})",
+            f"{sp}    T.copy(B[k * block_K, bx * block_N], {b2})",
+            f"{sp}    T.gemm({a2}, {b2}, {c2})",
+            f"{sp}# add second pipeline result to first",
+            f"{sp}for i, j in T.Parallel(block_M, block_N):",
+            f"{sp}    {frag}[i, j] = {frag}[i, j] + {c2}[i, j]",
+        ]
+        return lines
+
+    def _emit_accumulate_reduce(self, step: KernelStep, sp: str) -> list:
+        a = step.attrs
+        mode = a["mode"]
+        row_stat = a["row_stat_name"]
+        frag = a["frag_name"]
+
+        if mode == "subtract_max":
+            return [
+                f"{sp}# accumulate_reduce: subtract row max (online softmax pattern)",
+                f"{sp}{row_stat} = T.alloc_fragment((block_M,), accum_dtype)",
+                f"{sp}T.reduce_max({frag}, {row_stat}, dim=1, clear=True)",
+                f"{sp}for i, j in T.Parallel(block_M, block_N):",
+                f"{sp}    {frag}[i, j] = {frag}[i, j] - {row_stat}[i]",
+            ]
+        else:  # divide_sum
+            return [
+                f"{sp}# accumulate_reduce: divide by row sum (normalization pattern)",
+                f"{sp}{row_stat} = T.alloc_fragment((block_M,), accum_dtype)",
+                f"{sp}T.reduce_sum({frag}, {row_stat}, dim=1, clear=True)",
+                f"{sp}for i, j in T.Parallel(block_M, block_N):",
+                f"{sp}    {frag}[i, j] = {frag}[i, j] / ({row_stat}[i] + 1e-6)",
+            ]
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Kernel-level emission
+    # ─────────────────────────────────────────────────────────────────────────
 
     def _emit_kernel(self, seq: DynamicSequence) -> str:
         td = _torch_dtype(seq.dtype)
@@ -73,8 +358,7 @@ class TileLangDynamicEmitter:
         # Collect all kernel body lines from steps
         body_lines = []
         for step in seq.steps:
-            if step.tilelang_code:
-                body_lines.extend(step.tilelang_code)
+            body_lines.extend(self._emit_step_code(step, seq))
 
         # Grid
         if has_terminal_softmax:
