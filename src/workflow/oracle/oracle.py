@@ -60,6 +60,14 @@ class BugReport:
             self.root_cause = "shared_memory_overflow"
         elif "dtype mismatch" in err:
             self.root_cause = "dtype_mismatch"
+        # TileLang PTX/async copy boundary bug:
+        # cp.async requires transfer size in {4,8,16} bytes, triggered when
+        # tile boundary produces non-aligned byte counts (e.g. N < block_N).
+        elif "isvalidcpasync" in err or "ptx_cp_async" in err or "cp_async" in err:
+            self.root_cause = "ptx_async_boundary"
+        # Generic TVM codegen internal error (catch-all for TileLang compiler bugs)
+        elif "internalerror" in err and ("check failed" in err or "codegen" in err):
+            self.root_cause = "tilelang_codegen_error"
 
         # Triton errors
         elif "multiple values for argument" in err:
