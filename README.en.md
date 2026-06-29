@@ -101,6 +101,10 @@ The tool automatically classifies discovered bugs into 10 categories:
 | `segfault` | Compiler segmentation fault |
 | `other` | Uncategorized errors |
 
+> **Notes:**
+> - `wrong_result` does not necessarily indicate a genuine compiler bug. In chained computations (multi-step pipelines or dynamic sequences), accumulated floating-point rounding errors can cause the output to diverge slightly from the reference, leading to false positives.
+> - Hardware constraint failures such as `shared_memory_overflow` may be partially caused by inaccurate hardware introspection at the constraint-checking stage — if the actual GPU's shared memory capacity cannot be read reliably, the generator may produce kernels that exceed the true hardware limit.
+
 ---
 
 ## Output Structure

@@ -101,6 +101,10 @@ python main.py --seed 42 -n 100 --easy-shape -o results/easy
 | `segfault` | 编译器 segfault |
 | `other` | 其他未分类错误 |
 
+> **说明：**
+> - `wrong_result` 不一定意味着编译器存在真实 bug。对于链式计算（如多步 pipeline 或动态序列），浮点运算的累积误差可能导致结果与参考实现存在细微差异，从而被误判为错误。
+> - `shared_memory_overflow` 等硬件约束类错误，部分情况下是由于运行环境无法准确获取 GPU 硬件信息（如 shared memory 容量），导致约束检查阶段使用了不准确的上限，生成了实际上超出当前硬件限制的 kernel。
+
 ---
 
 ## 输出结构
