@@ -86,12 +86,20 @@ python main.py --seed 42 -n 100 --easy-shape -o results/easy
 
 ### Bug 分类
 
-工具自动将发现的 bug 分类为：
-- `wrong_result`：计算结果不正确
-- `compile_crash`：编译崩溃
-- `runtime_crash`：运行时崩溃
-- `timeout`：执行超时
-- `warp_partition` / `shared_memory_overflow` / `alignment` 等硬件约束 bug
+工具自动将发现的 bug 分类为 10 种：
+
+| 分类 | 含义 |
+|------|------|
+| `wrong_result` | 计算结果与参考不一致 |
+| `dtype_mismatch` | 编译器内部类型推断与声明不一致 |
+| `warp_partition` | warp 分区无法满足 block 大小 |
+| `shared_memory_overflow` | shared memory 超出硬件限制 |
+| `layout_inference` | TileLang layout inference 找不到可用布局 |
+| `dtype_unsupported_op` | 算子不支持指定类型（如 tl.sqrt 不支持 fp16） |
+| `codegen_duplicate_arg` | 代码生成的 kernel 参数重复 |
+| `triton_compile_error` | Triton 编译阶段报错 |
+| `segfault` | 编译器 segfault |
+| `other` | 其他未分类错误 |
 
 ---
 
@@ -99,7 +107,7 @@ python main.py --seed 42 -n 100 --easy-shape -o results/easy
 
 ```
 results/
-└── 2026.06.26-10.30_tilelang_seed=42/
+└── 2026.06.26-10.30_tilelang_hard-shape_seed=42/
     ├── summary.json                              # 统计摘要
     ├── passed/
     │   ├── passed_single_gemm.py                 # 单算子通过
