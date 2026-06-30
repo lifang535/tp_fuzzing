@@ -9,6 +9,7 @@ Usage:
     python main.py --list-kernels            # List all supported kernel kinds
     python main.py --easy-shape              # Use power-of-2 shapes (higher pass rate)
     python main.py --easy-shape --seed 42 -n 100  # Compare pass rate with regular mode
+    python main.py --resume 2026.06.29-16.41_triton_easy-shape_seed=42 -n 200  # Continue previous run
 """
 
 import argparse
@@ -33,6 +34,13 @@ def main():
              "These are always divisible by block sizes, so fewer kernels hit "
              "boundary code paths. Useful to measure baseline pass rate or "
              "build a clean seed corpus.",
+    )
+    parser.add_argument(
+        "--resume", type=str, default=None,
+        help="Resume fuzzing from a previous run directory. Pass the directory name "
+             "(e.g., '2026.06.29-16.41_triton_easy-shape_seed=42') or full path. "
+             "Historical results are loaded to avoid re-testing, and new results "
+             "are appended to the same directory.",
     )
     args = parser.parse_args()
 
@@ -79,7 +87,7 @@ def main():
             print(emitter.emit(program))
         return 0
 
-    fuzzer = TileSmith(config)
+    fuzzer = TileSmith(config, resume_dir=args.resume)
     fuzzer.run(num_iterations=args.iterations, verbose=not args.quiet)
     return 0
 

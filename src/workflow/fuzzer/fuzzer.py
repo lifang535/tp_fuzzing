@@ -40,26 +40,137 @@ class FuzzingStats:
 
 
 class TileSmith:
-    def __init__(self, config: Config = DEFAULT_CONFIG):
+    def __init__(self, config: Config = DEFAULT_CONFIG, resume_dir: str = None):
         self.config = config
         self.backend = config.backends[0] if config.backends else "tilelang"
         self.generator = ProgramGenerator(config, backend=self.backend)
         self.mutator = Mutator(config, backend=self.backend)
         self.oracle = Oracle(config, backend=self.backend)
         self.stats = FuzzingStats()
-        self.seed_pool: List = []  # holds TileProgram or TilePipeline
+        self.seed_pool: List = []
         self.tested_configs: set = set()
         self.known_root_causes: dict = {}
 
         if config.seed is not None:
             random.seed(config.seed)
 
-        timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M")
-        seed_str = f"seed={config.seed}" if config.seed is not None else "seed=random"
-        shape_str = "easy-shape" if config.easy_shape else "hard-shape"
-        run_dir_name = f"{timestamp}_{self.backend}_{shape_str}_{seed_str}"
-        self.output_dir = Path(config.output_dir) / run_dir_name
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        if resume_dir:
+            # Resume mode: use the specified directory
+            self.output_dir = Path(resume_dir)
+            if not self.output_dir.exists():
+                # Try as a subdirectory name under output_dir
+                self.output_dir = Path(config.output_dir) / resume_dir
+            if not self.output_dir.exists():
+                raise FileNotFoundError(f"Cannot find resume directory: {resume_dir}")
+            # Validate consistency: parse dir name and check against current config
+            self._validate_resume_config(self.output_dir.name, config)
+            self._load_history()
+        else:
+            # New run: create fresh directory
+            timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M")
+            seed_str = f"seed={config.seed}" if config.seed is not None else "seed=random"
+            shape_str = "easy-shape" if config.easy_shape else "hard-shape"
+            run_dir_name = f"{timestamp}_{self.backend}_{shape_str}_{seed_str}"
+            self.output_dir = Path(config.output_dir) / run_dir_name
+            self.output_dir.mkdir(parents=True, exist_ok=True)
+
+    def _load_history(self):
+        """Load previous results from resume directory to avoid re-testing."""
+        # Load summary if exists
+        summary_path = self.output_dir / "summary.json"
+        if summary_path.exists():
+            with open(summary_path) as f:
+                s = json.load(f)
+            self.known_root_causes = s.get("root_causes", {})
+            self.stats.total_tested = s.get("total_tested", 0)
+            self.stats.total_generated = s.get("total_tested", 0)
+
+        # Rebuild tested_configs from passed + failed files
+        # Each .json file contains params that we've already tested
+        count = 0
+        for subdir in ["passed", "failed"]:
+            search_dir = self.output_dir / subdir
+            if not search_dir.exists():
+                continue
+            for json_file in search_dir.rglob("*.json"):
+                try:
+                    with open(json_file) as f:
+                        d = json.load(f)
+                    params = d.get("params", {})
+                    if params:
+                        # Build a sig tuple from params to mark as tested
+                        sig = tuple(sorted(
+                            (k, v) for k, v in params.items()
+                            if isinstance(v, (int, float, str, bool))
+                        ))
+                        self.tested_configs.add(sig)
+                        count += 1
+                except (json.JSONDecodeError, KeyError):
+                    pass
+
+        print(f"[resume] Loaded {count} historical results from {self.output_dir}")
+        print(f"[resume] Known root causes: {self.known_root_causes}")
+        print(f"[resume] Previous tests: {self.stats.total_tested}")
+        print()
+
+    @staticmethod
+    def _validate_resume_config(dir_name: str, config):
+        """
+        Parse the directory name and check that current config matches.
+        Directory format: {date-time}_{backend}_{easy/hard-shape}_seed={seed}
+        Example: 2026.06.29-16.41_triton_easy-shape_seed=42
+        """
+        parts = dir_name.split("_")
+        # Expected parts: [date-time, backend, shape-mode, seed=N]
+        # But date-time itself contains no underscore (uses dots and dash)
+        # So: parts[0]=date-time, parts[1]=backend, parts[2]=shape-mode, parts[3]=seed=N
+        # However backend could be "tilelang" or "triton" (no underscore)
+
+        errors = []
+
+        # Check backend
+        current_backend = config.backends[0] if config.backends else "tilelang"
+        if current_backend not in dir_name:
+            errors.append(
+                f"Backend mismatch: directory is for "
+                f"'{'triton' if 'triton' in dir_name else 'tilelang'}' "
+                f"but current config uses '{current_backend}'"
+            )
+
+        # Check easy/hard shape
+        if "easy-shape" in dir_name and not config.easy_shape:
+            errors.append(
+                "Shape mode mismatch: directory used --easy-shape but current config does not"
+            )
+        elif "hard-shape" in dir_name and config.easy_shape:
+            errors.append(
+                "Shape mode mismatch: directory used hard-shape but current config uses --easy-shape"
+            )
+
+        # Check seed
+        if "seed=" in dir_name:
+            dir_seed_str = dir_name.split("seed=")[-1]
+            if dir_seed_str == "random":
+                if config.seed is not None:
+                    errors.append(
+                        f"Seed mismatch: directory used seed=random but current config uses seed={config.seed}"
+                    )
+            else:
+                try:
+                    dir_seed = int(dir_seed_str)
+                    if config.seed is not None and config.seed != dir_seed:
+                        errors.append(
+                            f"Seed mismatch: directory used seed={dir_seed} but current config uses seed={config.seed}"
+                        )
+                except ValueError:
+                    pass
+
+        if errors:
+            msg = "\n".join(f"  - {e}" for e in errors)
+            raise ValueError(
+                f"Resume directory '{dir_name}' does not match current config:\n{msg}\n"
+                f"Please use matching --backend, --easy-shape, and --seed options."
+            )
 
     def run(self, num_iterations: int = 1000, verbose: bool = True):
         if verbose:
