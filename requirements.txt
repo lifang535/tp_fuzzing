@@ -1,0 +1,10 @@
+# Core
+torch==2.4.0+cu124
+tilelang==0.1.11
+
+# Triton backend (optional — only needed when using --backend triton)
+triton==3.0.0
+
+# Hardware detection (optional — improves shared memory limit accuracy)
+# Falls back to a lookup table if not installed
+pynvml
