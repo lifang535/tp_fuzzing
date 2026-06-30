@@ -21,7 +21,12 @@ from src.workflow.fuzzer import TileSmith
 
 def main():
     parser = argparse.ArgumentParser(description="TileSmith: Tile Program Fuzzer")
-    parser.add_argument("-n", "--iterations", type=int, default=100)
+    parser.add_argument(
+        "-n", "--iterations", type=int, default=100,
+        help="Number of NEW test cases to execute (dedup-skipped cases do not count). "
+             "When resuming, the fuzzer replays the generation sequence until this many "
+             "previously-unseen programs have been tested.",
+    )
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("-o", "--output", type=str, default="results")
     parser.add_argument("--dump", action="store_true", help="Print generated code without executing")

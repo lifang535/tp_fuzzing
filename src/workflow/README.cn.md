@@ -160,21 +160,35 @@ subprocess.run([python3, tmp_file], timeout=compile_timeout + execute_timeout)
 
 ---
 
-### 第五步：结果保存（fuzzer/）
+### 第五步：结果保存与 Resume（fuzzer/）
 
 ```
-results/{日期-时间}_{backend}/
+results/{日期-时间}_{backend}_{easy/hard-shape}_seed={seed}/
 ├── passed/
 │   ├── passed_{op_label}.py       可复现的通过代码
 │   └── passed_{op_label}.json     元信息
 ├── failed/
-│   ├── {root_cause}/
-│   │   ├── failed_{op_label}.py   可复现的失败代码
-│   │   └── failed_{op_label}.json 元信息（含完整错误信息）
-└── summary.json                    统计汇总
+│   └── {root_cause}/
+│       ├── failed_{op_label}.py   可复现的失败代码
+│       └── failed_{op_label}.json 元信息（含完整错误信息）
+└── summary.json                    累计统计汇总（跨所有 session）
 ```
 
-**op_label 命名规则**：单 op 用类型名（`gemm`），多步序列用 `+` 连接（`gemm+exp+softmax`）。
+**op_label 命名规则**：单 op 用类型名（`gemm`），多步序列用 `+` 连接（`gemm+exp+softmax`）。  
+文件名相同时覆盖写，因此磁盘文件数 ≤ 触发次数。
+
+**Resume 机制**：`--resume <dir>` 恢复已有实验，核心步骤：
+
+1. **配置校验**：解析目录名，检查 backend / easy-shape / seed 与当前命令行参数一致，不一致立即报错
+2. **重建 `tested_configs`**：遍历 `passed/` 和 `failed/` 下所有 `.json`，用 `_make_sig_from_dict` 还原 sig（与运行时 `_make_sig` 格式完全一致），加入去重集合
+3. **恢复 `known_root_causes`**：先从 `failed/` 目录文件数统计，再用 `summary.json` 的触发次数覆盖（`max(文件数, summary值)`），确保 dup bug 的计数不丢失
+4. **恢复 `total_tested`**：取 `max(文件总数, summary["total_tested"])`，因为去重跳过的 case 不写文件但计入测试数
+5. **继续运行**：新测试写入同一目录，session 结束后将累计统计写回 `summary.json`
+
+**`summary.json` 字段语义**：
+- `bugs_total` = `sum(root_causes.values())`，触发次数之和
+- `bugs_unique` = `len(root_causes)`，不同 root_cause 类型数
+- `root_causes` 存触发次数（不是文件数），是 resume 时恢复 `known_root_causes` 的权威来源
 
 ---
 

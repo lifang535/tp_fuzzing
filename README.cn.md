@@ -61,6 +61,9 @@ python main.py --easy-shape -n 200
 # 对比两种模式的 pass 率
 python main.py --seed 42 -n 100 -o results/normal
 python main.py --seed 42 -n 100 --easy-shape -o results/easy
+
+# 恢复上一次未完成的实验（继续写入同一个结果目录）
+python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 -n 200 --seed 42 --easy-shape
 ```
 
 ---
@@ -112,7 +115,7 @@ python main.py --seed 42 -n 100 --easy-shape -o results/easy
 ```
 results/
 └── 2026.06.26-10.30_tilelang_hard-shape_seed=42/
-    ├── summary.json                              # 统计摘要
+    ├── summary.json                              # 统计摘要（累计跨所有 session）
     ├── passed/
     │   ├── passed_single_gemm.py                 # 单算子通过
     │   ├── passed_pipeline_gemm+scale+add.py     # 模板 pipeline 通过
@@ -128,6 +131,42 @@ results/
 - 单算子：`{passed/failed}_single_{op}`，如 `passed_single_gemm`
 - 模板 pipeline：`{passed/failed}_pipeline_{op1}+{op2}+...`，如 `failed_pipeline_gemm+softmax`
 - 动态序列：`{passed/failed}_dynamic_{op1}+{op2}+...`，如 `passed_dynamic_gemm+exp+copy_f2g`
+
+`summary.json` 格式：
+
+```json
+{
+  "backend": "tilelang",
+  "total_tested": 2011,
+  "bugs_total": 940,
+  "bugs_unique": 4,
+  "root_causes": {
+    "wrong_result": 859,
+    "shared_memory_overflow": 2,
+    "warp_partition": 5,
+    "dtype_mismatch": 74
+  }
+}
+```
+
+- `bugs_total`：所有 root_cause 触发次数之和（`sum(root_causes.values())`）
+- `bugs_unique`：不同 root_cause 类型数（`len(root_causes)`）
+- `root_causes`：每种 root_cause 的触发次数（包含未保存到文件的 dup）
+
+## Resume 机制
+
+`--resume` 将新测试写入已有结果目录，接续上一次中断的实验：
+
+```bash
+python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 \
+               -n 1000 --seed 42 --easy-shape
+```
+
+- `--backend`、`--easy-shape`、`--seed` 必须与目录名一致，否则报错
+- 从 `passed/` 和 `failed/` 目录重建已测试集合，避免重复测试
+- 从 `summary.json` 恢复每个 root_cause 的精确触发次数（包含未写文件的 dup）
+- 若 `summary.json` 不存在（上次中断过早），则从文件数推断，不影响继续运行
+- 所有统计数字（`total_tested`、`bugs_total` 等）在 session 结束后累计写回 `summary.json`
 
 ---
 

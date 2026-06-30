@@ -154,7 +154,7 @@ Error classification (generic + backend-specific):
 
 ---
 
-### Step 5: Result Storage (fuzzer/)
+### Step 5: Result Storage and Resume (fuzzer/)
 
 ```
 results/{date-time}_{backend}_{easy/hard-shape}_seed={seed}/
@@ -167,8 +167,23 @@ results/{date-time}_{backend}_{easy/hard-shape}_seed={seed}/
 │       ├── failed_single_{op}.py
 │       ├── failed_pipeline_{op1}+{op2}+...py
 │       └── failed_dynamic_{op1}+{op2}+...py
-└── summary.json
+└── summary.json          # cumulative across all sessions
 ```
+
+Files with the same name are overwritten, so the file count on disk may be less than the total trigger count.
+
+**Resume** (`--resume <dir>`) continues an existing run. Steps:
+
+1. **Config validation**: parse the directory name and verify backend / easy-shape / seed match the current CLI flags — mismatch raises an error immediately
+2. **Rebuild `tested_configs`**: scan all `.json` files under `passed/` and `failed/`, reconstruct each sig via `_make_sig_from_dict` (same format as the runtime `_make_sig`), add to the dedup set
+3. **Restore `known_root_causes`**: count files per root_cause directory, then overlay with `summary.json` trigger counts (`max(file_count, summary_count)`) so dup-bug counts lost between sessions are recovered
+4. **Restore `total_tested`**: `max(total_file_count, summary["total_tested"])` — deduped-and-skipped configs are counted as tested but not saved to files
+5. **Continue**: new tests are appended to the same directory; cumulative stats are written back to `summary.json` at session end
+
+**`summary.json` field semantics**:
+- `bugs_total` = `sum(root_causes.values())` — total trigger count
+- `bugs_unique` = `len(root_causes)` — number of distinct root cause categories
+- `root_causes` stores trigger counts (not file counts) and is the authoritative source for restoring `known_root_causes` on resume
 
 ---
 

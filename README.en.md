@@ -61,6 +61,9 @@ python main.py --easy-shape -n 200
 # Compare pass rates between modes
 python main.py --seed 42 -n 100 -o results/normal
 python main.py --seed 42 -n 100 --easy-shape -o results/easy
+
+# Resume a previous (possibly incomplete) run into the same result directory
+python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 -n 200 --seed 42 --easy-shape
 ```
 
 ---
@@ -112,7 +115,7 @@ The tool automatically classifies discovered bugs into 10 categories:
 ```
 results/
 └── 2026.06.26-10.30_tilelang_hard-shape_seed=42/
-    ├── summary.json                              # Statistics summary
+    ├── summary.json                              # Cumulative statistics (across all sessions)
     ├── passed/
     │   ├── passed_single_gemm.py                 # Single-op pass
     │   ├── passed_pipeline_gemm+scale+add.py     # Template pipeline pass
@@ -128,6 +131,42 @@ Filename convention:
 - Single op: `{passed/failed}_single_{op}`, e.g. `passed_single_gemm`
 - Template pipeline: `{passed/failed}_pipeline_{op1}+{op2}+...`, e.g. `failed_pipeline_gemm+softmax`
 - Dynamic sequence: `{passed/failed}_dynamic_{op1}+{op2}+...`, e.g. `passed_dynamic_gemm+exp+copy_f2g`
+
+`summary.json` format:
+
+```json
+{
+  "backend": "tilelang",
+  "total_tested": 2011,
+  "bugs_total": 940,
+  "bugs_unique": 4,
+  "root_causes": {
+    "wrong_result": 859,
+    "shared_memory_overflow": 2,
+    "warp_partition": 5,
+    "dtype_mismatch": 74
+  }
+}
+```
+
+- `bugs_total`: sum of all root_cause trigger counts (`sum(root_causes.values())`)
+- `bugs_unique`: number of distinct root cause categories (`len(root_causes)`)
+- `root_causes`: trigger count per category, including duplicate bugs not saved to disk
+
+## Resume
+
+`--resume` continues a previous run into the same result directory:
+
+```bash
+python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 \
+               -n 1000 --seed 42 --easy-shape
+```
+
+- `--backend`, `--easy-shape`, and `--seed` must match the directory name — mismatch raises an error
+- Rebuilds the tested-config set from `passed/` and `failed/` files to skip already-tested programs
+- Restores exact root_cause trigger counts from `summary.json` (including dup bugs not written to files)
+- If `summary.json` is absent (run was interrupted before saving), falls back to file counts
+- All statistics are written back to `summary.json` cumulatively at the end of each session
 
 ---
 
