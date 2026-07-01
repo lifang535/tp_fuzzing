@@ -1,0 +1,26 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "gemm",
+    "scale",
+    "sqrt",
+    "softmax"
+  ],
+  "params": {
+    "M": 256,
+    "N": 64,
+    "K": 512,
+    "block_M": 256,
+    "block_N": 64,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 2,
+    "pipeline": [
+      "gemm",
+      "scale",
+      "sqrt",
+      "softmax"
+    ]
+  },
+  "dtype": "float32"
+}

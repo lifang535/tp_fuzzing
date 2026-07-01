@@ -1,0 +1,25 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_add->copy_g2s->if_epilogue->reduce_max",
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 1024,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "elemwise_add",
+      "copy_g2s",
+      "if_epilogue",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_ojvh_ndy.py\", line 94, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_ojvh_ndy.py\", line 91, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_reduce]: max_diff=169534232353079955494250682221150076928.000000, relative_err=7316.6507",
+  "timestamp": 1782822568.8697693
+}

@@ -1,0 +1,34 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "double_pipeline",
+    "accumulate_reduce",
+    "elemwise_max",
+    "copy_g2s",
+    "elemwise_add",
+    "exp",
+    "copy_f2g"
+  ],
+  "params": {
+    "M": 557,
+    "N": 794,
+    "K": 1315,
+    "block_M": 128,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "accumulate_reduce",
+      "elemwise_max",
+      "copy_g2s",
+      "elemwise_add",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32"
+}

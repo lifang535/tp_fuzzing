@@ -1,0 +1,28 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "accumulate_reduce",
+    "exp",
+    "elemwise_add",
+    "copy_f2g"
+  ],
+  "params": {
+    "M": 1833,
+    "N": 1392,
+    "K": 1613,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "accumulate_reduce",
+      "exp",
+      "elemwise_add",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32"
+}

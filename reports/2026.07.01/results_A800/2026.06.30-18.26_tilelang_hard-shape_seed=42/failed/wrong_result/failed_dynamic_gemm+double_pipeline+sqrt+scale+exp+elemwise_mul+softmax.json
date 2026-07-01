@@ -1,0 +1,27 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->double_pipeline->sqrt->scale->exp->elemwise_mul->softmax",
+  "params": {
+    "M": 566,
+    "N": 64,
+    "K": 648,
+    "block_M": 16,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "sqrt",
+      "scale",
+      "exp",
+      "elemwise_mul",
+      "softmax"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_2h8y5hjd.py\", line 102, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_2h8y5hjd.py\", line 99, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [dynamic_softmax]: max_diff=1.000000",
+  "timestamp": 1782830469.7035425
+}

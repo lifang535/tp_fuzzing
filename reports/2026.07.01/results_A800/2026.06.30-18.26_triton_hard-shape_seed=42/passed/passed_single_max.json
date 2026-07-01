@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "max",
+  "params": {
+    "M": 154,
+    "N": 1578,
+    "K": 915,
+    "block_M": 64,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "max",
+    "alpha": 1.0
+  },
+  "dtype": "float16"
+}

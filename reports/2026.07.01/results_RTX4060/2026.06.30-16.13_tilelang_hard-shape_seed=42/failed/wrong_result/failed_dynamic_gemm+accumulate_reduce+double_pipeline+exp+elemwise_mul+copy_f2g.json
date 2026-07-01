@@ -1,0 +1,26 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->accumulate_reduce->double_pipeline->exp->elemwise_mul->copy_f2g",
+  "params": {
+    "M": 898,
+    "N": 432,
+    "K": 619,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "accumulate_reduce",
+      "double_pipeline",
+      "exp",
+      "elemwise_mul",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_xejbcttp.py\", line 97, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_xejbcttp.py\", line 94, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=1999818719232.0000, relative_err=2664.5037",
+  "timestamp": 1782862360.3878381
+}

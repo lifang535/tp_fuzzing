@@ -1,0 +1,22 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "copy_f2g"
+  ],
+  "params": {
+    "M": 1671,
+    "N": 1172,
+    "K": 1638,
+    "block_M": 64,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32"
+}

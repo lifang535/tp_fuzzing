@@ -1,0 +1,28 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->if_epilogue->double_pipeline->elemwise_add->accumulate_reduce->scale->elemwise_add->copy_f2g",
+  "params": {
+    "M": 597,
+    "N": 530,
+    "K": 1767,
+    "block_M": 16,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "if_epilogue",
+      "double_pipeline",
+      "elemwise_add",
+      "accumulate_reduce",
+      "scale",
+      "elemwise_add",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_sjduaoyc.py\", line 105, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_sjduaoyc.py\", line 102, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=340086885057178468663828603823873589248.0000, relative_err=477281.7905",
+  "timestamp": 1782830691.956674
+}

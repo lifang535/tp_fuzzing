@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->add->add->reduce_min",
+  "params": {
+    "M": 1035,
+    "N": 64,
+    "K": 847,
+    "block_M": 32,
+    "block_N": 64,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "add",
+      "add",
+      "reduce_min"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_68of7w4z.py\", line 92, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_68of7w4z.py\", line 89, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline_reduce]: max_diff=79.161606, relative_err=1.1637",
+  "timestamp": 1782826251.2443016
+}

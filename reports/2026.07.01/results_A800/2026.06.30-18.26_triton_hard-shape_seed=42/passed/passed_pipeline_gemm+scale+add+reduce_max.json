@@ -1,0 +1,26 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "gemm",
+    "scale",
+    "add",
+    "reduce_max"
+  ],
+  "params": {
+    "M": 1621,
+    "N": 32,
+    "K": 683,
+    "block_M": 128,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 3,
+    "pipeline": [
+      "gemm",
+      "scale",
+      "add",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float32"
+}

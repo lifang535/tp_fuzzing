@@ -1,0 +1,21 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "softmax",
+  "params": {
+    "M": 128,
+    "N": 32,
+    "K": 512,
+    "block_M": 16,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "loop_kind": "pipelined",
+    "compute_kind": "softmax",
+    "alpha": 1.0
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_j_ufyxvv.py\", line 65, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_j_ufyxvv.py\", line 62, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [softmax]: max_diff=0.384703",
+  "timestamp": 1782855844.3399968
+}

@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->sqrt->reduce_sum",
+  "params": {
+    "M": 2048,
+    "N": 16,
+    "K": 256,
+    "block_M": 64,
+    "block_N": 16,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 2,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "sqrt",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_e362jw97.py\", line 87, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_e362jw97.py\", line 84, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_reduce]: max_diff=53984786120704.000000, relative_err=36.1661",
+  "timestamp": 1782846744.9207177
+}

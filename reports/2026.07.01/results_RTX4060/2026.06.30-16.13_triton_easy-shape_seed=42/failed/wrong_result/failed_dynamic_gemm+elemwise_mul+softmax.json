@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_mul->softmax",
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 128,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "softmax"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_4hcdcgud.py\", line 92, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_4hcdcgud.py\", line 89, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_softmax]: max_diff=1.000000",
+  "timestamp": 1782811824.654457
+}

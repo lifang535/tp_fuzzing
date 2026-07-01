@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_add->exp->copy_f2g",
+  "params": {
+    "M": 1343,
+    "N": 64,
+    "K": 166,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "elemwise_add",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_sicrgaxj.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_sicrgaxj.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=47299757648000504037376.0000, relative_err=1490.2507",
+  "timestamp": 1782830386.4432774
+}

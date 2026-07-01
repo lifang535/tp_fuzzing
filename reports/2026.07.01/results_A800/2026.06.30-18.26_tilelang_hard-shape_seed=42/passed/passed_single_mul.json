@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "mul",
+  "params": {
+    "M": 303,
+    "N": 1925,
+    "K": 1915,
+    "block_M": 256,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "mul",
+    "alpha": 1.0
+  },
+  "dtype": "float16"
+}

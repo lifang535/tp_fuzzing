@@ -1,0 +1,26 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->exp->exp->elemwise_add->sqrt->copy_f2g",
+  "params": {
+    "M": 557,
+    "N": 343,
+    "K": 16,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "exp",
+      "exp",
+      "elemwise_add",
+      "sqrt",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_z5h9lcds.py\", line 95, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_z5h9lcds.py\", line 92, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic]: max_diff=4829066064308469760.0000, relative_err=185.9107",
+  "timestamp": 1782842008.2507973
+}

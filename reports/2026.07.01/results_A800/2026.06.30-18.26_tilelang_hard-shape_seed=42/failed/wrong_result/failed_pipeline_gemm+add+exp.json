@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->add->exp",
+  "params": {
+    "M": 835,
+    "N": 835,
+    "K": 167,
+    "block_M": 64,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 256,
+    "num_stages": 4,
+    "pipeline": [
+      "gemm",
+      "add",
+      "exp"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_2qbwj39n.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_2qbwj39n.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=799004578651664732389376.0000, relative_err=11250.7394",
+  "timestamp": 1782868493.3731983
+}

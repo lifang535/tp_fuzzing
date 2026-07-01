@@ -1,0 +1,26 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "sqrt",
+    "if_epilogue",
+    "reduce_sum"
+  ],
+  "params": {
+    "M": 2048,
+    "N": 256,
+    "K": 128,
+    "block_M": 64,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "sqrt",
+      "if_epilogue",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float32"
+}

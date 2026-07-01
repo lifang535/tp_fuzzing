@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->double_pipeline->elemwise_max->reduce_sum",
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 2048,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "elemwise_max",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_jtrlrewl.py\", line 101, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_jtrlrewl.py\", line 98, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_reduce]: max_diff=3213.368164, relative_err=1.3764",
+  "timestamp": 1782826814.789499
+}

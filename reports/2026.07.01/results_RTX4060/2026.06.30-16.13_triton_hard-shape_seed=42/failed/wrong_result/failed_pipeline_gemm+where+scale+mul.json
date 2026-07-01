@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->where->scale->mul",
+  "params": {
+    "M": 1498,
+    "N": 128,
+    "K": 1084,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "where",
+      "scale",
+      "mul"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_jhoca5el.py\", line 103, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_jhoca5el.py\", line 100, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline]: max_diff=10.6853, relative_err=0.1396",
+  "timestamp": 1782834747.3935838
+}

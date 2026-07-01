@@ -1,0 +1,10 @@
+{
+  "backend": "triton",
+  "total_tested": 20000,
+  "bugs_total": 3004,
+  "bugs_unique": 2,
+  "root_causes": {
+    "wrong_result": 2995,
+    "shared_memory_overflow": 9
+  }
+}

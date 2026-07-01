@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->copy_g2s->exp->copy_f2g",
+  "params": {
+    "M": 128,
+    "N": 256,
+    "K": 128,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "copy_g2s",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_wm2e4unt.py\", line 80, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_wm2e4unt.py\", line 77, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=850853818600039383040.0000, relative_err=1328.8062",
+  "timestamp": 1782868730.8658214
+}

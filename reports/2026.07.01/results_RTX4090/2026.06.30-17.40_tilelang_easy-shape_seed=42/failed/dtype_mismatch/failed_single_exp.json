@@ -1,0 +1,21 @@
+{
+  "bug_type": "runtime_crash",
+  "root_cause": "dtype_mismatch",
+  "compute_kind": "exp",
+  "params": {
+    "M": 128,
+    "N": 512,
+    "K": 512,
+    "block_M": 64,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "pipelined",
+    "compute_kind": "exp",
+    "alpha": 1.0
+  },
+  "dtype": "float16",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_a9jdwh9x.py\", line 68, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_a9jdwh9x.py\", line 61, in test_kernel_0\n    B = kernel(A)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/kernel.py\", line 203, in __call__\n    return self.torch_function(*args, **kwds)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/adapter/tvm_ffi.py\", line 253, in func\n    executable(*tensor_list)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tvm_ffi/module.py\", line 299, in __call__\n    return self.main(*args)\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in __tvm_ffi_main\n  File \"<unknown>\", line 0, in __tvm_ffi_impl\nRuntimeError: kernel impl input A dtype mismatch, expected float32",
+  "timestamp": 1782870416.4936852
+}

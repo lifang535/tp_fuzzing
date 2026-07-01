@@ -1,0 +1,25 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->sqrt->accumulate_reduce->scale->copy_f2g",
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 512,
+    "block_M": 64,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "sqrt",
+      "accumulate_reduce",
+      "scale",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_dfo44k08.py\", line 85, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_dfo44k08.py\", line 82, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=0.1315, relative_err=8.8711",
+  "timestamp": 1782831231.066226
+}

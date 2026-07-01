@@ -1,0 +1,28 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "copy_g2s",
+    "copy_s2f",
+    "if_epilogue",
+    "copy_f2g"
+  ],
+  "params": {
+    "M": 1043,
+    "N": 688,
+    "K": 688,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "copy_g2s",
+      "copy_s2f",
+      "if_epilogue",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32"
+}

@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->add",
+  "params": {
+    "M": 2048,
+    "N": 512,
+    "K": 128,
+    "block_M": 128,
+    "block_N": 64,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 4,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "add"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_9n5uy7z0.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_9n5uy7z0.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=43415974926546127290368.0000, relative_err=346932.7350",
+  "timestamp": 1782852375.7680821
+}

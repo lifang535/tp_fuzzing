@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->where",
+  "params": {
+    "M": 658,
+    "N": 1463,
+    "K": 308,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "where"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_frmampe2.py\", line 94, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_frmampe2.py\", line 91, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline]: max_diff=2829720658263066450867424710419808256.0000, relative_err=37255.1422",
+  "timestamp": 1782830269.7248926
+}

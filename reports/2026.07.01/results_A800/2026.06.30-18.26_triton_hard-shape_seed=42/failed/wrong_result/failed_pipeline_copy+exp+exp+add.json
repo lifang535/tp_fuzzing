@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:copy->exp->exp->add",
+  "params": {
+    "M": 1959,
+    "N": 1793,
+    "K": 1073,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "copy",
+      "exp",
+      "exp",
+      "add"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_zskji36v.py\", line 89, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_zskji36v.py\", line 86, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_chain]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_chain]: max_diff=547625059298595101446575784722432.000000, relative_err=9.4404",
+  "timestamp": 1782829472.2904444
+}

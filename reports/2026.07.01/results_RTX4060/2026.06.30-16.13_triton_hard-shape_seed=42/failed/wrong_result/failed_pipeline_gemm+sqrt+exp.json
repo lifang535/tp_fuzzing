@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->sqrt->exp",
+  "params": {
+    "M": 870,
+    "N": 1552,
+    "K": 2020,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "sqrt",
+      "exp"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_igcbzwyc.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_igcbzwyc.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline]: max_diff=13056.2500, relative_err=4.4121",
+  "timestamp": 1782834545.2141516
+}

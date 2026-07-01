@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->sqrt->softmax",
+  "params": {
+    "M": 2048,
+    "N": 256,
+    "K": 256,
+    "block_M": 32,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 3,
+    "pipeline": [
+      "gemm",
+      "sqrt",
+      "softmax"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_67865hbz.py\", line 87, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_67865hbz.py\", line 84, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [pipeline_softmax]: max_diff=0.280171",
+  "timestamp": 1782862053.0386055
+}

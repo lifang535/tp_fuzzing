@@ -1,0 +1,26 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_max->double_pipeline->accumulate_reduce->sqrt->reduce_max",
+  "params": {
+    "M": 137,
+    "N": 16,
+    "K": 1707,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "elemwise_max",
+      "double_pipeline",
+      "accumulate_reduce",
+      "sqrt",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_hgm9li0q.py\", line 105, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_hgm9li0q.py\", line 102, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_reduce]: max_diff=12556.516602, relative_err=2.4311",
+  "timestamp": 1782863010.9776647
+}

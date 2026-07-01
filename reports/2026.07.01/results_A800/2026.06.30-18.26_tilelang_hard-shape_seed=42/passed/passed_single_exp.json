@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "exp",
+  "params": {
+    "M": 380,
+    "N": 114,
+    "K": 1206,
+    "block_M": 256,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 3,
+    "loop_kind": "pipelined",
+    "compute_kind": "exp",
+    "alpha": 1.0
+  },
+  "dtype": "float16"
+}

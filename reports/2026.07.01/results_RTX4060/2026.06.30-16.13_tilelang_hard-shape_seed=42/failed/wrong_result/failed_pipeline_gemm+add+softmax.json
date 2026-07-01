@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->add->softmax",
+  "params": {
+    "M": 1543,
+    "N": 16,
+    "K": 1765,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "add",
+      "softmax"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_jmugqfhb.py\", line 91, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_jmugqfhb.py\", line 88, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [pipeline_softmax]: max_diff=0.010299",
+  "timestamp": 1782854957.4763687
+}

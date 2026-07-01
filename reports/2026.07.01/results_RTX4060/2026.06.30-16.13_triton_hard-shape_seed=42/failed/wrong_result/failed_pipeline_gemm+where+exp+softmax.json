@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->where->exp->softmax",
+  "params": {
+    "M": 826,
+    "N": 64,
+    "K": 95,
+    "block_M": 16,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "where",
+      "exp",
+      "softmax"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_5ktyv3mh.py\", line 95, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_5ktyv3mh.py\", line 92, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_softmax]: max_diff=1.000000",
+  "timestamp": 1782821241.5904136
+}

@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->reduce_max",
+  "params": {
+    "M": 128,
+    "N": 64,
+    "K": 512,
+    "block_M": 128,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_zp5rm50n.py\", line 85, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_zp5rm50n.py\", line 82, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_reduce]: max_diff=7877789302106327051013232135745044480.000000, relative_err=7.4322",
+  "timestamp": 1782870032.3187842
+}

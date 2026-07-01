@@ -1,0 +1,26 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "copy",
+    "exp",
+    "scale",
+    "sqrt"
+  ],
+  "params": {
+    "M": 128,
+    "N": 1024,
+    "K": 256,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "pipeline": [
+      "copy",
+      "exp",
+      "scale",
+      "sqrt"
+    ]
+  },
+  "dtype": "float16"
+}

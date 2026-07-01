@@ -1,0 +1,121 @@
+import tilelang
+import tilelang.language as T
+import torch
+
+# Correctness thresholds — set by TileSmith config
+_THRESHOLDS = {
+    'gemm_fp16':      0.1,
+    'gemm_fp32':      0.05,
+    'reduce':         0.1,
+    'softmax':        0.01,
+    'copy':           1e-05,
+    'transpose':      1e-05,
+    'elemwise':       0.001,
+    'pipeline_fp16':  0.1,
+    'pipeline_fp32':  0.05,
+}
+
+def _finite_compare(C, ref):
+    """Compare only finite elements. Skip inf/nan overflow cases."""
+    import torch
+    c_f32 = C.to(torch.float32)
+    r_f32 = ref.to(torch.float32)
+    mask = c_f32.isfinite() & r_f32.isfinite()
+    if not mask.any():
+        return 0.0, 1.0, 0.0  # all overflow → skip
+    diff = (c_f32[mask] - r_f32[mask]).abs()
+    max_diff = diff.max().item()
+    ref_norm = r_f32[mask].abs().mean().item() + 1e-6
+    relative_err = max_diff / ref_norm
+    return max_diff, ref_norm, relative_err
+
+
+def kernel_0():
+    M, N, K = 788, 128, 1281
+    block_M, block_N, block_K = 256, 128, 8
+    dtype = "float32"
+    accum_dtype = "float32"
+
+    @tilelang.jit(out_idx=[4], target="cuda")
+    def kernel_func(M, N, K, block_M, block_N, block_K):
+        @T.prim_func
+        def impl(
+            A: T.Buffer((M, K), dtype),
+            B: T.Buffer((K, N), dtype),
+            D2: T.Buffer((M, N), dtype),
+            D3: T.Buffer((M, N), dtype),
+            C: T.Buffer((M, N), dtype),
+        ):
+            with T.Kernel(1, T.ceildiv(M, block_M), threads=128) as (bx, by):
+                A_shared_1 = T.alloc_shared((block_M, block_K), dtype)
+                B_shared_1 = T.alloc_shared((block_K, block_N), dtype)
+                C_local_1 = T.alloc_fragment((block_M, block_N), accum_dtype)
+                T.clear(C_local_1)
+                for k in T.Pipelined(T.ceildiv(K, block_K), num_stages=4):
+                    T.copy(A[by * block_M, k * block_K], A_shared_1)
+                    T.copy(B[k * block_K, bx * block_N], B_shared_1)
+                    T.gemm(A_shared_1, B_shared_1, C_local_1)
+                D2_local = T.alloc_fragment((block_M, block_N), dtype)
+                T.copy(D2[by * block_M, bx * block_N], D2_local)
+                for i, j in T.Parallel(block_M, block_N):
+                    C_local_1[i, j] = C_local_1[i, j] * D2_local[i, j]
+                # double_pipeline: second K-loop over latter half of K
+                A2_1 = T.alloc_shared((block_M, block_K), dtype)
+                B2_1 = T.alloc_shared((block_K, block_N), dtype)
+                C2_1 = T.alloc_fragment((block_M, block_N), accum_dtype)
+                T.clear(C2_1)
+                for k in T.Pipelined(T.ceildiv(K, block_K), num_stages=4):
+                    T.copy(A[by * block_M, k * block_K], A2_1)
+                    T.copy(B[k * block_K, bx * block_N], B2_1)
+                    T.gemm(A2_1, B2_1, C2_1)
+                # add second pipeline result to first
+                for i, j in T.Parallel(block_M, block_N):
+                    C_local_1[i, j] = C_local_1[i, j] + C2_1[i, j]
+                # if_epilogue: sqrt(|x|) if x>-0.275 else x*0.5
+                for i, j in T.Parallel(block_M, block_N):
+                    if C2_1[i, j] > -0.275:
+                        C2_1[i, j] = T.sqrt(T.abs(C2_1[i, j]))
+                    else:
+                        C2_1[i, j] = C2_1[i, j] * 0.5
+                for i, j in T.Parallel(block_M, block_N):
+                    C2_1[i, j] = T.exp(T.cast(C2_1[i, j], T.float32))
+                D3_local = T.alloc_fragment((block_M, block_N), dtype)
+                T.copy(D3[by * block_M, bx * block_N], D3_local)
+                for i, j in T.Parallel(block_M, block_N):
+                    C2_1[i, j] = C2_1[i, j] if C2_1[i, j] > D3_local[i, j] else D3_local[i, j]
+                # accumulate_reduce: divide by row sum (normalization pattern)
+                row_stat_1 = T.alloc_fragment((block_M,), accum_dtype)
+                T.reduce_sum(C2_1, row_stat_1, dim=1, clear=True)
+                for i, j in T.Parallel(block_M, block_N):
+                    C2_1[i, j] = C2_1[i, j] / (row_stat_1[i] + 1e-6)
+                max_local = T.alloc_fragment((block_M,), accum_dtype)
+                sum_local = T.alloc_fragment((block_M,), accum_dtype)
+                T.reduce_max(C2_1, max_local, dim=1, clear=True)
+                for i, j in T.Parallel(block_M, block_N):
+                    C2_1[i, j] = T.exp(C2_1[i, j] - max_local[i])
+                T.reduce_sum(C2_1, sum_local, dim=1, clear=True)
+                for i, j in T.Parallel(block_M, block_N):
+                    C2_1[i, j] = C2_1[i, j] / sum_local[i]
+        return impl
+
+    return kernel_func(M, N, K, block_M, block_N, block_K)
+
+
+def test_kernel_0():
+    M, N, K = 788, 128, 1281
+    kernel = kernel_0()
+    A = torch.randn(M, K, dtype=torch.float32, device='cuda')
+    B = torch.randn(K, N, dtype=torch.float32, device='cuda')
+    D2 = torch.randn(M, N, dtype=torch.float32, device='cuda')
+    D3 = torch.randn(M, N, dtype=torch.float32, device='cuda')
+    C = kernel(A, B, D2, D3)
+    # Reference computation
+    ref = torch.softmax((((torch.maximum((torch.exp((torch.where((((A.float()) @ (B.float()))).float() > -0.275, torch.sqrt((((A.float()) @ (B.float()))).float().abs()), ((((A.float()) @ (B.float()))).float() * 0.5))).float())).float(), D3.float())).float() / (torch.maximum((torch.exp((torch.where((((A.float()) @ (B.float()))).float() > -0.275, torch.sqrt((((A.float()) @ (B.float()))).float().abs()), ((((A.float()) @ (B.float()))).float() * 0.5))).float())).float(), D3.float())).float().sum(dim=-1, keepdim=True).clamp(min=1e-6))).float(), dim=-1)
+    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()
+    if max_diff > _THRESHOLDS["softmax"]:
+        raise RuntimeError(f"WRONG RESULT [dynamic_softmax]: max_diff={max_diff:.6f}")
+
+if __name__ == '__main__':
+    test_kernel_0()
+    print('kernel_0 PASSED')
+    print('ALL PASSED')

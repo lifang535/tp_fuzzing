@@ -1,0 +1,22 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->reduce_sum",
+  "params": {
+    "M": 512,
+    "N": 128,
+    "K": 512,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_62rm4qwn.py\", line 77, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_62rm4qwn.py\", line 74, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic_reduce]: max_diff=812.752747, relative_err=3.8296",
+  "timestamp": 1782857215.6543238
+}

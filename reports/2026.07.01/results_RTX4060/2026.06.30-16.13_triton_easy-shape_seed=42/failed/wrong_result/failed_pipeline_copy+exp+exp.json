@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:copy->exp->exp",
+  "params": {
+    "M": 512,
+    "N": 512,
+    "K": 1024,
+    "block_M": 16,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "pipeline": [
+      "copy",
+      "exp",
+      "exp"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith__zlv3y3u.py\", line 79, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith__zlv3y3u.py\", line 76, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_chain]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_chain]: max_diff=1445913965885324161082177093632.000000, relative_err=2.3224",
+  "timestamp": 1782855264.5586667
+}

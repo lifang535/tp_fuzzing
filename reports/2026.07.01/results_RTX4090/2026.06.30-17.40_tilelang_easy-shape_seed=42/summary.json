@@ -1,0 +1,13 @@
+{
+  "backend": "tilelang",
+  "total_tested": 10000,
+  "bugs_total": 1935,
+  "bugs_unique": 5,
+  "root_causes": {
+    "wrong_result": 1578,
+    "dtype_mismatch": 339,
+    "warp_partition": 13,
+    "shared_memory_overflow": 4,
+    "ptx_async_boundary": 1
+  }
+}

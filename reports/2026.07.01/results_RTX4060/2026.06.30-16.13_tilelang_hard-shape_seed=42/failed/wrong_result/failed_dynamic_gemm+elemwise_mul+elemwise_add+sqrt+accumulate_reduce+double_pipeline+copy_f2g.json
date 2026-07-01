@@ -1,0 +1,27 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_mul->elemwise_add->sqrt->accumulate_reduce->double_pipeline->copy_f2g",
+  "params": {
+    "M": 1937,
+    "N": 1734,
+    "K": 1610,
+    "block_M": 256,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "elemwise_add",
+      "sqrt",
+      "accumulate_reduce",
+      "double_pipeline",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith__jlps5q_.py\", line 107, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith__jlps5q_.py\", line 104, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=296.7438, relative_err=9.2680",
+  "timestamp": 1782837915.0697467
+}

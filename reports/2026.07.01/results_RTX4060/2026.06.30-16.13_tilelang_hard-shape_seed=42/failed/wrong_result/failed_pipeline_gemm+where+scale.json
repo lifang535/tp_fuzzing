@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->where->scale",
+  "params": {
+    "M": 669,
+    "N": 1680,
+    "K": 253,
+    "block_M": 128,
+    "block_N": 64,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 2,
+    "pipeline": [
+      "gemm",
+      "where",
+      "scale"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_xl_rwkoi.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_xl_rwkoi.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=509.6327, relative_err=10.7274",
+  "timestamp": 1782844996.19407
+}

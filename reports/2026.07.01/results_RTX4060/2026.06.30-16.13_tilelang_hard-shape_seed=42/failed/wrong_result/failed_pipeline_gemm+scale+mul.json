@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->scale->mul",
+  "params": {
+    "M": 852,
+    "N": 852,
+    "K": 1942,
+    "block_M": 128,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "scale",
+      "mul"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_7m2cma26.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_7m2cma26.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=4774.2051, relative_err=27.4260",
+  "timestamp": 1782827336.8168037
+}

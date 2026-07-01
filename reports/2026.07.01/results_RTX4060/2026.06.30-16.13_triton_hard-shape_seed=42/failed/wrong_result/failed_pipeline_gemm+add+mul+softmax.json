@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->add->mul->softmax",
+  "params": {
+    "M": 1405,
+    "N": 32,
+    "K": 1454,
+    "block_M": 128,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 4,
+    "pipeline": [
+      "gemm",
+      "add",
+      "mul",
+      "softmax"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_ogv6vyj3.py\", line 102, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_ogv6vyj3.py\", line 99, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_softmax]: max_diff=1.000000",
+  "timestamp": 1782839685.374538
+}

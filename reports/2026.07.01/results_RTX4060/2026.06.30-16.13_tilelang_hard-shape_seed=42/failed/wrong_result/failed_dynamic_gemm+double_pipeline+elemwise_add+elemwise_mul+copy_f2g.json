@@ -1,0 +1,25 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->double_pipeline->elemwise_add->elemwise_mul->copy_f2g",
+  "params": {
+    "M": 1242,
+    "N": 1211,
+    "K": 195,
+    "block_M": 256,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "elemwise_add",
+      "elemwise_mul",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_g__lhzty.py\", line 92, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_g__lhzty.py\", line 89, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=30534.5410, relative_err=25.9553",
+  "timestamp": 1782817007.6530757
+}

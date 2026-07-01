@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->if_epilogue->scale->copy_f2g",
+  "params": {
+    "M": 16,
+    "N": 1454,
+    "K": 1328,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "if_epilogue",
+      "scale",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_phtyhouu.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_phtyhouu.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=258777098280472152831334099193887195136.0000, relative_err=310199.1192",
+  "timestamp": 1782860534.574156
+}

@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_mul->exp->copy_f2g",
+  "params": {
+    "M": 2048,
+    "N": 512,
+    "K": 32,
+    "block_M": 64,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_zbz6kl6c.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_zbz6kl6c.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=8811983080699586665208872960.0000, relative_err=45917.5104",
+  "timestamp": 1782859157.3277693
+}

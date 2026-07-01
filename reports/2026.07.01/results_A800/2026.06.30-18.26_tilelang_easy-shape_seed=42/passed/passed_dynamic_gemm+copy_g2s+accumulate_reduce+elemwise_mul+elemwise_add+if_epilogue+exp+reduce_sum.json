@@ -1,0 +1,34 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "copy_g2s",
+    "accumulate_reduce",
+    "elemwise_mul",
+    "elemwise_add",
+    "if_epilogue",
+    "exp",
+    "reduce_sum"
+  ],
+  "params": {
+    "M": 512,
+    "N": 256,
+    "K": 256,
+    "block_M": 32,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "copy_g2s",
+      "accumulate_reduce",
+      "elemwise_mul",
+      "elemwise_add",
+      "if_epilogue",
+      "exp",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float32"
+}

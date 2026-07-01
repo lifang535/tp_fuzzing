@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->add->sqrt->softmax",
+  "params": {
+    "M": 1024,
+    "N": 128,
+    "K": 256,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "add",
+      "sqrt",
+      "softmax"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_lwam8im4.py\", line 95, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_lwam8im4.py\", line 92, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_softmax]: max_diff=0.507864",
+  "timestamp": 1782818241.2641554
+}

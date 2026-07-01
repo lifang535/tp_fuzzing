@@ -1,5 +1,8 @@
 # Core
 torch==2.4.0+cu124
+
+# TileLang backend
+apache-tvm-ffi==0.1.11
 tilelang==0.1.11
 
 # Triton backend (optional — only needed when using --backend triton)

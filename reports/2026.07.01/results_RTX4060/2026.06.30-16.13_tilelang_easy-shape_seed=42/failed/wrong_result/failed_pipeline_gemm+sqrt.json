@@ -1,0 +1,22 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->sqrt",
+  "params": {
+    "M": 128,
+    "N": 1024,
+    "K": 1024,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "sqrt"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_k7bq9cf1.py\", line 79, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_k7bq9cf1.py\", line 76, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=10.7285, relative_err=2.2964",
+  "timestamp": 1782854525.3723907
+}

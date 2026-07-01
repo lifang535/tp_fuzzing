@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->add->scale",
+  "params": {
+    "M": 279,
+    "N": 1372,
+    "K": 1925,
+    "block_M": 128,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 4,
+    "pipeline": [
+      "gemm",
+      "add",
+      "scale"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_jcuy1u52.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_jcuy1u52.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=102.5751, relative_err=8.1957",
+  "timestamp": 1782849517.9551167
+}

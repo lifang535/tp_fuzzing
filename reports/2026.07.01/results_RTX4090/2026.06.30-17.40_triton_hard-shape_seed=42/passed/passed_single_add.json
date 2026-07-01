@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "add",
+  "params": {
+    "M": 1839,
+    "N": 1940,
+    "K": 823,
+    "block_M": 16,
+    "block_N": 32,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "pipelined",
+    "compute_kind": "add",
+    "alpha": 1.0
+  },
+  "dtype": "float32"
+}

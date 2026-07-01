@@ -1,0 +1,22 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->softmax",
+  "params": {
+    "M": 1823,
+    "N": 16,
+    "K": 180,
+    "block_M": 16,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 2,
+    "pipeline": [
+      "gemm",
+      "softmax"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_lefqmii0.py\", line 83, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_lefqmii0.py\", line 80, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_softmax]: max_diff=0.999999",
+  "timestamp": 1782855057.4638984
+}

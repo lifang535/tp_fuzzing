@@ -1,0 +1,30 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "elemwise_mul",
+    "scale",
+    "copy_g2s",
+    "copy_g2s",
+    "copy_f2g"
+  ],
+  "params": {
+    "M": 1346,
+    "N": 1739,
+    "K": 367,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "scale",
+      "copy_g2s",
+      "copy_g2s",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32"
+}

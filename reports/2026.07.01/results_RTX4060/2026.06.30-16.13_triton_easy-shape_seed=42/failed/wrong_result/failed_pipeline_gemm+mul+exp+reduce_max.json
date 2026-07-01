@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->mul->exp->reduce_max",
+  "params": {
+    "M": 64,
+    "N": 64,
+    "K": 256,
+    "block_M": 32,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "mul",
+      "exp",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_k0l6pk1f.py\", line 95, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_k0l6pk1f.py\", line 92, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_reduce]: max_diff=9367569648524927876428854198272.000000, relative_err=1.6496",
+  "timestamp": 1782828463.5537806
+}

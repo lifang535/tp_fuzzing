@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->mul->reduce_min",
+  "params": {
+    "M": 256,
+    "N": 32,
+    "K": 512,
+    "block_M": 64,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 4,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "mul",
+      "reduce_min"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_ckirgcm3.py\", line 95, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_ckirgcm3.py\", line 92, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline_reduce]: max_diff=67452718404256771890028293629411328.000000, relative_err=13.4938",
+  "timestamp": 1782825945.7037923
+}

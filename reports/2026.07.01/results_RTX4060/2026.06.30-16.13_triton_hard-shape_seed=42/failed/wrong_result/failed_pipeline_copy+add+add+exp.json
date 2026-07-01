@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:copy->add->add->exp",
+  "params": {
+    "M": 1547,
+    "N": 437,
+    "K": 2015,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 4,
+    "pipeline": [
+      "copy",
+      "add",
+      "add",
+      "exp"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_6i3lyhan.py\", line 96, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_6i3lyhan.py\", line 93, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_chain]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_chain]: max_diff=1.510254, relative_err=0.3364",
+  "timestamp": 1782849836.1417868
+}

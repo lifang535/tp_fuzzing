@@ -1,0 +1,26 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->double_pipeline->elemwise_max->scale->exp->copy_f2g",
+  "params": {
+    "M": 513,
+    "N": 1933,
+    "K": 1947,
+    "block_M": 128,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "elemwise_max",
+      "scale",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_xyz4m683.py\", line 103, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_xyz4m683.py\", line 100, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic]: max_diff=340073701490936095078053038110537678848.0000, relative_err=8278123297007384657920.0000",
+  "timestamp": 1782816008.1279135
+}

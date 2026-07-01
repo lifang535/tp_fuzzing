@@ -1,0 +1,25 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_mul->double_pipeline->elemwise_max->softmax",
+  "params": {
+    "M": 1899,
+    "N": 16,
+    "K": 1506,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "double_pipeline",
+      "elemwise_max",
+      "softmax"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_58qf5hk5.py\", line 106, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_58qf5hk5.py\", line 103, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [dynamic_softmax]: max_diff=1.000000",
+  "timestamp": 1782829414.6573617
+}

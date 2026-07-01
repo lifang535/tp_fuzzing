@@ -1,0 +1,27 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->accumulate_reduce->exp->if_epilogue->elemwise_add->elemwise_max->copy_f2g",
+  "params": {
+    "M": 1735,
+    "N": 1028,
+    "K": 1543,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "accumulate_reduce",
+      "exp",
+      "if_epilogue",
+      "elemwise_add",
+      "elemwise_max",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_2isopdnx.py\", line 101, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_2isopdnx.py\", line 98, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=1.0020, relative_err=1.2544",
+  "timestamp": 1782855189.6305707
+}

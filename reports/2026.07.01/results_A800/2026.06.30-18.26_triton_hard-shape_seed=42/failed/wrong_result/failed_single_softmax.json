@@ -1,0 +1,21 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "softmax",
+  "params": {
+    "M": 482,
+    "N": 32,
+    "K": 850,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "softmax",
+    "alpha": 1.0
+  },
+  "dtype": "float32",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_35fjdfvd.py\", line 65, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_35fjdfvd.py\", line 62, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [softmax]: max_diff=0.847080",
+  "timestamp": 1782872065.5509877
+}

@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "reduce_sum",
+  "params": {
+    "M": 1350,
+    "N": 32,
+    "K": 2014,
+    "block_M": 128,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 4,
+    "loop_kind": "pipelined",
+    "compute_kind": "reduce_sum",
+    "alpha": 1.0
+  },
+  "dtype": "float32"
+}

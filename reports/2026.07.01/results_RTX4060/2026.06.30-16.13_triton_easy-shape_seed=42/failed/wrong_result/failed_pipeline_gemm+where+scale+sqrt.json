@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->where->scale->sqrt",
+  "params": {
+    "M": 2048,
+    "N": 128,
+    "K": 2048,
+    "block_M": 32,
+    "block_N": 16,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "where",
+      "scale",
+      "sqrt"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_243k67l5.py\", line 96, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_243k67l5.py\", line 93, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline]: max_diff=3.3215, relative_err=0.3543",
+  "timestamp": 1782855920.908177
+}

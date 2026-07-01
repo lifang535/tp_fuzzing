@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->accumulate_reduce->reduce_max",
+  "params": {
+    "M": 1024,
+    "N": 128,
+    "K": 2048,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "accumulate_reduce",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_lopym64f.py\", line 86, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_lopym64f.py\", line 83, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_reduce]: max_diff=188095600.000000, relative_err=3.3724",
+  "timestamp": 1782812936.7914267
+}

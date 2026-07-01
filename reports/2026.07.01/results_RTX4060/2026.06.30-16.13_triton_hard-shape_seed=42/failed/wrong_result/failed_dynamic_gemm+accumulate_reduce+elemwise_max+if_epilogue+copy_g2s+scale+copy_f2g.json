@@ -1,0 +1,27 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->accumulate_reduce->elemwise_max->if_epilogue->copy_g2s->scale->copy_f2g",
+  "params": {
+    "M": 682,
+    "N": 1208,
+    "K": 1180,
+    "block_M": 32,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "accumulate_reduce",
+      "elemwise_max",
+      "if_epilogue",
+      "copy_g2s",
+      "scale",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_jv63eifi.py\", line 98, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_jv63eifi.py\", line 95, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic]: max_diff=69710.3906, relative_err=10.3654",
+  "timestamp": 1782847408.552126
+}

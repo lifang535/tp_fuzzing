@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->if_epilogue->copy_f2g",
+  "params": {
+    "M": 1078,
+    "N": 1910,
+    "K": 607,
+    "block_M": 16,
+    "block_N": 16,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "if_epilogue",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_c_mmqbjt.py\", line 85, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_c_mmqbjt.py\", line 82, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic]: max_diff=337947455927366083164169799863722049536.0000, relative_err=11778798.3843",
+  "timestamp": 1782854746.1996377
+}

@@ -1,0 +1,24 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "if_epilogue",
+    "softmax"
+  ],
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 512,
+    "block_M": 64,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "if_epilogue",
+      "softmax"
+    ]
+  },
+  "dtype": "float32"
+}

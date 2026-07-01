@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->sqrt->reduce_sum",
+  "params": {
+    "M": 1202,
+    "N": 32,
+    "K": 1174,
+    "block_M": 256,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "sqrt",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_92c82lvv.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_92c82lvv.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline_reduce]: max_diff=17944657586443780096.000000, relative_err=36.4469",
+  "timestamp": 1782867662.4318376
+}

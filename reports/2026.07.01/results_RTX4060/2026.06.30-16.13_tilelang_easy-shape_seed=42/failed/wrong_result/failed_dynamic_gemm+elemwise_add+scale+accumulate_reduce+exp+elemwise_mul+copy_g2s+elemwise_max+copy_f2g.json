@@ -1,0 +1,29 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_add->scale->accumulate_reduce->exp->elemwise_mul->copy_g2s->elemwise_max->copy_f2g",
+  "params": {
+    "M": 512,
+    "N": 128,
+    "K": 128,
+    "block_M": 32,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "elemwise_add",
+      "scale",
+      "accumulate_reduce",
+      "exp",
+      "elemwise_mul",
+      "copy_g2s",
+      "elemwise_max",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_kkxg2izb.py\", line 105, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_kkxg2izb.py\", line 102, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=6148728461376924772009846175699042304.0000, relative_err=2271708028974697.0000",
+  "timestamp": 1782810407.9319785
+}

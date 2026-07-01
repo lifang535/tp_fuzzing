@@ -1,0 +1,23 @@
+{
+  "bug_type": "compile_crash",
+  "root_cause": "warp_partition",
+  "compute_kind": "pipeline:gemm->exp->reduce_max",
+  "params": {
+    "M": 512,
+    "N": 16,
+    "K": 128,
+    "block_M": 16,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "allocator<int> >&, std::vector<bool, std::allocator<bool> >&)\n  File \"<unknown>\", line 0, in tvm::tl::GemmNode::InferLayout(tvm::tl::LayoutInferArgs const&, tvm::tl::InferLevel) const\n  File \"<unknown>\", line 0, in TVMFFIPyCallback(void*, TVMFFIAny const*, int, TVMFFIAny*)\n  File \"<unknown>\", line 0, in TVMFFICyErrorSetRaisedFromPyError(_object*)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/tileop/gemm/__init__.py\", line 15, in gemm_infer_layout\n    return gemm.infer_layout(target, thread_nums)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/tileop/gemm/__init__.py\", line 125, in infer_layout\n    return impl_class(self).infer_layout(target, thread_nums)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/op/gemm/gemm_mma.py\", line 43, in infer_layout\n    mma_emitter = self._make_mma_emitter(target, thread_nums)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/op/gemm/gemm_mma.py\", line 24, in _make_mma_emitter\n    m_warp, n_warp = self.policy.compute_warp_partition(self.M, self.N, thread_nums, target, GEMM_INST_MMA)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/ir.py\", line 32, in compute_warp_partition\n    _ffi_api.GemmWarpPolicyComputeWarpPartition(self, int(M), int(N), int(block_size), target, gemm_inst)\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::tl::GemmWarpPolicyNode::computeWarpPartition(int, int, int, tvm::Target, tvm::ffi::String) const\n  File \"/project/src/cuda/op/gemm.cc\", line 179, in std::pair<int, int> tvm::tl::cuda::{anonymous}::ComputeDefaultWarpPartition(const tvm::tl::GemmWarpPolicyNode&, int, int, int, int)\ntvm.error.InternalError: Check failed: (m_warp * n_warp == num_warps) is false: m_warp * n_warp must equal num_warps, m_warp: 1, n_warp: 1, num_warps: 8",
+  "timestamp": 1782867315.7207332
+}

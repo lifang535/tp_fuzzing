@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->sqrt->exp->copy_f2g",
+  "params": {
+    "M": 2048,
+    "N": 1024,
+    "K": 2048,
+    "block_M": 128,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "sqrt",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith__y2baryg.py\", line 80, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith__y2baryg.py\", line 77, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=3780284.0000, relative_err=1439.8804",
+  "timestamp": 1782861592.602753
+}

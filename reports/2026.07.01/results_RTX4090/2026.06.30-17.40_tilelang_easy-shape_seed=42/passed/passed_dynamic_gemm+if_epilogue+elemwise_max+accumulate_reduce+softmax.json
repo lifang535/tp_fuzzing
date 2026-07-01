@@ -1,0 +1,28 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "if_epilogue",
+    "elemwise_max",
+    "accumulate_reduce",
+    "softmax"
+  ],
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 2048,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "if_epilogue",
+      "elemwise_max",
+      "accumulate_reduce",
+      "softmax"
+    ]
+  },
+  "dtype": "float32"
+}

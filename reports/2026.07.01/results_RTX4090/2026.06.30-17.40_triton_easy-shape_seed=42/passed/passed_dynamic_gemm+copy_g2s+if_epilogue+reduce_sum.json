@@ -1,0 +1,26 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "copy_g2s",
+    "if_epilogue",
+    "reduce_sum"
+  ],
+  "params": {
+    "M": 1024,
+    "N": 256,
+    "K": 256,
+    "block_M": 32,
+    "block_N": 256,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "copy_g2s",
+      "if_epilogue",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float16"
+}

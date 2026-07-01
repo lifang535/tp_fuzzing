@@ -1,0 +1,26 @@
+{
+  "bug_type": "compile_crash",
+  "root_cause": "shared_memory_overflow",
+  "compute_kind": "dynamic:gemm->accumulate_reduce->double_pipeline->if_epilogue->exp->copy_f2g",
+  "params": {
+    "M": 7,
+    "N": 131,
+    "K": 414,
+    "block_M": 16,
+    "block_N": 64,
+    "block_K": 128,
+    "threads": 128,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "accumulate_reduce",
+      "double_pipeline",
+      "if_epilogue",
+      "exp",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_sv7howzl.py\", line 98, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_sv7howzl.py\", line 89, in test_kernel_0\n    A, B, C = kernel_0()\n  File \"/tmp/tilesmith_sv7howzl.py\", line 78, in kernel_0\n    kernel_0_kernel[grid](\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/runtime/jit.py\", line 345, in <lambda>\n    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/runtime/jit.py\", line 691, in run\n    kernel.run(grid_0, grid_1, grid_2, stream, kernel.function, kernel.packed_metadata, launch_metadata,\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/compiler/compiler.py\", line 381, in __getattribute__\n    self._init_handles()\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/compiler/compiler.py\", line 374, in _init_handles\n    raise OutOfResources(self.metadata.shared, max_shared, \"shared memory\")\ntriton.runtime.errors.OutOfResources: out of resource: shared memory, Required: 122880, Hardware limit: 101376. Reducing block sizes or `num_stages` may help.",
+  "timestamp": 1782854835.6634724
+}

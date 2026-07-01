@@ -1,0 +1,22 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp",
+  "params": {
+    "M": 357,
+    "N": 1465,
+    "K": 131,
+    "block_M": 64,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "pipeline": [
+      "gemm",
+      "exp"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_v9e5_7wh.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_v9e5_7wh.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline]: max_diff=138398426795262821269504.0000, relative_err=16727.3262",
+  "timestamp": 1782854122.9633186
+}

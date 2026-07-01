@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "gemm",
+  "params": {
+    "M": 1694,
+    "N": 720,
+    "K": 594,
+    "block_M": 64,
+    "block_N": 16,
+    "block_K": 128,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "gemm",
+    "alpha": 1.0
+  },
+  "dtype": "float32"
+}

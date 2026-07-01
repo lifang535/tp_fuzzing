@@ -1,0 +1,29 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_add->copy_g2s->if_epilogue->elemwise_max->copy_s2f->copy_s2f->accumulate_reduce->copy_f2g",
+  "params": {
+    "M": 1293,
+    "N": 1095,
+    "K": 1095,
+    "block_M": 16,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "elemwise_add",
+      "copy_g2s",
+      "if_epilogue",
+      "elemwise_max",
+      "copy_s2f",
+      "copy_s2f",
+      "accumulate_reduce",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_mqo13m4p.py\", line 105, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_mqo13m4p.py\", line 102, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=4.3018, relative_err=1.3183",
+  "timestamp": 1782851084.3493338
+}

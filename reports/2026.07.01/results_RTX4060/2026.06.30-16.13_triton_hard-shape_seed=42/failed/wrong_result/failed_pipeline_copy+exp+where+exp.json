@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:copy->exp->where->exp",
+  "params": {
+    "M": 1104,
+    "N": 1668,
+    "K": 1532,
+    "block_M": 16,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 2,
+    "pipeline": [
+      "copy",
+      "exp",
+      "where",
+      "exp"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_eocpo3ke.py\", line 89, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_eocpo3ke.py\", line 86, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_chain]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_chain]: max_diff=20123953278623141748760163385344.000000, relative_err=7.8323",
+  "timestamp": 1782810032.9971526
+}

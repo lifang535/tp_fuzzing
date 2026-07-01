@@ -1,0 +1,25 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_mul->if_epilogue->elemwise_max->reduce_max",
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 512,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "if_epilogue",
+      "elemwise_max",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_b8vsqq36.py\", line 102, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_b8vsqq36.py\", line 99, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_reduce]: max_diff=197554036419561476106536602769509318656.000000, relative_err=17022.4117",
+  "timestamp": 1782811859.1365778
+}

@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "where",
+  "params": {
+    "M": 820,
+    "N": 1593,
+    "K": 639,
+    "block_M": 16,
+    "block_N": 128,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "where",
+    "alpha": 1.0
+  },
+  "dtype": "float32"
+}

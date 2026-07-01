@@ -1,0 +1,28 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->sqrt->elemwise_add->elemwise_mul->exp->elemwise_max->if_epilogue->copy_f2g",
+  "params": {
+    "M": 2048,
+    "N": 64,
+    "K": 1024,
+    "block_M": 128,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "sqrt",
+      "elemwise_add",
+      "elemwise_mul",
+      "exp",
+      "elemwise_max",
+      "if_epilogue",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_julls7ri.py\", line 104, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_julls7ri.py\", line 101, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=338507554668570924042927103207985381376.0000, relative_err=1079198.4800",
+  "timestamp": 1782818608.457196
+}

@@ -1,0 +1,24 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "exp",
+    "reduce_sum"
+  ],
+  "params": {
+    "M": 128,
+    "N": 128,
+    "K": 128,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 128,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "exp",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float16"
+}

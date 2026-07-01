@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:copy->where->exp->exp",
+  "params": {
+    "M": 1463,
+    "N": 1981,
+    "K": 1463,
+    "block_M": 16,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "copy",
+      "where",
+      "exp",
+      "exp"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_vawldmi1.py\", line 89, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_vawldmi1.py\", line 86, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_chain]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_chain]: max_diff=1216944576219100225436835077160960.000000, relative_err=11.9576",
+  "timestamp": 1782846483.549274
+}

@@ -1,0 +1,26 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "copy",
+    "mul",
+    "add",
+    "where"
+  ],
+  "params": {
+    "M": 1140,
+    "N": 979,
+    "K": 1630,
+    "block_M": 32,
+    "block_N": 16,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "copy",
+      "mul",
+      "add",
+      "where"
+    ]
+  },
+  "dtype": "float32"
+}

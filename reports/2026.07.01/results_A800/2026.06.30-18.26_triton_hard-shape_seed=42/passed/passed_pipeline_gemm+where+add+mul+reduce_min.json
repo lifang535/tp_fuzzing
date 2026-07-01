@@ -1,0 +1,28 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "gemm",
+    "where",
+    "add",
+    "mul",
+    "reduce_min"
+  ],
+  "params": {
+    "M": 1886,
+    "N": 16,
+    "K": 265,
+    "block_M": 64,
+    "block_N": 16,
+    "block_K": 128,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "where",
+      "add",
+      "mul",
+      "reduce_min"
+    ]
+  },
+  "dtype": "float16"
+}

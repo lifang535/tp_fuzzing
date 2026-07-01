@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->exp->reduce_sum",
+  "params": {
+    "M": 128,
+    "N": 32,
+    "K": 1024,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 2,
+    "sequence": [
+      "gemm",
+      "exp",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_00pyss8w.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_00pyss8w.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_reduce]: max_diff=1216666960737650243197907299158982656.000000, relative_err=5.4094",
+  "timestamp": 1782842031.4309907
+}

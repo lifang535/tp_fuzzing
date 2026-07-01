@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->double_pipeline->softmax",
+  "params": {
+    "M": 2048,
+    "N": 16,
+    "K": 512,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "softmax"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_y4hyajep.py\", line 92, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_y4hyajep.py\", line 89, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_dynamic_softmax]: max_diff={max_diff:.6f}\")\nRuntimeError: WRONG RESULT [triton_dynamic_softmax]: max_diff=1.000000",
+  "timestamp": 1782850070.0652165
+}

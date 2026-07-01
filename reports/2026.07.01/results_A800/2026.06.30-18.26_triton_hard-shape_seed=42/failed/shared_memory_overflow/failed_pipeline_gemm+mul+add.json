@@ -1,0 +1,23 @@
+{
+  "bug_type": "runtime_crash",
+  "root_cause": "shared_memory_overflow",
+  "compute_kind": "pipeline:gemm->mul->add",
+  "params": {
+    "M": 1383,
+    "N": 1041,
+    "K": 1567,
+    "block_M": 256,
+    "block_N": 256,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 4,
+    "pipeline": [
+      "gemm",
+      "mul",
+      "add"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/tmp/tilesmith_8ubb4gpo.py\", line 101, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_8ubb4gpo.py\", line 91, in test_kernel_0\n    A, B, D1, D2, C = kernel_0()\n  File \"/tmp/tilesmith_8ubb4gpo.py\", line 75, in kernel_0\n    kernel_0_kernel[grid](\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/runtime/jit.py\", line 345, in <lambda>\n    return lambda *args, **kwargs: self.run(grid=grid, warmup=False, *args, **kwargs)\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/runtime/jit.py\", line 691, in run\n    kernel.run(grid_0, grid_1, grid_2, stream, kernel.function, kernel.packed_metadata, launch_metadata,\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/compiler/compiler.py\", line 381, in __getattribute__\n    self._init_handles()\n  File \"/root/miniconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/triton/compiler/compiler.py\", line 374, in _init_handles\n    raise OutOfResources(self.metadata.shared, max_shared, \"shared memory\")\ntriton.runtime.errors.OutOfResources: out of resource: shared memory, Required: 196608, Hardware limit: 166912. Reducing block sizes or `num_stages` may help.",
+  "timestamp": 1782845163.7258337
+}

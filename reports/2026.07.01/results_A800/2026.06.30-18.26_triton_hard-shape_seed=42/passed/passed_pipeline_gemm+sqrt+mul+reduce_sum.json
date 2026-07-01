@@ -1,0 +1,26 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "gemm",
+    "sqrt",
+    "mul",
+    "reduce_sum"
+  ],
+  "params": {
+    "M": 880,
+    "N": 256,
+    "K": 724,
+    "block_M": 32,
+    "block_N": 256,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "sqrt",
+      "mul",
+      "reduce_sum"
+    ]
+  },
+  "dtype": "float16"
+}

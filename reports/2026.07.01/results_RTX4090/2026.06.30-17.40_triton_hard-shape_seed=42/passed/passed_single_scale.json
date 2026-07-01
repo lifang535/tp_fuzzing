@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "scale",
+  "params": {
+    "M": 1940,
+    "N": 1839,
+    "K": 1269,
+    "block_M": 64,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "loop_kind": "pipelined",
+    "compute_kind": "scale",
+    "alpha": 9.1718
+  },
+  "dtype": "float32"
+}

@@ -1,0 +1,26 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "sqrt",
+    "scale",
+    "reduce_max"
+  ],
+  "params": {
+    "M": 256,
+    "N": 128,
+    "K": 1024,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 3,
+    "sequence": [
+      "gemm",
+      "sqrt",
+      "scale",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float32"
+}

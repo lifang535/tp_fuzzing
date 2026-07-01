@@ -1,0 +1,26 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "dynamic:gemm->elemwise_mul->exp->elemwise_max->sqrt->copy_f2g",
+  "params": {
+    "M": 512,
+    "N": 1024,
+    "K": 256,
+    "block_M": 256,
+    "block_N": 64,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "elemwise_mul",
+      "exp",
+      "elemwise_max",
+      "sqrt",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_5a63bpec.py\", line 92, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_5a63bpec.py\", line 89, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [dynamic]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [dynamic]: max_diff=631021817808551936.0000, relative_err=433.4281",
+  "timestamp": 1782851940.698231
+}

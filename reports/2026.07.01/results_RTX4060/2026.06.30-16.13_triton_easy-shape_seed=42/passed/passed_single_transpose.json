@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "transpose",
+  "params": {
+    "M": 1024,
+    "N": 2048,
+    "K": 128,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 128,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "pipelined",
+    "compute_kind": "transpose",
+    "alpha": 1.0
+  },
+  "dtype": "float16"
+}

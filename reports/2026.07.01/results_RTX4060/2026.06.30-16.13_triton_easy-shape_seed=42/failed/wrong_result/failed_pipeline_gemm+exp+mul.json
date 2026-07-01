@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->exp->mul",
+  "params": {
+    "M": 512,
+    "N": 2048,
+    "K": 128,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "exp",
+      "mul"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_2jc76uce.py\", line 94, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_2jc76uce.py\", line 91, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [triton_pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [triton_pipeline]: max_diff=2570950391669010773049344.0000, relative_err=28885.4802",
+  "timestamp": 1782841949.4067252
+}

@@ -1,0 +1,36 @@
+{
+  "type": "dynamic",
+  "sequence": [
+    "gemm",
+    "double_pipeline",
+    "elemwise_add",
+    "accumulate_reduce",
+    "exp",
+    "if_epilogue",
+    "scale",
+    "elemwise_mul",
+    "copy_f2g"
+  ],
+  "params": {
+    "M": 2018,
+    "N": 1605,
+    "K": 579,
+    "block_M": 128,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 4,
+    "sequence": [
+      "gemm",
+      "double_pipeline",
+      "elemwise_add",
+      "accumulate_reduce",
+      "exp",
+      "if_epilogue",
+      "scale",
+      "elemwise_mul",
+      "copy_f2g"
+    ]
+  },
+  "dtype": "float16"
+}

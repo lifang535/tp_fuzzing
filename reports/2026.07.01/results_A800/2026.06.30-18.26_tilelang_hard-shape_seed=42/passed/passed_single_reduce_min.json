@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "reduce_min",
+  "params": {
+    "M": 1747,
+    "N": 128,
+    "K": 1896,
+    "block_M": 32,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "reduce_min",
+    "alpha": 0.5704
+  },
+  "dtype": "float16"
+}

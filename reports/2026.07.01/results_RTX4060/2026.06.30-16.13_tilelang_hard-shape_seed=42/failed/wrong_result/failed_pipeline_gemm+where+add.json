@@ -1,0 +1,23 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->where->add",
+  "params": {
+    "M": 1621,
+    "N": 1577,
+    "K": 387,
+    "block_M": 64,
+    "block_N": 64,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "where",
+      "add"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_gt015laj.py\", line 90, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_gt015laj.py\", line 87, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline]: max_diff={max_diff:.4f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline]: max_diff=96.8359, relative_err=11.5025",
+  "timestamp": 1782864871.825159
+}

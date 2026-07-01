@@ -1,0 +1,24 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->sqrt->sqrt->reduce_min",
+  "params": {
+    "M": 256,
+    "N": 256,
+    "K": 128,
+    "block_M": 128,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "sqrt",
+      "sqrt",
+      "reduce_min"
+    ]
+  },
+  "dtype": "float32",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_bspmyq7p.py\", line 84, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_bspmyq7p.py\", line 81, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline_reduce]: max_diff=0.109210, relative_err=0.2505",
+  "timestamp": 1782864040.6227765
+}

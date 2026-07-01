@@ -1,0 +1,22 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "wrong_result",
+  "compute_kind": "pipeline:gemm->reduce_max",
+  "params": {
+    "M": 1008,
+    "N": 256,
+    "K": 1174,
+    "block_M": 64,
+    "block_N": 256,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 3,
+    "pipeline": [
+      "gemm",
+      "reduce_max"
+    ]
+  },
+  "dtype": "float16",
+  "error_message": "Traceback (most recent call last):\n  File \"/tmp/tilesmith_xs3zrsia.py\", line 78, in <module>\n    test_kernel_0()\n  File \"/tmp/tilesmith_xs3zrsia.py\", line 75, in test_kernel_0\n    raise RuntimeError(f\"WRONG RESULT [pipeline_reduce]: max_diff={max_diff:.6f}, relative_err={relative_err:.4f}\")\nRuntimeError: WRONG RESULT [pipeline_reduce]: max_diff=71.214691, relative_err=0.7350",
+  "timestamp": 1782867679.2413473
+}

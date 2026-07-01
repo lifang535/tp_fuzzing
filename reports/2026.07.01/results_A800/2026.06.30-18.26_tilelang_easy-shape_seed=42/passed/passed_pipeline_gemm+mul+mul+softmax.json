@@ -1,0 +1,26 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "gemm",
+    "mul",
+    "mul",
+    "softmax"
+  ],
+  "params": {
+    "M": 512,
+    "N": 16,
+    "K": 512,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "mul",
+      "mul",
+      "softmax"
+    ]
+  },
+  "dtype": "float32"
+}

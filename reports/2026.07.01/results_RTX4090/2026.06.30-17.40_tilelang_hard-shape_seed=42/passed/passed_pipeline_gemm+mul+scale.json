@@ -1,0 +1,24 @@
+{
+  "type": "pipeline",
+  "pipeline": [
+    "gemm",
+    "mul",
+    "scale"
+  ],
+  "params": {
+    "M": 2004,
+    "N": 256,
+    "K": 1338,
+    "block_M": 256,
+    "block_N": 128,
+    "block_K": 8,
+    "threads": 128,
+    "num_stages": 1,
+    "pipeline": [
+      "gemm",
+      "mul",
+      "scale"
+    ]
+  },
+  "dtype": "float32"
+}

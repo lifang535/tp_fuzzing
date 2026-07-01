@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "sqrt",
+  "params": {
+    "M": 71,
+    "N": 1628,
+    "K": 16,
+    "block_M": 64,
+    "block_N": 16,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 3,
+    "loop_kind": "pipelined",
+    "compute_kind": "sqrt",
+    "alpha": 1.0
+  },
+  "dtype": "float16"
+}

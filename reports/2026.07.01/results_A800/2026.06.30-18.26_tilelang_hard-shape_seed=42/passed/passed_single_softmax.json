@@ -1,0 +1,18 @@
+{
+  "type": "single_op",
+  "compute_kind": "softmax",
+  "params": {
+    "M": 1172,
+    "N": 16,
+    "K": 1732,
+    "block_M": 128,
+    "block_N": 16,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "softmax",
+    "alpha": 1.0
+  },
+  "dtype": "float32"
+}
