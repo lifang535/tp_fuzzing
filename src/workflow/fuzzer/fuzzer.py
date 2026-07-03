@@ -376,19 +376,34 @@ class TileSmith:
     def _kind_label(self, program) -> str:
         """Return a human-readable label for use in filenames.
         Format:
-          single_{op}                e.g. single_gemm
-          pipeline_{op1}+{op2}+...  e.g. pipeline_gemm+scale+softmax
-          dynamic_{op1}+{op2}+...   e.g. dynamic_gemm+exp+copy_f2g
+          dynamic_{ops}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
+          pipeline_{ops}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
+          single_{op}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
         """
         if isinstance(program, DynamicSequence):
             ops = "+".join(s.op_kind for s in program.steps)
-            return f"dynamic_{ops}"
+            params = (f"M{program.M},N{program.N},K{program.K},"
+                      f"bM{program.block_M},bN{program.block_N},bK{program.block_K},"
+                      f"t{program.threads},{program.loop_kind},s{program.num_stages},{program.dtype}")
+            return f"dynamic_{ops}_{params}"
         if isinstance(program, TilePipeline):
             ops = "+".join(s.kind.value for s in program.steps)
-            return f"pipeline_{ops}"
+            lk = program.loop_kind.value if hasattr(program.loop_kind, "value") else program.loop_kind
+            dt = program.dtype.value if hasattr(program.dtype, "value") else program.dtype
+            params = (f"M{program.M},N{program.N},K{program.K},"
+                      f"bM{program.block_M},bN{program.block_N},bK{program.block_K},"
+                      f"t{program.threads},{lk},s{program.num_stages},{dt}")
+            return f"pipeline_{ops}_{params}"
         kernel = program.kernels[0] if program.kernels else None
-        op = kernel.compute_kind.value if kernel else "unknown"
-        return f"single_{op}"
+        if kernel:
+            op = kernel.compute_kind.value
+            lk = kernel.loop_kind.value if hasattr(kernel.loop_kind, "value") else kernel.loop_kind
+            dt = kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype
+            params = (f"M{kernel.M},N{kernel.N},K{kernel.K},"
+                      f"bM{kernel.block_M},bN{kernel.block_N},bK{kernel.block_K},"
+                      f"t{kernel.threads},{lk},s{kernel.num_stages},{dt}")
+            return f"single_{op}_{params}"
+        return "single_unknown"
 
     def _save_bug(self, bug: BugReport, iteration: int, program):
         """

@@ -117,20 +117,24 @@ results/
 └── 2026.06.26-10.30_tilelang_hard-shape_seed=42/
     ├── summary.json                              # 统计摘要（累计跨所有 session）
     ├── passed/
-    │   ├── passed_single_gemm.py                 # 单算子通过
-    │   ├── passed_pipeline_gemm+scale+add.py     # 模板 pipeline 通过
-    │   └── passed_dynamic_gemm+exp+copy_f2g.py   # 动态序列通过
+    │   ├── passed_single_gemm_M128,N256,K64,bM64,bN128,bK32,t128,pipelined,s2,float16.py
+    │   ├── passed_pipeline_gemm+scale+add_M512,N512,K128,bM64,bN64,bK32,t128,serial,s1,float16.py
+    │   └── passed_dynamic_gemm+exp+copy_f2g_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16.py
     └── failed/
         └── {root_cause}/
-            ├── failed_single_gemm.py             # 单算子失败
-            ├── failed_pipeline_gemm+where.py     # pipeline 失败
-            └── failed_dynamic_gemm+sqrt+mul.py   # 动态序列失败
+            ├── failed_single_gemm_M128,N256,K64,bM64,bN128,bK32,t128,pipelined,s2,float16.py
+            ├── failed_pipeline_gemm+where_M512,N512,K128,bM64,bN64,bK32,t128,serial,s1,float16.py
+            └── failed_dynamic_gemm+sqrt+mul_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16.py
 ```
 
-文件名命名规则：
-- 单算子：`{passed/failed}_single_{op}`，如 `passed_single_gemm`
-- 模板 pipeline：`{passed/failed}_pipeline_{op1}+{op2}+...`，如 `failed_pipeline_gemm+softmax`
-- 动态序列：`{passed/failed}_dynamic_{op1}+{op2}+...`，如 `passed_dynamic_gemm+exp+copy_f2g`
+文件名命名规则：`{passed/failed}_{type}_{ops}_{params}`
+
+- 参数格式：`M{m},N{n},K{k},bM{block_M},bN{block_N},bK{block_K},t{threads},{loop_kind},s{num_stages},{dtype}`
+- 单算子：`{passed/failed}_single_{op}_{params}`
+- 模板 pipeline：`{passed/failed}_pipeline_{op1}+{op2}+..._{params}`
+- 动态序列：`{passed/failed}_dynamic_{op1}+{op2}+..._{params}`
+
+只有程序结构和所有输入参数完全一致时才视为同一测试用例，不同参数的测试不会互相覆盖。
 
 `summary.json` 格式：
 

@@ -165,17 +165,21 @@ subprocess.run([python3, tmp_file], timeout=compile_timeout + execute_timeout)
 ```
 results/{日期-时间}_{backend}_{easy/hard-shape}_seed={seed}/
 ├── passed/
-│   ├── passed_{op_label}.py       可复现的通过代码
-│   └── passed_{op_label}.json     元信息
+│   ├── passed_{type}_{ops}_{params}.py       可复现的通过代码
+│   └── passed_{type}_{ops}_{params}.json     元信息
 ├── failed/
 │   └── {root_cause}/
-│       ├── failed_{op_label}.py   可复现的失败代码
-│       └── failed_{op_label}.json 元信息（含完整错误信息）
-└── summary.json                    累计统计汇总（跨所有 session）
+│       ├── failed_{type}_{ops}_{params}.py   可复现的失败代码
+│       └── failed_{type}_{ops}_{params}.json 元信息（含完整错误信息）
+└── summary.json                               累计统计汇总（跨所有 session）
 ```
 
-**op_label 命名规则**：单 op 用类型名（`gemm`），多步序列用 `+` 连接（`gemm+exp+softmax`）。  
-文件名相同时覆盖写，因此磁盘文件数 ≤ 触发次数。
+**文件命名规则**：`{passed/failed}_{type}_{ops}_{params}`
+
+- 参数格式：`M{m},N{n},K{k},bM{block_M},bN{block_N},bK{block_K},t{threads},{loop_kind},s{num_stages},{dtype}`
+- 示例：`passed_dynamic_gemm+exp+copy_f2g_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16`
+
+只有程序结构和所有输入参数完全一致时才视为同一测试用例（与 dedup 签名一致），不同参数的测试不会互相覆盖。
 
 **Resume 机制**：`--resume <dir>` 恢复已有实验，核心步骤：
 

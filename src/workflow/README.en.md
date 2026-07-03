@@ -159,18 +159,23 @@ Error classification (generic + backend-specific):
 ```
 results/{date-time}_{backend}_{easy/hard-shape}_seed={seed}/
 ├── passed/
-│   ├── passed_single_{op}.py
-│   ├── passed_pipeline_{op1}+{op2}+...py
-│   └── passed_dynamic_{op1}+{op2}+...py
+│   ├── passed_single_{op}_{params}.py
+│   ├── passed_pipeline_{op1}+{op2}+..._{params}.py
+│   └── passed_dynamic_{op1}+{op2}+..._{params}.py
 ├── failed/
 │   └── {root_cause}/
-│       ├── failed_single_{op}.py
-│       ├── failed_pipeline_{op1}+{op2}+...py
-│       └── failed_dynamic_{op1}+{op2}+...py
+│       ├── failed_single_{op}_{params}.py
+│       ├── failed_pipeline_{op1}+{op2}+..._{params}.py
+│       └── failed_dynamic_{op1}+{op2}+..._{params}.py
 └── summary.json          # cumulative across all sessions
 ```
 
-Files with the same name are overwritten, so the file count on disk may be less than the total trigger count.
+Filename convention: `{passed/failed}_{type}_{ops}_{params}`
+
+- Params format: `M{m},N{n},K{k},bM{block_M},bN{block_N},bK{block_K},t{threads},{loop_kind},s{num_stages},{dtype}`
+- Example: `passed_dynamic_gemm+exp+copy_f2g_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16`
+
+Only test cases with identical program structure AND all input parameters are considered duplicates (matching the dedup signature); different parameters produce distinct files.
 
 **Resume** (`--resume <dir>`) continues an existing run. Steps:
 

@@ -117,20 +117,24 @@ results/
 └── 2026.06.26-10.30_tilelang_hard-shape_seed=42/
     ├── summary.json                              # Cumulative statistics (across all sessions)
     ├── passed/
-    │   ├── passed_single_gemm.py                 # Single-op pass
-    │   ├── passed_pipeline_gemm+scale+add.py     # Template pipeline pass
-    │   └── passed_dynamic_gemm+exp+copy_f2g.py   # Dynamic sequence pass
+    │   ├── passed_single_gemm_M128,N256,K64,bM64,bN128,bK32,t128,pipelined,s2,float16.py
+    │   ├── passed_pipeline_gemm+scale+add_M512,N512,K128,bM64,bN64,bK32,t128,serial,s1,float16.py
+    │   └── passed_dynamic_gemm+exp+copy_f2g_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16.py
     └── failed/
         └── {root_cause}/
-            ├── failed_single_gemm.py             # Single-op failure
-            ├── failed_pipeline_gemm+where.py     # Pipeline failure
-            └── failed_dynamic_gemm+sqrt+mul.py   # Dynamic sequence failure
+            ├── failed_single_gemm_M128,N256,K64,bM64,bN128,bK32,t128,pipelined,s2,float16.py
+            ├── failed_pipeline_gemm+where_M512,N512,K128,bM64,bN64,bK32,t128,serial,s1,float16.py
+            └── failed_dynamic_gemm+sqrt+mul_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16.py
 ```
 
-Filename convention:
-- Single op: `{passed/failed}_single_{op}`, e.g. `passed_single_gemm`
-- Template pipeline: `{passed/failed}_pipeline_{op1}+{op2}+...`, e.g. `failed_pipeline_gemm+softmax`
-- Dynamic sequence: `{passed/failed}_dynamic_{op1}+{op2}+...`, e.g. `passed_dynamic_gemm+exp+copy_f2g`
+Filename convention: `{passed/failed}_{type}_{ops}_{params}`
+
+- Params format: `M{m},N{n},K{k},bM{block_M},bN{block_N},bK{block_K},t{threads},{loop_kind},s{num_stages},{dtype}`
+- Single op: `{passed/failed}_single_{op}_{params}`
+- Template pipeline: `{passed/failed}_pipeline_{op1}+{op2}+..._{params}`
+- Dynamic sequence: `{passed/failed}_dynamic_{op1}+{op2}+..._{params}`
+
+Only test cases with identical program structure AND all input parameters are considered duplicates; different parameters produce distinct files.
 
 `summary.json` format:
 
