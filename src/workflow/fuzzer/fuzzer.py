@@ -294,13 +294,16 @@ class TileSmith:
         """Create a hashable dedup signature for TileProgram, TilePipeline, or DynamicSequence.
         All enum fields are converted to their string .value so the sig matches _make_sig_from_dict."""
         if isinstance(program, DynamicSequence):
-            steps_sig = tuple(s.op_kind for s in program.steps)
+            steps_sig = tuple(
+                (s.op_kind, s.attrs.get("alpha", 1.0) if s.op_kind == "scale" else 1.0)
+                for s in program.steps
+            )
             return (steps_sig, program.M, program.N, program.K,
                     program.block_M, program.block_N, program.block_K,
                     program.threads, program.loop_kind, program.num_stages, program.dtype)
         if isinstance(program, TilePipeline):
             steps_sig = tuple(
-                s.kind.value if hasattr(s.kind, "value") else s.kind
+                (s.kind.value if hasattr(s.kind, "value") else s.kind, s.alpha)
                 for s in program.steps
             )
             return (steps_sig, program.M, program.N, program.K,
@@ -318,6 +321,7 @@ class TileSmith:
             kernel.loop_kind.value if hasattr(kernel.loop_kind, "value") else kernel.loop_kind,
             kernel.num_stages,
             kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype,
+            kernel.alpha,
         )
 
     @staticmethod
@@ -349,16 +353,24 @@ class TileSmith:
                 type_ = "single_op"
 
         if type_ == "dynamic":
-            steps_sig = tuple(params.get("sequence", []))
+            ops = params.get("sequence", [])
+            alphas = params.get("sequence_alphas", [1.0] * len(ops))
+            steps_sig = tuple(
+                (op, a if op == "scale" else 1.0)
+                for op, a in zip(ops, alphas)
+            )
             return (steps_sig, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype)
 
         if type_ == "pipeline":
-            steps_sig = tuple(params.get("pipeline", []))
+            ops = params.get("pipeline", [])
+            alphas = params.get("pipeline_alphas", [1.0] * len(ops))
+            steps_sig = tuple(zip(ops, alphas))
             return (steps_sig, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype)
 
         # single_op
         compute_kind = d.get("compute_kind", params.get("compute_kind", ""))
-        return (compute_kind, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype)
+        alpha = params.get("alpha", 1.0)
+        return (compute_kind, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype, alpha)
 
     def _generate_test_case(self):
         if not self.seed_pool:
@@ -380,14 +392,25 @@ class TileSmith:
           pipeline_{ops}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
           single_{op}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
         """
+        def _step_label_dynamic(s) -> str:
+            if s.op_kind == "scale":
+                return f"scale_a{s.attrs.get('alpha', 1.0)}"
+            return s.op_kind
+
+        def _step_label_pipeline(s) -> str:
+            kind = s.kind.value if hasattr(s.kind, "value") else s.kind
+            if kind == "scale":
+                return f"scale_a{s.alpha}"
+            return kind
+
         if isinstance(program, DynamicSequence):
-            ops = "+".join(s.op_kind for s in program.steps)
+            ops = "+".join(_step_label_dynamic(s) for s in program.steps)
             params = (f"M{program.M},N{program.N},K{program.K},"
                       f"bM{program.block_M},bN{program.block_N},bK{program.block_K},"
                       f"t{program.threads},{program.loop_kind},s{program.num_stages},{program.dtype}")
             return f"dynamic_{ops}_{params}"
         if isinstance(program, TilePipeline):
-            ops = "+".join(s.kind.value for s in program.steps)
+            ops = "+".join(_step_label_pipeline(s) for s in program.steps)
             lk = program.loop_kind.value if hasattr(program.loop_kind, "value") else program.loop_kind
             dt = program.dtype.value if hasattr(program.dtype, "value") else program.dtype
             params = (f"M{program.M},N{program.N},K{program.K},"
@@ -399,9 +422,10 @@ class TileSmith:
             op = kernel.compute_kind.value
             lk = kernel.loop_kind.value if hasattr(kernel.loop_kind, "value") else kernel.loop_kind
             dt = kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype
+            alpha_suffix = f",a{kernel.alpha}" if op == "scale" else ""
             params = (f"M{kernel.M},N{kernel.N},K{kernel.K},"
                       f"bM{kernel.block_M},bN{kernel.block_N},bK{kernel.block_K},"
-                      f"t{kernel.threads},{lk},s{kernel.num_stages},{dt}")
+                      f"t{kernel.threads},{lk},s{kernel.num_stages},{dt}{alpha_suffix}")
             return f"single_{op}_{params}"
         return "single_unknown"
 

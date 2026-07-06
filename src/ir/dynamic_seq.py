@@ -140,6 +140,7 @@ class DynamicSequence:
             "block_M": self.block_M, "block_N": self.block_N, "block_K": self.block_K,
             "threads": self.threads, "num_stages": self.num_stages,
             "sequence": [s.op_kind for s in self.steps],
+            "sequence_alphas": [s.attrs.get("alpha", 1.0) if s.op_kind == "scale" else 1.0 for s in self.steps],
         }
 
 

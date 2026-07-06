@@ -99,6 +99,7 @@ class TilePipeline:
             "block_M": self.block_M, "block_N": self.block_N, "block_K": self.block_K,
             "threads": self.threads, "num_stages": self.num_stages,
             "pipeline": [s.kind.value for s in self.steps],
+            "pipeline_alphas": [s.alpha for s in self.steps],
         }
 
 
