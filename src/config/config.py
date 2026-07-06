@@ -21,7 +21,7 @@ class Config:
     # but reduce the probability of compatible shapes across op chains.
     dim_pool_size: int = 20
     # Dimension value range [lo, hi] for M, N, K sampling.
-    dim_range: tuple = (1, 2048)
+    dim_range: tuple = (1, 16384)
 
     # ── Tile size choices ───────────────────────────────────────────────
     # Valid block_M/block_N sizes for TileLang (must be multiples of 16 for MMA).
@@ -153,7 +153,7 @@ class Config:
     easy_shape: bool = False
     # The pool of "nice" shapes used in easy-shape mode.
     easy_shape_values: List[int] = field(default_factory=lambda: [
-        128, 256, 512, 1024, 2048,
+        1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384,
     ])
 
     # ── Hardware constraint margin ─────────────────────────────────────

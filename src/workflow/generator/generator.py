@@ -115,9 +115,7 @@ class ProgramGenerator:
         )
         # Re-validate with actual num_stages (generate_valid_params uses stages=1 default)
         if loop_kind == LoopKind.PIPELINED and num_stages > 1:
-            from src.constraints.constraints import (
-                tilelang_check_shared_memory, triton_check_shared_memory,
-            )
+            from src.constraints import tilelang_check_shared_memory, triton_check_shared_memory
             check_fn = tilelang_check_shared_memory if self.backend == "tilelang" else triton_check_shared_memory
             if not check_fn(params["block_M"], params["block_N"], params["block_K"], dtype, num_stages):
                 for ns in sorted(self.config.pipeline_stages_choices):
@@ -155,7 +153,7 @@ class ProgramGenerator:
         # generate_valid_params checks with num_stages=1 by default, but the
         # actual num_stages may be larger and require more shared memory.
         if loop_kind == LoopKind.PIPELINED and num_stages > 1:
-            from src.constraints.constraints import (
+            from src.constraints import (
                 tilelang_check_shared_memory, triton_check_shared_memory,
                 tilelang_valid_block_k, triton_valid_block_sizes,
             )

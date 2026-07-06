@@ -141,239 +141,27 @@ def dtype_bytes(dtype) -> int:
 
 
 # ============================================================
-# TileLang constraints
-# ============================================================
-
-def tilelang_valid_block_m_n() -> list:
-    """block_M and block_N must be multiples of 16 (MMA m16n8k16 requires this)."""
-    return [16, 32, 64, 128, 256]
-
-
-def tilelang_valid_block_k(dtype) -> list:
-    """block_K must be a multiple of 8 (stride alignment for tensor core)."""
-    return [8, 16, 32, 64, 128]
-
-
-def tilelang_valid_threads() -> list:
-    """threads must be a multiple of warp_size (32), and num_warps must factor into m_warp * n_warp."""
-    return [128, 256]  # 4 or 8 warps — safe for most block_M x block_N
-
-
-def tilelang_check_shared_memory(block_M: int, block_N: int, block_K: int, dtype, num_stages: int = 2) -> bool:
-    """
-    Check TileLang shared memory usage including pipeline multi-buffering.
-    TileLang allocates (A_shared + B_shared) * num_stages bytes for pipelining.
-    Hardware limit: TILELANG_MAX_SHARED (96 KB on sm_89).
-    """
-    elem_size = dtype_bytes(dtype)
-    per_stage = (block_M * block_K + block_K * block_N) * elem_size
-    shared_bytes = per_stage * num_stages
-    return shared_bytes <= TILELANG_MAX_SHARED
-
-
-def tilelang_check_warp_partition(block_M: int, block_N: int, threads: int) -> bool:
-    """
-    Check that warp partition is valid:
-    - num_warps = threads / 32
-    - Must be able to partition block_M/16 x block_N/16 tiles across num_warps
-    - Specifically: (block_M/16) * (block_N/16) >= num_warps or factorizable
-    """
-    num_warps = threads // WARP_SIZE
-    m_tiles = block_M // MMA_M  # How many 16-wide tiles in M
-    n_tiles = block_N // MMA_N  # How many 8-wide tiles in N
-
-    # Simple check: num_warps must divide evenly into a m_warp * n_warp grid
-    # where m_warp <= m_tiles and n_warp <= n_tiles
-    for m_warp in range(1, num_warps + 1):
-        if num_warps % m_warp == 0:
-            n_warp = num_warps // m_warp
-            if m_warp <= m_tiles and n_warp <= n_tiles:
-                return True
-    return False
-
-
-def tilelang_generate_valid_params(dim_pool: list, dtype) -> dict:
-    """Generate a valid parameter set for TileLang, satisfying all constraints."""
-    valid_block_mn = tilelang_valid_block_m_n()
-    valid_block_k = tilelang_valid_block_k(dtype)
-    valid_threads = tilelang_valid_threads()
-
-    for _ in range(100):  # Retry until we find a valid combination
-        M = random.choice(dim_pool)
-        N = random.choice(dim_pool)
-        K = random.choice(dim_pool)
-
-        # block_M, block_N: must be multiples of 16, must be <= M, N
-        bm_candidates = [b for b in valid_block_mn if b <= max(M, 16)]
-        bn_candidates = [b for b in valid_block_mn if b <= max(N, 16)]
-        if not bm_candidates:
-            bm_candidates = [16]
-        if not bn_candidates:
-            bn_candidates = [16]
-
-        block_M = random.choice(bm_candidates)
-        block_N = random.choice(bn_candidates)
-
-        # block_K: must be multiple of 8, must be <= K
-        bk_candidates = [b for b in valid_block_k if b <= max(K, 8)]
-        if not bk_candidates:
-            bk_candidates = [8]
-        block_K = random.choice(bk_candidates)
-
-        # threads: must pass warp partition check
-        threads = random.choice(valid_threads)
-        if not tilelang_check_warp_partition(block_M, block_N, threads):
-            # Try other thread counts
-            found = False
-            for t in valid_threads:
-                if tilelang_check_warp_partition(block_M, block_N, t):
-                    threads = t
-                    found = True
-                    break
-            if not found:
-                continue  # Retry with different block sizes
-
-        # Check shared memory (assume max 4 pipeline stages for worst case)
-        max_stages = 4
-        if not tilelang_check_shared_memory(block_M, block_N, block_K, dtype, num_stages=max_stages):
-            # Reduce block_K until it fits
-            for bk in sorted(valid_block_k):
-                if bk <= K and tilelang_check_shared_memory(block_M, block_N, bk, dtype, num_stages=max_stages):
-                    block_K = bk
-                    break
-            else:
-                continue  # Retry
-
-        return {
-            "M": M, "N": N, "K": K,
-            "block_M": block_M, "block_N": block_N, "block_K": block_K,
-            "threads": threads,
-        }
-
-    # Fallback: guaranteed valid config
-    return {
-        "M": 128, "N": 128, "K": 128,
-        "block_M": 64, "block_N": 64, "block_K": 32,
-        "threads": 128,
-    }
-
-
-# ============================================================
-# Triton constraints
-# ============================================================
-
-def triton_valid_block_sizes() -> list:
-    """Triton requires tile sizes to be powers of 2."""
-    return [16, 32, 64, 128, 256]
-
-
-def triton_check_shared_memory(block_M: int, block_N: int, block_K: int,
-                               dtype, num_stages: int = 1) -> bool:
-    """
-    Check Triton shared memory usage for a GEMM kernel.
-
-    Triton GEMM requires:
-      - A_tile: block_M * block_K * dtype_bytes  (input dtype)
-      - B_tile: block_K * block_N * dtype_bytes  (input dtype)
-      - acc:    block_M * block_N * 4            (always float32, not duplicated per stage)
-    A_tile + B_tile are duplicated by num_stages for software pipelining.
-
-    Hardware limit: TRITON_MAX_SHARED (87 KB on sm_89, 10% safety margin applied).
-    """
-    elem_size = dtype_bytes(dtype)
-    acc_size = 4  # accumulator is always float32
-    tiles_per_stage = (block_M * block_K + block_K * block_N) * elem_size
-    acc_total = block_M * block_N * acc_size
-    shared_bytes = tiles_per_stage * num_stages + acc_total
-    return shared_bytes <= TRITON_MAX_SHARED
-
-
-def triton_generate_valid_params(dim_pool: list, dtype) -> dict:
-    """Generate valid parameters for Triton. Triton needs power-of-2 tile sizes."""
-    valid_blocks = triton_valid_block_sizes()
-    valid_block_k = [16, 32, 64, 128]  # Triton tl.dot needs K dim to be power of 2 and >= 16
-
-    for _ in range(100):
-        M = random.choice(dim_pool)
-        N = random.choice(dim_pool)
-        K = random.choice(dim_pool)
-
-        bm_candidates = [b for b in valid_blocks if b <= max(M, 16)]
-        bn_candidates = [b for b in valid_blocks if b <= max(N, 16)]
-        if not bm_candidates:
-            bm_candidates = [16]
-        if not bn_candidates:
-            bn_candidates = [16]
-
-        block_M = random.choice(bm_candidates)
-        block_N = random.choice(bn_candidates)
-
-        bk_candidates = [b for b in valid_block_k if b <= max(K, 16)]
-        if not bk_candidates:
-            bk_candidates = [16]
-        block_K = random.choice(bk_candidates)
-
-        # Check shared memory
-        if not triton_check_shared_memory(block_M, block_N, block_K, dtype):
-            for bk in sorted(valid_block_k):
-                if bk <= K and triton_check_shared_memory(block_M, block_N, bk, dtype):
-                    block_K = bk
-                    break
-            else:
-                continue
-
-        # Triton num_stages — must also fit in shared memory
-        num_stages = random.choice([1, 2, 3, 4])
-        # Re-check with actual num_stages (multi-stage doubles/triples shmem)
-        if not triton_check_shared_memory(block_M, block_N, block_K, dtype, num_stages):
-            # Try to reduce num_stages first, then block_K
-            for ns in [1, 2]:
-                if triton_check_shared_memory(block_M, block_N, block_K, dtype, ns):
-                    num_stages = ns
-                    break
-            else:
-                for bk in sorted(valid_block_k):
-                    if bk <= K and triton_check_shared_memory(block_M, block_N, bk, dtype, num_stages):
-                        block_K = bk
-                        break
-                else:
-                    num_stages = 1  # fallback: single stage always uses least shmem
-
-        threads = 128  # Triton typically uses 128 threads (4 warps)
-
-        return {
-            "M": M, "N": N, "K": K,
-            "block_M": block_M, "block_N": block_N, "block_K": block_K,
-            "threads": threads,
-        }
-
-    return {
-        "M": 128, "N": 128, "K": 128,
-        "block_M": 64, "block_N": 64, "block_K": 32,
-        "threads": 128,
-    }
-
-
-# ============================================================
-# Unified interface
+# Unified interface — delegates to backend-specific params modules
 # ============================================================
 
 def generate_valid_params(backend: str, dim_pool: list, dtype,
                           transpose: bool = False) -> dict:
     """Generate hardware-valid parameters for the given backend."""
-    if backend == "tilelang":
-        params = tilelang_generate_valid_params(dim_pool, dtype)
-    elif backend == "triton":
-        params = triton_generate_valid_params(dim_pool, dtype)
+    from src.workflow.emitter.tilelang import params as tl_params
+    from src.workflow.emitter.triton import params as triton_params
+
+    if backend == "triton":
+        params = triton_params.generate_valid_params(dim_pool, dtype)
+        valid_mn_fn = triton_params.valid_block_sizes
     else:
-        params = tilelang_generate_valid_params(dim_pool, dtype)
+        params = tl_params.generate_valid_params(dim_pool, dtype)
+        valid_mn_fn = tl_params.valid_block_m_n
 
     # Transpose needs two shared buffers (A + B), so halve the allowed block size
     if transpose:
         elem = dtype_bytes(dtype)
         while params["block_M"] * params["block_N"] * elem * 2 > MAX_SHARED_MEMORY_BYTES:
-            valid_mn = tilelang_valid_block_m_n() if backend == "tilelang" else triton_valid_block_sizes()
-            smaller = [b for b in sorted(valid_mn) if b < params["block_N"]]
+            smaller = [b for b in sorted(valid_mn_fn()) if b < params["block_N"]]
             if smaller:
                 params["block_N"] = smaller[-1]
             else:
