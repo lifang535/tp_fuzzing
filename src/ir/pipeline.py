@@ -98,6 +98,7 @@ class TilePipeline:
             "M": self.M, "N": self.N, "K": self.K,
             "block_M": self.block_M, "block_N": self.block_N, "block_K": self.block_K,
             "threads": self.threads, "num_stages": self.num_stages,
+            "loop_kind": self.loop_kind.value if hasattr(self.loop_kind, "value") else self.loop_kind,
             "pipeline": [s.kind.value for s in self.steps],
             "pipeline_alphas": [s.alpha for s in self.steps],
         }

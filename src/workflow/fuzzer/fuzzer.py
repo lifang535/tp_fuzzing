@@ -68,6 +68,8 @@ class TileSmith:
             # Validate consistency: parse dir name and check against current config
             self._validate_resume_config(self.output_dir.name, config)
             self._load_history()
+            self._restore_rng_state()
+            self._restore_seed_pool()
         else:
             # New run: create fresh directory
             timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M")
@@ -116,29 +118,7 @@ class TileSmith:
 
         total_count = passed_count + failed_count
 
-        # Load summary to restore accurate trigger counts (which exceed file counts when
-        # is_new=False dups are recorded but not saved as files)
-        summary_path = self.output_dir / "summary.json"
-        if summary_path.exists():
-            try:
-                with open(summary_path) as f:
-                    s = json.load(f)
-                # root_causes in summary stores trigger counts; use it when a key's
-                # summary count >= file count (always true for valid summaries)
-                summary_root_causes = s.get("root_causes", {})
-                for rc, file_count in self.known_root_causes.items():
-                    summary_count = summary_root_causes.get(rc, 0)
-                    self.known_root_causes[rc] = max(file_count, summary_count)
-                # Also pick up root causes that appear in summary but have no files
-                # (shouldn't happen, but be defensive)
-                for rc, summary_count in summary_root_causes.items():
-                    if rc not in self.known_root_causes:
-                        self.known_root_causes[rc] = summary_count
-                self.stats.total_tested = max(total_count, s.get("total_tested", 0))
-            except (json.JSONDecodeError, KeyError):
-                self.stats.total_tested = total_count
-        else:
-            self.stats.total_tested = total_count
+        self.stats.total_tested = total_count
         self.stats.total_generated = self.stats.total_tested
 
         # bugs_total = sum of all trigger counts; bugs_unique = distinct root cause categories
@@ -150,6 +130,135 @@ class TileSmith:
         print(f"[resume] Known root causes: {self.known_root_causes}")
         print(f"[resume] Previous tests: {self.stats.total_tested}")
         print()
+
+    def _restore_rng_state(self):
+        rng_path = self.output_dir / "rng_state.json"
+        if not rng_path.exists():
+            print("[resume] No rng_state.json found, keeping current random state")
+            return
+        try:
+            with open(rng_path) as f:
+                s = json.load(f)
+            state = (s["version"], tuple(s["internalstate"]), s["gauss_next"])
+            random.setstate(state)
+            print("[resume] Restored random state from rng_state.json")
+        except Exception as e:
+            print(f"[resume] Failed to restore random state: {e}")
+
+    def _save_seed_pool(self):
+        if not self.seed_pool:
+            return
+        entries = []
+        for program in self.seed_pool:
+            entries.append(self._program_to_dict(program))
+        with open(self.output_dir / "seed_pool.json", "w") as f:
+            json.dump(entries, f, indent=2)
+
+    def _restore_seed_pool(self):
+        pool_path = self.output_dir / "seed_pool.json"
+        if not pool_path.exists():
+            return
+        try:
+            with open(pool_path) as f:
+                entries = json.load(f)
+            for d in entries:
+                program = self._dict_to_program(d)
+                if program is not None:
+                    self.seed_pool.append(program)
+            print(f"[resume] Restored seed_pool with {len(self.seed_pool)} entries")
+        except Exception as e:
+            print(f"[resume] Failed to restore seed_pool: {e}")
+
+    def _program_to_dict(self, program) -> dict:
+        """Serialize a program to a JSON-compatible dict (same format as passed files)."""
+        if isinstance(program, DynamicSequence):
+            return {
+                "type": "dynamic",
+                "sequence": [s.op_kind for s in program.steps],
+                "params": program.params_dict,
+                "dtype": program.dtype,
+            }
+        if isinstance(program, TilePipeline):
+            return {
+                "type": "pipeline",
+                "pipeline": [s.kind.value for s in program.steps],
+                "params": program.params_dict,
+                "dtype": program.dtype.value if hasattr(program.dtype, "value") else program.dtype,
+            }
+        # TileProgram (single_op)
+        kernel = program.kernels[0]
+        return {
+            "type": "single_op",
+            "compute_kind": kernel.compute_kind.value,
+            "params": kernel.params_dict,
+            "dtype": kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype,
+        }
+
+    @staticmethod
+    def _dict_to_program(d: dict):
+        """Deserialize a dict back to a program object."""
+        from src.ir import TileKernel, ComputeKind, LoopKind, DataType, TileProgram
+        from src.ir import TilePipeline, PipelineStep
+        from src.ir import DynamicSequence, KernelStep, TileValuePool
+
+        params = d.get("params", {})
+        type_ = d.get("type", "")
+
+        if type_ == "pipeline":
+            ops = params.get("pipeline", [])
+            alphas = params.get("pipeline_alphas", [1.0] * len(ops))
+            steps = [PipelineStep(kind=ComputeKind(op), alpha=a) for op, a in zip(ops, alphas)]
+            lk = params.get("loop_kind", "pipelined")
+            dtype_str = d.get("dtype", "float16")
+            return TilePipeline(
+                steps=steps,
+                M=params["M"], N=params["N"], K=params["K"],
+                block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
+                threads=params["threads"], num_stages=params["num_stages"],
+                loop_kind=LoopKind(lk) if isinstance(lk, str) else lk,
+                dtype=DataType(dtype_str) if isinstance(dtype_str, str) else dtype_str,
+            )
+
+        if type_ == "single_op":
+            ck = d.get("compute_kind", params.get("compute_kind", "gemm"))
+            lk = params.get("loop_kind", "pipelined")
+            dtype_str = d.get("dtype", "float16")
+            kernel = TileKernel(
+                name="kernel_0",
+                compute_kind=ComputeKind(ck),
+                M=params["M"], N=params["N"], K=params["K"],
+                block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
+                threads=params["threads"], num_stages=params["num_stages"],
+                loop_kind=LoopKind(lk) if isinstance(lk, str) else lk,
+                dtype=DataType(dtype_str) if isinstance(dtype_str, str) else dtype_str,
+                alpha=params.get("alpha", 1.0),
+            )
+            return TileProgram(kernels=[kernel])
+
+        if type_ == "dynamic":
+            # Rebuild a minimal DynamicSequence with just the scalar fields.
+            # The pool and step buffers are not needed by the mutator (it only
+            # reads op_kind and scalar params before regenerating the sequence).
+            ops = params.get("sequence", [])
+            alphas = params.get("sequence_alphas", [1.0] * len(ops))
+            steps = [
+                KernelStep(op_kind=op, inputs=[], outputs=[],
+                           attrs={"alpha": a} if op == "scale" else {},
+                           torch_ref_update="")
+                for op, a in zip(ops, alphas)
+            ]
+            lk = params.get("loop_kind", "pipelined")
+            return DynamicSequence(
+                steps=steps,
+                pool=TileValuePool(),
+                M=params["M"], N=params["N"], K=params["K"],
+                block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
+                threads=params["threads"], num_stages=params["num_stages"],
+                loop_kind=lk if isinstance(lk, str) else lk.value,
+                dtype=d.get("dtype", "float16"),
+            )
+
+        return None
 
     @staticmethod
     def _validate_resume_config(dir_name: str, config):
@@ -222,54 +331,74 @@ class TileSmith:
         i = 0
         new_tested = 0
 
-        while new_tested < num_iterations:
-            # Rotate dim_pool periodically based on generation attempts
-            if i > 0 and i % pool_rotation_interval == 0:
-                self.generator.type_gen._init_pool()
-                if verbose:
-                    print(f"[{i}] dim_pool rotated → {self.generator.type_gen.dim_pool[:5]}...")
+        try:
+            while new_tested < num_iterations:
+                # Rotate dim_pool periodically based on generation attempts
+                if i > 0 and i % pool_rotation_interval == 0:
+                    self.generator.type_gen._init_pool()
+                    if verbose:
+                        print(f"[{i}] dim_pool rotated → {self.generator.type_gen.dim_pool[:5]}...")
 
-            program = self._generate_test_case()
-            self.stats.total_generated += 1
-            i += 1
+                program = self._generate_test_case()
+                self.stats.total_generated += 1
+                i += 1
 
-            # Dedup
-            config_sig = self._make_sig(program)
-            if config_sig in self.tested_configs:
-                continue
-            self.tested_configs.add(config_sig)
+                # Dedup
+                config_sig = self._make_sig(program)
+                if config_sig in self.tested_configs:
+                    if verbose:
+                        print(f"[{i}] [DUPLICATE] {self._kind_label(program)}")
+                    continue
+                self.tested_configs.add(config_sig)
 
-            # Test
-            bug = self.oracle.test(program)
-            self.stats.total_tested += 1
-            new_tested += 1
+                # Test
+                bug = self.oracle.test(program)
+                self.stats.total_tested += 1
+                new_tested += 1
 
-            if bug:
-                self.stats.bugs_found.append(bug)
-                is_new = self.known_root_causes.get(bug.root_cause, 0) < self.config.max_same_root_cause
-                if is_new:
-                    self.stats.unique_bugs.append(bug)
-                    self._save_bug(bug, i, program)
-                self.known_root_causes[bug.root_cause] = self.known_root_causes.get(bug.root_cause, 0) + 1
-                if verbose:
-                    marker = "NEW" if is_new else "dup"
-                    print(f"[{new_tested}] BUG ({marker}): {bug.summary()}")
-            else:
-                self._save_passed(program, i)
-                if random.random() < self.config.seed_add_prob:
-                    self.seed_pool.append(program)
-                    if len(self.seed_pool) > self.config.seed_pool_max:
-                        self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
+                if bug:
+                    self.stats.bugs_found.append(bug)
+                    is_new = self.known_root_causes.get(bug.root_cause, 0) < self.config.max_same_root_cause
+                    if is_new:
+                        self.stats.unique_bugs.append(bug)
+                        self._save_bug(bug, i, program)
+                    self.known_root_causes[bug.root_cause] = self.known_root_causes.get(bug.root_cause, 0) + 1
+                    if verbose:
+                        marker = "NEW" if is_new else "dup"
+                        print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}")
+                else:
+                    self._save_passed(program, i)
+                    if random.random() < self.config.seed_add_prob:
+                        self.seed_pool.append(program)
+                        if len(self.seed_pool) > self.config.seed_pool_max:
+                            self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
+                    if verbose:
+                        print(f"[{i}] [PASSED] {self._kind_label(program)}")
 
-            if verbose and new_tested % 100 == 0:
-                total_bugs = self._historical_bugs_total + len(self.stats.bugs_found)
-                total_unique = self._historical_bugs_unique + len(self.stats.unique_bugs)
-                print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} unique={total_unique}")
+                if verbose and new_tested % 100 == 0:
+                    total_bugs = self._historical_bugs_total + len(self.stats.bugs_found)
+                    total_unique = self._historical_bugs_unique + len(self.stats.unique_bugs)
+                    print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} unique={total_unique}")
 
-        # bugs_total = sum of all root_cause counters (consistent with root_causes dict)
-        # bugs_unique = number of distinct root cause categories
-        bugs_total = sum(self.known_root_causes.values())
-        bugs_unique = len(self.known_root_causes)
+        finally:
+            bugs_total = sum(self.known_root_causes.values())
+            bugs_unique = len(self.known_root_causes)
+
+            summary = {
+                "backend": self.backend,
+                "total_tested": self.stats.total_tested,
+                "bugs_total": bugs_total,
+                "bugs_unique": bugs_unique,
+                "root_causes": self.known_root_causes,
+            }
+            with open(self.output_dir / "summary.json", "w") as f:
+                json.dump(summary, f, indent=2)
+
+            rng_state = random.getstate()
+            with open(self.output_dir / "rng_state.json", "w") as f:
+                json.dump({"version": rng_state[0], "internalstate": list(rng_state[1]), "gauss_next": rng_state[2]}, f)
+
+            self._save_seed_pool()
 
         if verbose:
             print()
@@ -277,16 +406,6 @@ class TileSmith:
                 max(0, bugs_total - len(self.stats.bugs_found)),
                 max(0, bugs_unique - len(self.stats.unique_bugs)),
             ))
-
-        summary = {
-            "backend": self.backend,
-            "total_tested": self.stats.total_tested,
-            "bugs_total": bugs_total,
-            "bugs_unique": bugs_unique,
-            "root_causes": self.known_root_causes,
-        }
-        with open(self.output_dir / "summary.json", "w") as f:
-            json.dump(summary, f, indent=2)
 
         return self.stats
 
