@@ -3,6 +3,7 @@ TileSmith Fuzzer — Main fuzzing loop.
 """
 
 import json
+import pickle
 import random
 import time
 from datetime import datetime
@@ -141,7 +142,18 @@ class TileSmith:
                 s = json.load(f)
             state = (s["version"], tuple(s["internalstate"]), s["gauss_next"])
             random.setstate(state)
-            print("[resume] Restored random state from rng_state.json")
+            self._resume_generation_attempts = s.get("generation_attempts", 0)
+            pending_path = self.output_dir / "pending_program.pkl"
+            if pending_path.exists():
+                try:
+                    with open(pending_path, "rb") as pf:
+                        pending_i, pending_program = pickle.load(pf)
+                    self._resume_pending_i = pending_i
+                    self._resume_pending_program = pending_program
+                    print(f"[resume] Restored pending program [{pending_i}] (interrupted test will be re-run)")
+                except Exception as pe:
+                    print(f"[resume] Failed to restore pending program: {pe}")
+            print(f"[resume] Restored random state from rng_state.json (generation_attempts={self._resume_generation_attempts})")
         except Exception as e:
             print(f"[resume] Failed to restore random state: {e}")
 
@@ -328,31 +340,46 @@ class TileSmith:
         pool_rotation_interval = self.config.pool_rotation_interval
         # i counts all generation attempts (including dedup skips); new_tested counts
         # only cases actually tested this session — loop runs until new_tested == num_iterations
-        i = 0
+        i = getattr(self, '_resume_generation_attempts', 0)
         new_tested = 0
+        # If a previous run was interrupted mid-test, resume that program first.
+        _pending_program = getattr(self, '_resume_pending_program', None)
+        _pending_i = getattr(self, '_resume_pending_i', None)
+        _inflight_i, _inflight_program = None, None  # set around oracle.test(); used by finally
 
         try:
             while new_tested < num_iterations:
-                # Rotate dim_pool periodically based on generation attempts
-                if i > 0 and i % pool_rotation_interval == 0:
-                    self.generator.type_gen._init_pool()
-                    if verbose:
-                        print(f"[{i}] dim_pool rotated → {self.generator.type_gen.dim_pool[:5]}...")
+                if _pending_program is not None:
+                    # Resume the interrupted program directly (already past dedup).
+                    program = _pending_program
+                    i = _pending_i
+                    self.tested_configs.add(self._make_sig(program))
+                    self.stats.total_generated += 1
+                    _pending_program = None
+                    _pending_i = None
+                else:
+                    # Rotate dim_pool periodically based on generation attempts
+                    if i > 0 and i % pool_rotation_interval == 0:
+                        self.generator.type_gen._init_pool()
+                        if verbose:
+                            print(f"[{i}] dim_pool rotated → {self.generator.type_gen.dim_pool[:5]}...")
 
-                program = self._generate_test_case()
-                self.stats.total_generated += 1
-                i += 1
+                    program = self._generate_test_case()
+                    self.stats.total_generated += 1
+                    i += 1
 
-                # Dedup
-                config_sig = self._make_sig(program)
-                if config_sig in self.tested_configs:
-                    if verbose:
-                        print(f"[{i}] [DUPLICATE] {self._kind_label(program)}")
-                    continue
-                self.tested_configs.add(config_sig)
+                    # Dedup
+                    config_sig = self._make_sig(program)
+                    if config_sig in self.tested_configs:
+                        if verbose:
+                            print(f"[{i}] [DUPLICATE] {self._kind_label(program)}")
+                        continue
+                    self.tested_configs.add(config_sig)
 
-                # Test
+                # Test — track inflight program so interrupt can resume it
+                _inflight_i, _inflight_program = i, program
                 bug = self.oracle.test(program)
+                _inflight_i, _inflight_program = None, None
                 self.stats.total_tested += 1
                 new_tested += 1
 
@@ -396,7 +423,19 @@ class TileSmith:
 
             rng_state = random.getstate()
             with open(self.output_dir / "rng_state.json", "w") as f:
-                json.dump({"version": rng_state[0], "internalstate": list(rng_state[1]), "gauss_next": rng_state[2]}, f)
+                json.dump({
+                    "version": rng_state[0],
+                    "internalstate": list(rng_state[1]),
+                    "gauss_next": rng_state[2],
+                    "generation_attempts": i,
+                }, f)
+            pending_path = self.output_dir / "pending_program.pkl"
+            # _inflight_program is non-None only when interrupt happened inside oracle.test()
+            if _inflight_program is not None:
+                with open(pending_path, "wb") as f:
+                    pickle.dump((_inflight_i, _inflight_program), f)
+            elif pending_path.exists():
+                pending_path.unlink()
 
             self._save_seed_pool()
 
