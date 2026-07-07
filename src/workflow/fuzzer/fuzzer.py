@@ -70,6 +70,7 @@ class TileSmith:
             self._validate_resume_config(self.output_dir.name, config)
             self._load_history()
             self._restore_rng_state()
+            self._restore_dim_pool()
             self._restore_seed_pool()
         else:
             # New run: create fresh directory
@@ -156,6 +157,21 @@ class TileSmith:
             print(f"[resume] Restored random state from rng_state.json (generation_attempts={self._resume_generation_attempts})")
         except Exception as e:
             print(f"[resume] Failed to restore random state: {e}")
+
+    def _save_dim_pool(self):
+        with open(self.output_dir / "dim_pool.json", "w") as f:
+            json.dump(self.generator.type_gen.dim_pool, f)
+
+    def _restore_dim_pool(self):
+        pool_path = self.output_dir / "dim_pool.json"
+        if not pool_path.exists():
+            return
+        try:
+            with open(pool_path) as f:
+                self.generator.type_gen.dim_pool = json.load(f)
+            print(f"[resume] Restored dim_pool ({len(self.generator.type_gen.dim_pool)} entries)")
+        except Exception as e:
+            print(f"[resume] Failed to restore dim_pool: {e}")
 
     def _save_seed_pool(self):
         if not self.seed_pool:
@@ -437,6 +453,7 @@ class TileSmith:
             elif pending_path.exists():
                 pending_path.unlink()
 
+            self._save_dim_pool()
             self._save_seed_pool()
 
         if verbose:
