@@ -17,6 +17,7 @@ env/
 
 # Fuzzing results
 results/
+reports/*/results_*/
 
 # Claude Code
 .claude/
