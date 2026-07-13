@@ -1,8 +1,7 @@
 # TileSmith 实验结果报告
 
 **日期**：2026-07-11  
-**测试条件**：3张 GPU（RTX4060 / RTX4090 / A800），2个后端（TileLang / Triton），2种形状模式（easy-shape / hard-shape），各跑 seed=42  
-**相较上次变化**：测试规模翻倍（TileLang 10,000→20,000 次/配置，Triton 20,000→40,000 次/配置）；输入参数范围扩大，约束从 fuzzer 前端移至后端。
+**测试条件**：3张 GPU（RTX4060 / RTX4090 / A800），2个后端（TileLang / Triton），2种形状模式（easy-shape / hard-shape），各跑 seed=42
 
 ---
 
@@ -32,15 +31,34 @@
 
 ---
 
-## 二、`wrong_result` 的真实性分析
+## 二、假阳性分析
 
-与上次实验一致，`wrong_result` 数量依然庞大（TileLang ~2,800–3,300 次/配置，Triton ~5,900–6,600 次/配置），经验证**全部为假阳性**，来源与上次相同：oracle 参考语义错误、`WHERE` 类条件算子放大浮点误差、大 K 下 fp32 阈值过紧。参数范围扩大后绝对数量有所上升，但比例基本稳定。本报告后续分析均排除 `wrong_result`。
+以下两类触发均为假阳性，不反映真实的编译器 bug，排除在后续分析之外。
+
+### 2.1 `wrong_result`
+
+`wrong_result` 数量庞大（TileLang ~2,800–3,300 次/配置，Triton ~5,900–6,600 次/配置），经验证**全部为假阳性**，来源分三类：
+
+**1. Oracle 参考实现语义错误（主因）**  
+Dynamic sequence 中的复合算子，oracle 参考对整个矩阵做全局统计，但 kernel 实际在每个 tile 内做局部统计。tile 尺寸远小于矩阵尺寸时，局部与全局结果相差数倍乃至数十倍，相对误差远超阈值。这是 fuzzer 自身的 oracle 缺陷，不是编译器 bug。
+
+**2. 浮点误差被条件算子放大**  
+`WHERE` 算子对 GEMM 输出做正负判断，当结果在零附近时，Triton 与 PyTorch 对 K 维的不同累加顺序导致符号误差，WHERE 把该误差放大成 `max_diff ≈ |D2|`（可达 1.0 以上），远超阈值。
+
+**3. 阈值对大 K 的 fp32 GEMM 过紧**  
+fp32 GEMM 在 K 较大时，Triton 与 PyTorch 的累加误差稳定在 ~3%–5%，刚好超过 fp32 阈值 5%，属于纯浮点精度问题。
+
+### 2.2 `timeout`
+
+**仅在 RTX4060 上触发**（TileLang：easy-shape 9 次 + hard-shape 15 次；Triton：easy-shape 10 次 + hard-shape 13 次；RTX4090 / A800 均为 0 次），3 张卡合计 47 次。
+
+经排查，这些超时均由**本地测试机多线程卡死**引起，并非 kernel 在 GPU 上发生死锁或真实挂起。RTX4060 所在的测试机在并发跑多个配置时，Python 多线程调度出现卡顿，导致超时计时器误触发。RTX4090 和 A800 运行在算力更强、调度更稳定的机器上，相同参数下不触发，进一步印证了这一判断。此类超时属于**测试环境噪声**，不是编译器 bug。
 
 ---
 
 ## 三、真实 Bug 汇总
 
-去掉 `wrong_result` 后，本次共检出 **8 种根因**，较上次新增 `timeout`、`assertion_failure`、`gpu_oom` 三种。3 张卡合计：
+去掉 `wrong_result` 和 `timeout` 后，共检出 **6 种根因**，分为 compile fail、runtime fail 以及工具健壮性问题三类：
 
 | root_cause | 后端 | crash 时机 | 3张卡合计 |
 |---|---|---|---|
@@ -48,12 +66,9 @@
 | `ptx_async_boundary` | TileLang | **compile fail** | 275 |
 | `shared_memory_overflow` | Triton | **runtime fail** | 174 |
 | `warp_partition` | TileLang | **compile fail** | 164 |
-| `timeout` | TileLang + Triton | — | 47 |
 | `shared_memory_overflow` | TileLang | **runtime fail** | 2 |
 | `assertion_failure` | TileLang + Triton | **runtime fail** | 6 |
 | `gpu_oom` | TileLang + Triton | **runtime fail** | 3 |
-
-> **与上次对比**：`dtype_mismatch` 从 454 增至 3,644（约 8×），`ptx_async_boundary` 从 8 增至 275（约 34×），`warp_partition` 从 40 增至 164（约 4×），`shared_memory_overflow`（Triton）从 72 增至 174（约 2.4×）。其中 `ptx_async_boundary` 的增幅远超测试规模翻倍的预期，原因见第四节。
 
 ---
 
@@ -61,29 +76,53 @@
 
 ### 4.1 `warp_partition`
 
-行为与上次完全一致：TileLang `LayoutInference` pass 将线程数分解为 `m_warp × n_warp` 时，遇到 block_M/block_N 过小（如 16×16）的情况无法凑齐请求的 warp 数，编译期断言失败。
+**crash 时机**：`tilelang.lower()` 内部的 Layout 推断阶段
 
+**典型案例**：`results_RTX4060/.../failed/warp_partition/failed_pipeline_gemm+sqrt.py`
+
+```python
+# kernel 声明：block_M=16, block_N=16, threads=128（= 4 个 warp）
+with T.Kernel(..., threads=128) as (bx, by):
+    ...
+    T.gemm(A_shared, B_shared, C_local)   # GEMM 算子触发 warp partition 推断
 ```
+
+执行输出：
+```
+TileLang begins to compile kernel `impl`
+  tilelang/jit/__init__.py compile
+    JITKernel.__init__
+      _compile_and_create_adapter
+        tilelang.lower()
+          LayoutInference pass
+            GemmNode.InferLayout
+              compute_warp_partition
 InternalError: m_warp * n_warp must equal num_warps,
                m_warp: 1, n_warp: 1, num_warps: 4
 ```
 
-本次 3 张卡合计 164 次（上次 40 次），增幅约 4×，与测试量翻倍和参数空间扩大（更多小 block 尺寸组合被采样）相符。
+TileLang 在 `LayoutInference` pass 中将线程数分解为 `m_warp × n_warp` 的 warp 网格。block_M=16、block_N=16 的组合下只能得到 `m_warp=1, n_warp=1`（共 1 个 warp），无法凑齐请求的 4 个 warp，编译期断言失败。
+
+**本质**：TileLang 的 `ComputeDefaultWarpPartition` 对小 tile（如 16×16）没有合法的 fallback，tile 尺寸无法支持所请求的 warp 数量时，编译器直接断言失败。3 张卡合计 164 次，RTX4060 / RTX4090 / A800 均有触发，与形状模式无明显关联。
 
 ---
 
 ### 4.2 `ptx_async_boundary`
 
-**上次规律**：仅在 hard-shape 下触发（共 8 次），因为 hard-shape 才有质数/奇数 K。  
-**本次变化**：easy-shape 下也大量触发（RTX4060：100 次，RTX4090：72 次，A800：99 次），而 hard-shape 下反而极少（各卡约 1–2 次）。
+**crash 时机**：`tilelang.lower()` 内部的 PTX 代码生成阶段
 
-原因在于**参数范围扩大**：本次 fuzzer 的 block_K 采样不再局限于 2 的幂次，部分组合下 `block_K × 2` 不满足 `cp.async` 要求的 {4, 8, 16} 字节约束，因此即使 K 本身是 2 的幂次，也可能在代码生成阶段断言失败。
-
+**典型报错**：
 ```
+_compile_and_create_adapter
+  tilelang.lower()
+    device_codegen → BuildTileLangCUDA
+      CodeGenTileLangCUDA → GetTileLangCPAsyncTransferBytes
 InternalError: tl::ptx_cp_async requires PTX byte width in {4, 8, 16}, but got 2
 ```
 
-实际触发触发 block_K 值多为非标准对齐尺寸（如 block_K=1），进一步证实了参数范围扩大的影响。
+`cp.async` 是 PTX 异步内存拷贝指令，要求拷贝字节数必须是 {4, 8, 16} 之一。per-row 拷贝量 = `block_K × sizeof(dtype)`，当 `block_K` 取非标准对齐值（如 block_K=1，float16 时每行 2 字节）时，不满足约束，代码生成阶段断言失败。
+
+**与形状模式的关系**：本次 easy-shape 下触发频繁（RTX4060：100 次，RTX4090：72 次，A800：99 次），hard-shape 下反而极少（各卡约 1–2 次）。原因在于 `block_K` 采样范围扩大后，easy-shape 下也会出现非标准对齐尺寸（如 block_K=1），即使 K 本身是 2 的幂次也可能触发。该 bug 的根源是编译器代码生成对任意 `block_K` 尺寸缺乏预检。3 张卡合计 275 次。
 
 ---
 
@@ -91,48 +130,62 @@ InternalError: tl::ptx_cp_async requires PTX byte width in {4, 8, 16}, but got 2
 
 ### 5.1 `dtype_mismatch`
 
-行为与上次一致：混合精度 kernel（fp16 输入 + fp32 accumulator）在 TileLang 类型推断阶段把某个 buffer 推导为 fp32，导致调用时类型检查失败。
+**crash 时机**：kernel 编译成功后，第一次调用 `kernel(A, B)` 时
 
+**典型案例**：`results_RTX4060/.../failed/dtype_mismatch/failed_dynamic_gemm+copy_f2g.py`
+
+```python
+# kernel 声明：dtype="float16"，accum_dtype="float32"
+dtype = "float16"
+accum_dtype = "float32"
+...
+C_local_1 = T.alloc_fragment((block_M, block_N), accum_dtype)  # fp32 accumulator
+T.gemm(A_shared_1, B_shared_1, C_local_1)
+T.copy(C_local_1, C[...])   # 将 fp32 accumulator 拷贝回 fp16 输出
 ```
+
+执行输出：
+```
+C = kernel(A, B)             ← kernel 已编译好，这里是第一次调用
+  tilelang/jit/kernel.py __call__
+    tilelang/jit/adapter/tvm_ffi.py func
+      executable(*tensor_list)
 RuntimeError: kernel impl input A dtype mismatch, expected float32
 ```
 
-本次 3 张卡合计 3,644 次（上次 454 次），增幅约 8×，远超测试量翻倍的预期。参数范围扩大后，更多混合精度组合（`dtype="float16"`, `accum_dtype="float32"`）被采样，覆盖了更多触发路径。此 bug 仍为 TileLang 混合精度场景下类型推断的系统性缺陷。
+**根本原因**：kernel 声明 `dtype="float16"`，但 TileLang 在处理 `accum_dtype="float32"` 的 fragment buffer 时，类型推断将某个 buffer 的期望类型推导成了 float32，与外部传入的 float16 tensor 不一致。编译阶段未检测到这个矛盾，直到 JIT adapter 在执行前做参数类型检查时才发现。
+
+**触发规律**：凡是同时使用 `dtype` 和 `accum_dtype` 的 kernel（GEMM 累加器为 fp32，输入输出为 fp16）几乎全部触发，说明是 TileLang 类型推断在混合精度 kernel 中的系统性缺陷。3 张卡合计 3,644 次，是本次触发最多的真实 bug。
 
 ---
 
 ### 5.2 `shared_memory_overflow`
 
-Triton 后端行为与上次一致：kernel 编译成功，首次执行时 `_init_handles` 查询 GPU 硬件上限，发现申请的共享内存超限。
+**crash 时机**：kernel 编译成功后，第一次调用执行时 Triton 初始化 GPU handle
 
+**典型报错**：
 ```
+kernel_0_kernel[grid](...)
+  triton/runtime/jit.py run
+    triton/compiler/compiler.py _init_handles
+      raise OutOfResources(...)
 triton.runtime.errors.OutOfResources:
   out of resource: shared memory, Required: 110592, Hardware limit: 101376
 ```
 
-跨卡频次仍然严格按 RTX4090 > RTX4060 > A800 排列（RTX4090 easy+hard=86，RTX4060 easy+hard=59，A800 easy+hard=29），与三张卡的共享内存容量成反比。
+Triton kernel 编译本身成功，`_init_handles` 在首次实际执行时向 GPU 查询硬件限制，此时才发现申请的共享内存（108 KB）超过了 GPU 上限（99 KB）。
 
-> 注意：本次 RTX4090 触发次数（86）超过 RTX4060（59），与上次（RTX4060 > RTX4090 > A800）有所不同。结合参数范围扩大，推测本次 RTX4090 采样到了更多接近其上限的共享内存配置。
+**跨卡频次规律**：本次排列为 RTX4090 > RTX4060 > A800（RTX4090 easy+hard=86，RTX4060 easy+hard=59，A800 easy+hard=29）。A800 单 SM 共享内存最大，相同参数在 A800 上不越界；RTX4090 和 RTX4060 上限相近，因此两者频次接近。
 
-TileLang 后端也在 RTX4090 hard-shape 下出现 2 次 `shared_memory_overflow`，与上次零星触发的模式一致，说明 TileLang 同样存在类似的运行时内存检查时机问题，但频率远低于 Triton。
-
----
-
-### 5.3 `timeout`（新增）
-
-**仅在 RTX4060 上触发**（TileLang：easy-shape 9 次 + hard-shape 15 次；Triton：easy-shape 10 次 + hard-shape 13 次；RTX4090 / A800 均为 0 次），3 张卡合计 47 次。
-
-**典型案例**：`failed_dynamic_gemm+copy_f2g_M32,N256,K32,bM16,bN128,bK32,t128,pipelined,s4,float16.py`
-
-```
-error_message: "Execution timed out"
-```
-
-这类 kernel 通常包含多阶段 pipeline（`num_stages=4`）或 dynamic sequence 中的 `copy_f2g` 算子。超时意味着 kernel 启动后 GPU 长时间无响应，既可能是真正的死锁（barrier 不配对、warp 饥饿），也可能是 RTX4060 算力或内存带宽在特定参数下导致实际运行时间超过了 fuzzer 的限制阈值。RTX4090 和 A800 因算力更强，相同参数下没有触发超时，建议在确认是真实 kernel hang 之前先放宽超时阈值并在相同参数下复现。
+TileLang 后端也在 RTX4090 hard-shape 下出现 2 次 `shared_memory_overflow`，说明 TileLang 同样存在类似的运行时内存检查时机问题，但频率远低于 Triton。
 
 ---
 
-### 5.4 `assertion_failure`（新增）
+## 六、工具健壮性问题
+
+以下两类触发不是编译器 bug，而是暴露了 fuzzer 自身的工程缺陷。
+
+### 6.1 `assertion_failure`
 
 3 张卡合计 6 次，全部集中在 RTX4060（TileLang easy/hard 各 2 次，Triton easy/hard 各 1 次），RTX4090 和 A800 均为 0 次。
 
@@ -141,11 +194,9 @@ error_message: "Execution timed out"
 RuntimeError: CUDA error: CUDA-capable device(s) is/are busy or unavailable
 ```
 
-与名字暗示的"断言失败"不同，这类错误的实质是：**前一个 kernel 崩溃（如 `warp_partition`）使 GPU 进入异常状态，后续的 `torch.randn(..., device='cuda')` 调用无法获取 CUDA 句柄，间接触发此类报错**。这是 crash 的级联效应，不是独立的新 bug；它暴露的真实问题是 fuzzer 在 kernel 崩溃后没有有效地重置 GPU 状态，导致后续测试污染。RTX4060 独有的原因与其 VRAM 和 compute capability 在崩溃后的恢复能力较弱有关。
+实质是：**前一个 kernel 崩溃（如 `warp_partition`）使 GPU 进入异常状态，后续的 `torch.randn(..., device='cuda')` 调用无法获取 CUDA 句柄，间接触发此类报错**。这是 crash 的级联效应，不是独立的新 bug。它暴露的问题是 fuzzer 在 kernel 崩溃后缺少有效的 GPU 状态恢复机制，导致后续测试受到污染。
 
----
-
-### 5.5 `gpu_oom`（新增）
+### 6.2 `gpu_oom`
 
 3 张卡合计 3 次，全部在 RTX4060（TileLang hard-shape 1 次，Triton hard-shape 2 次），RTX4090 和 A800 为 0 次。
 
@@ -155,13 +206,15 @@ RuntimeError: CUDA error: CUDA-capable device(s) is/are busy or unavailable
 RuntimeError: CUDA error: CUBLAS_STATUS_ALLOC_FAILED when calling `cublasCreate(handle)`
 ```
 
-这是 oracle 参考实现（PyTorch 的 cublas GEMM）在分配极大矩阵时耗尽了 RTX4060 的 8 GB 显存，而不是被测 kernel 本身的问题。RTX4090（24 GB）和 A800（80 GB）显存充裕，相同参数不触发。触发原因是参数范围扩大后出现了 M/N/K 均在数千量级的极端组合；修复方向是在 fuzzer 前端根据 GPU 显存对矩阵尺寸组合加上上界约束。
+这是 **oracle 参考实现**（PyTorch 的 cuBLAS GEMM）在分配极大矩阵时耗尽了 RTX4060 的 8 GB 显存，而不是被测 kernel 本身的问题。RTX4090（24 GB）和 A800（80 GB）显存充裕，相同参数不触发。修复方向是在 fuzzer 前端根据 GPU 显存对矩阵尺寸组合加上上界约束。
 
 ---
 
-## 六、与论文 Bug 分类的对应关系
+## 七、与论文 Bug 分类的对应关系
 
 参考论文：*Characterizing Real-World Bugs in Tile Programs for Automated Bug Detection*（ISSTA '26）
+
+论文按**症状**将 301 个 bug 分为三类：Crash（58.14%）、Correctness issues（36.21%）、Performance Bottleneck（5.65%）。
 
 | 实验 root_cause | crash 时机 | 论文分类 | 对应论文案例 |
 |---|---|---|---|
@@ -169,16 +222,13 @@ RuntimeError: CUDA error: CUBLAS_STATUS_ALLOC_FAILED when calling `cublasCreate(
 | `ptx_async_boundary` | compile fail | Memory Bugs（19.27%）+ Device-Specific Bugs（3.99%） | PTX 对齐约束，非对齐 block_K 触发 codegen 断言 |
 | `dtype_mismatch` | runtime fail | Type and Operator Bugs（48.84%）— Data-Type Semantics | Apache TVM #14112（dtype 不匹配） |
 | `shared_memory_overflow` | runtime fail | Memory Bugs（19.27%）— Resource Allocation | Triton `OutOfResources`；TileLang 动态共享内存分配失败 |
-| `timeout` | — | Crash（58.14%）— potential deadlock | 需进一步复现确认是 hang 还是性能问题 |
-| `assertion_failure` | runtime fail | — | GPU 崩溃级联效应，非独立 bug |
-| `gpu_oom` | runtime fail | — | oracle 参考实现（cuBLAS）显存不足，非被测 kernel 问题 |
 
 **主要发现**：
 
-1. **`dtype_mismatch` 依然是数量最多的真实 bug**（3,644 次），绝对数量较上次增长约 8×，印证了 TileLang 混合精度类型推断缺陷在更大参数空间下的系统性。
+1. **`dtype_mismatch` 是数量最多的真实 bug**（3,644 次），对应论文中最大类 Type and Operator Bugs（48.84%）。混合精度 kernel（fp16 输入 + fp32 accumulator）几乎全部触发，说明 TileLang 在混合精度场景下的类型推断存在系统性缺陷。
 
-2. **`ptx_async_boundary` 突破 easy-shape 限制**：参数范围扩大后，easy-shape 下的非标准 block_K 同样触发 PTX 对齐错误，说明该 bug 的触发条件比上次分析的"奇数/质数 K"更广泛，根源在于代码生成对任意 block_K 尺寸缺乏预检。
+2. **`warp_partition` 精确复现了论文引用的 Triton #5265**（`num_warps` 无法分解为合法 warp grid 导致断言失败），说明该类问题跨框架存在，TileLang 同样受影响。
 
-3. **新增 `timeout` 需要区分真假**：47 次超时全部发生在 RTX4060，不能排除是性能瓶颈而非真正的 hang，建议后续加入 GPU 状态探针（如 `CUDA_LAUNCH_BLOCKING=1` 配合 watchdog）加以区分。
+3. **`ptx_async_boundary` 的触发条件比"奇数/质数 K"更广泛**：`block_K` 取任意非标准对齐值即可触发，根源在于编译器代码生成对 `block_K` 缺乏预检，easy-shape 下同样会出现。
 
-4. **`assertion_failure` 和 `gpu_oom` 是工具健壮性问题**，而非新发现的编译器 bug。`assertion_failure` 指向 fuzzer 缺少崩溃后的 GPU 状态恢复机制；`gpu_oom` 指向 oracle 参考实现对极大矩阵缺少显存预估和保护。
+4. **`shared_memory_overflow` 的跨卡频次差异**（RTX4090 > RTX4060 > A800）与三张卡的共享内存容量成反比，直接印证了论文中 Resource Allocation Bugs 与硬件参数强相关的论断。

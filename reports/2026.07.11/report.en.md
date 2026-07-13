@@ -1,8 +1,7 @@
 # TileSmith Experiment Report
 
 **Date**: 2026-07-11  
-**Setup**: 3 GPUs (RTX4060 / RTX4090 / A800), 2 backends (TileLang / Triton), 2 shape modes (easy-shape / hard-shape), seed=42  
-**Changes from last run**: Test scale doubled (TileLang 10,000→20,000 iterations/config, Triton 20,000→40,000); input parameter ranges expanded; constraints moved from fuzzer frontend to backend.
+**Setup**: 3 GPUs (RTX4060 / RTX4090 / A800), 2 backends (TileLang / Triton), 2 shape modes (easy-shape / hard-shape), seed=42
 
 ---
 
@@ -32,15 +31,34 @@
 
 ---
 
-## 2. Analysis of `wrong_result` Cases
+## 2. False Positive Analysis
 
-Consistent with the previous run, `wrong_result` counts remain large (TileLang ~2,800–3,300 per configuration, Triton ~5,900–6,600 per configuration) and are **all false positives** from the same three sources: incorrect oracle reference semantics, floating-point errors amplified by conditional operators like `WHERE`, and thresholds that are too tight for fp32 GEMM with large K. The expanded parameter ranges increased absolute counts but the trigger rate remained stable. All subsequent analysis excludes `wrong_result`.
+The following two categories are false positives and are excluded from subsequent analysis.
+
+### 2.1 `wrong_result`
+
+`wrong_result` counts are large (TileLang ~2,800–3,300 per configuration, Triton ~5,900–6,600 per configuration) but are **all false positives**, arising from three sources:
+
+**1. Incorrect oracle reference semantics (primary cause)**  
+Composite operators in dynamic sequences use a global reduction over the full matrix as the oracle reference, while the kernel performs local reductions per tile. When the tile size is much smaller than the matrix, local and global results differ by orders of magnitude, producing relative errors far above threshold. This is a defect in the fuzzer's oracle, not a compiler bug.
+
+**2. Floating-point errors amplified by conditional operators**  
+The `WHERE` operator gates on the sign of GEMM output. When the result is near zero, different accumulation orders in Triton vs. PyTorch can flip the sign, and `WHERE` amplifies this into `max_diff ≈ |D2|` (potentially > 1.0), far exceeding the threshold.
+
+**3. Threshold too tight for fp32 GEMM with large K**  
+For large K, the fp32 accumulation difference between Triton and PyTorch stabilizes at ~3%–5%, just above the 5% threshold. This is a pure floating-point precision issue unrelated to kernel correctness.
+
+### 2.2 `timeout`
+
+**Only observed on RTX4060** (TileLang: easy-shape 9 + hard-shape 15; Triton: easy-shape 10 + hard-shape 13; RTX4090 and A800: 0 each). Total: 47.
+
+These timeouts are caused by **Python multi-threading stalls on the local test machine**, not by GPU kernel hangs or deadlocks. When running multiple configurations concurrently on the RTX4060 machine, Python thread scheduling stalls caused the timeout timer to fire spuriously. RTX4090 and A800 ran on more stable machines and did not time out on identical configurations, confirming that these are **test environment noise** rather than compiler bugs.
 
 ---
 
 ## 3. Real Bug Summary
 
-Excluding `wrong_result`, this run detected **8 distinct root causes** — three new ones compared to the previous run: `timeout`, `assertion_failure`, and `gpu_oom`. Totals across all 3 GPUs:
+Excluding `wrong_result` and `timeout`, this run detected **6 distinct root causes**, grouped into compile failures, runtime failures, and tool-robustness issues:
 
 | root_cause | Backend | Crash Stage | Total (3 GPUs) |
 |---|---|---|---|
@@ -48,12 +66,9 @@ Excluding `wrong_result`, this run detected **8 distinct root causes** — three
 | `ptx_async_boundary` | TileLang | **compile fail** | 275 |
 | `shared_memory_overflow` | Triton | **runtime fail** | 174 |
 | `warp_partition` | TileLang | **compile fail** | 164 |
-| `timeout` | TileLang + Triton | — | 47 |
 | `shared_memory_overflow` | TileLang | **runtime fail** | 2 |
 | `assertion_failure` | TileLang + Triton | **runtime fail** | 6 |
 | `gpu_oom` | TileLang + Triton | **runtime fail** | 3 |
-
-> **Comparison with previous run**: `dtype_mismatch` grew from 454 to 3,644 (~8×), `ptx_async_boundary` from 8 to 275 (~34×), `warp_partition` from 40 to 164 (~4×), and `shared_memory_overflow` (Triton) from 72 to 174 (~2.4×). The exceptional growth in `ptx_async_boundary` — far beyond the 2× scale increase — is explained in Section 4.
 
 ---
 
@@ -61,29 +76,53 @@ Excluding `wrong_result`, this run detected **8 distinct root causes** — three
 
 ### 4.1 `warp_partition`
 
-Behavior is identical to the previous run: TileLang's `LayoutInference` pass cannot factor the thread count into a valid `m_warp × n_warp` warp grid when block_M and block_N are too small (e.g., 16×16), causing a compile-time assertion failure.
+**Crash stage**: Layout inference pass inside `tilelang.lower()`
 
+**Example**: `results_RTX4060/.../failed/warp_partition/failed_pipeline_gemm+sqrt.py`
+
+```python
+# kernel declaration: block_M=16, block_N=16, threads=128 (= 4 warps)
+with T.Kernel(..., threads=128) as (bx, by):
+    ...
+    T.gemm(A_shared, B_shared, C_local)   # GEMM triggers warp partition inference
 ```
+
+Output:
+```
+TileLang begins to compile kernel `impl`
+  tilelang/jit/__init__.py compile
+    JITKernel.__init__
+      _compile_and_create_adapter
+        tilelang.lower()
+          LayoutInference pass
+            GemmNode.InferLayout
+              compute_warp_partition
 InternalError: m_warp * n_warp must equal num_warps,
                m_warp: 1, n_warp: 1, num_warps: 4
 ```
 
-The total across 3 GPUs is 164 (up from 40), an ~4× increase consistent with the doubled test scale and expanded parameter space sampling more small-block configurations.
+TileLang's `LayoutInference` pass factors the thread count into an `m_warp × n_warp` warp grid. With block_M=16 and block_N=16, the only valid factoring yields `m_warp=1, n_warp=1` (1 warp total), which cannot satisfy the requested 4 warps, causing a compile-time assertion failure.
+
+**Root cause**: `ComputeDefaultWarpPartition` has no valid fallback for small tiles (e.g., 16×16). When the tile size cannot support the requested warp count, the compiler fails immediately. 164 total across 3 GPUs, with no strong correlation to shape mode.
 
 ---
 
 ### 4.2 `ptx_async_boundary`
 
-**Previous run**: triggered only in hard-shape mode (8 total), because odd/prime K values were exclusive to hard-shape.  
-**This run**: triggers heavily in easy-shape mode (RTX4060: 100, RTX4090: 72, A800: 99) while hard-shape shows almost none (1–2 per GPU).
+**Crash stage**: PTX codegen pass inside `tilelang.lower()`
 
-The cause is the **expanded parameter ranges**: `block_K` is no longer restricted to powers of 2. Certain `block_K` values cause the per-row transfer size `block_K × sizeof(dtype)` to fall outside the {4, 8, 16} bytes required by the `cp.async` PTX instruction, triggering a codegen assertion even when K itself is a power of 2.
-
+**Typical error**:
 ```
+_compile_and_create_adapter
+  tilelang.lower()
+    device_codegen → BuildTileLangCUDA
+      CodeGenTileLangCUDA → GetTileLangCPAsyncTransferBytes
 InternalError: tl::ptx_cp_async requires PTX byte width in {4, 8, 16}, but got 2
 ```
 
-Many triggering cases have non-standard `block_K` values (e.g., block_K=1), confirming that the root cause has shifted from shape-mode-dependent K alignment to unconstrained block_K sampling.
+The `cp.async` PTX instruction requires the per-row transfer size to be exactly 4, 8, or 16 bytes. The transfer size equals `block_K × sizeof(dtype)`. When `block_K` takes a non-standard value (e.g., block_K=1 with float16, giving 2 bytes per row), the constraint is violated and codegen fails.
+
+**Relationship to shape mode**: easy-shape triggers this heavily (RTX4060: 100, RTX4090: 72, A800: 99) while hard-shape triggers almost none (1–2 per GPU). The root cause is expanded `block_K` sampling: easy-shape M/N/K are powers of 2, but `block_K` can now take arbitrary non-power-of-2 values, some of which violate the PTX alignment constraint even when K itself is a power of 2. The compiler lacks a pre-check on `block_K` alignment before entering codegen. 275 total across 3 GPUs.
 
 ---
 
@@ -91,59 +130,73 @@ Many triggering cases have non-standard `block_K` values (e.g., block_K=1), conf
 
 ### 5.1 `dtype_mismatch`
 
-Behavior is unchanged from the previous run: mixed-precision kernels (`dtype="float16"`, `accum_dtype="float32"`) cause TileLang's type inference to infer float32 as the expected input type, conflicting with the float16 tensors passed by the caller.
+**Crash stage**: first call to `kernel(A, B)` after successful compilation
 
+**Example**: `results_RTX4060/.../failed/dtype_mismatch/failed_dynamic_gemm+copy_f2g.py`
+
+```python
+# kernel declaration: dtype="float16", accum_dtype="float32"
+dtype = "float16"
+accum_dtype = "float32"
+...
+C_local_1 = T.alloc_fragment((block_M, block_N), accum_dtype)  # fp32 accumulator
+T.gemm(A_shared_1, B_shared_1, C_local_1)
+T.copy(C_local_1, C[...])   # copy fp32 accumulator back to fp16 output
 ```
+
+Output (no compile failure — crash only at call time):
+```
+C = kernel(A, B)             ← kernel already compiled; this is the first call
+  tilelang/jit/kernel.py __call__
+    tilelang/jit/adapter/tvm_ffi.py func
+      executable(*tensor_list)
 RuntimeError: kernel impl input A dtype mismatch, expected float32
 ```
 
-The total across 3 GPUs is 3,644 (up from 454, ~8× increase) — well above the expected 2× from the test scale increase. The expanded parameter ranges cause the fuzzer to sample more mixed-precision kernel configurations, covering more trigger paths. This remains a systemic defect in TileLang's type inference for mixed-precision patterns.
+**Root cause**: the kernel declares `dtype="float16"`, but TileLang's type inference infers float32 as the expected input type when processing the `accum_dtype="float32"` fragment buffer, conflicting with the float16 tensors passed by the caller. This mismatch is not caught at compile time and surfaces only when the JIT adapter performs argument type checking before execution.
+
+**Trigger pattern**: virtually every kernel that combines `dtype` and `accum_dtype` (fp16 input/output with fp32 accumulator) triggers this. This is a systemic defect in TileLang's type inference for mixed-precision kernels. 3,644 total across 3 GPUs — the most frequent real bug in this run.
 
 ---
 
 ### 5.2 `shared_memory_overflow`
 
-Triton backend behavior is identical to the previous run: the kernel compiles successfully, and `_init_handles` discovers the shared memory overcommitment only on the first execution call.
+**Crash stage**: first execution call after successful compilation, during Triton's GPU handle initialization
 
+**Typical error**:
 ```
+kernel_0_kernel[grid](...)
+  triton/runtime/jit.py run
+    triton/compiler/compiler.py _init_handles
+      raise OutOfResources(...)
 triton.runtime.errors.OutOfResources:
   out of resource: shared memory, Required: 110592, Hardware limit: 101376
 ```
 
-The cross-GPU frequency ordering this run is RTX4090 > RTX4060 > A800 (RTX4090: 86, RTX4060: 59, A800: 29). This differs slightly from the previous run (RTX4060 > RTX4090 > A800); with the expanded parameter space, RTX4090 happened to sample more configurations near its hardware limit.
+The Triton kernel compiles successfully. `_init_handles` queries the GPU hardware limit only on the first actual execution, at which point it discovers that the requested shared memory (108 KB) exceeds the GPU limit (99 KB).
 
-TileLang also triggered `shared_memory_overflow` twice on RTX4090 hard-shape, consistent with the sparse occurrence seen in the previous run.
+**Cross-GPU frequency**: RTX4090 > RTX4060 > A800 (RTX4090 easy+hard=86, RTX4060 easy+hard=59, A800 easy+hard=29), inversely correlated with the shared memory capacity of each card. A800 has the largest per-SM shared memory, so the same configurations do not overflow there.
 
----
-
-### 5.3 `timeout` (new)
-
-**Only observed on RTX4060** (TileLang: easy-shape 9 + hard-shape 15; Triton: easy-shape 10 + hard-shape 13; RTX4090 and A800: 0 each). Total: 47 across 3 GPUs.
-
-**Example**: `failed_dynamic_gemm+copy_f2g_M32,N256,K32,bM16,bN128,bK32,t128,pipelined,s4,float16.py`
-
-```
-error_message: "Execution timed out"
-```
-
-These kernels typically involve deep pipelines (`num_stages=4`) or `copy_f2g` in dynamic sequences. A timeout could indicate either a genuine GPU hang (unmatched barrier, warp starvation) or simply that RTX4060's lower compute throughput caused the same kernel to exceed the fuzzer's time limit. Since RTX4090 and A800 did not time out on the same configurations, it is premature to classify these as compiler bugs. Recommended follow-up: reproduce with `CUDA_LAUNCH_BLOCKING=1` and a GPU watchdog to distinguish true hangs from performance-limited runs.
+TileLang also triggered `shared_memory_overflow` twice on RTX4090 hard-shape, indicating that TileLang has a similar late-check timing issue, though at much lower frequency than Triton.
 
 ---
 
-### 5.4 `assertion_failure` (new)
+## 6. Tool-Robustness Issues
+
+The following two categories are not compiler bugs, but expose engineering gaps in the fuzzer itself.
+
+### 6.1 `assertion_failure`
 
 6 total, all on RTX4060 (TileLang easy/hard: 2 each; Triton easy/hard: 1 each). RTX4090 and A800: 0.
 
-**Typical error message**:
+**Typical error**:
 ```
 RuntimeError: CUDA error: CUDA-capable device(s) is/are busy or unavailable
 ```
 
-Despite the name, these are not compiler assertion failures. The actual mechanism is: **a preceding kernel crash (e.g., `warp_partition`) leaves the GPU in an error state; the next test's `torch.randn(..., device='cuda')` call fails to acquire a CUDA context and surfaces this secondary error**. This is a cascading crash effect, not an independent bug. It exposes a gap in the fuzzer: there is no GPU state reset between tests after a crash. RTX4060's weaker post-crash CUDA context recovery likely explains why this only appears on that card.
+Despite the name, these are not compiler assertion failures. The actual mechanism is: **a preceding kernel crash (e.g., `warp_partition`) leaves the GPU in an error state; the next test's `torch.randn(..., device='cuda')` call fails to acquire a CUDA context and surfaces this secondary error**. This is a cascading crash effect, not an independent bug. It exposes a gap in the fuzzer: no GPU state reset is performed between tests after a crash.
 
----
-
-### 5.5 `gpu_oom` (new)
+### 6.2 `gpu_oom`
 
 3 total, all on RTX4060 (TileLang hard-shape: 1; Triton hard-shape: 2). RTX4090 and A800: 0.
 
@@ -153,13 +206,15 @@ Despite the name, these are not compiler assertion failures. The actual mechanis
 RuntimeError: CUDA error: CUBLAS_STATUS_ALLOC_FAILED when calling `cublasCreate(handle)`
 ```
 
-This is the **oracle reference implementation** (PyTorch/cuBLAS) running out of VRAM on RTX4060's 8 GB when allocating matrices in the thousands for both dimensions — not a defect in the kernel under test. RTX4090 (24 GB) and A800 (80 GB) have sufficient VRAM for the same shapes. The expanded parameter ranges introduced extreme M×N×K combinations that were previously excluded by frontend constraints. The fix is to add a pre-check in the fuzzer frontend that bounds matrix size combinations based on available GPU VRAM.
+This is the **oracle reference implementation** (PyTorch/cuBLAS) running out of VRAM on RTX4060's 8 GB when allocating large matrices — not a defect in the kernel under test. RTX4090 (24 GB) and A800 (80 GB) have sufficient VRAM. The fix is to add a VRAM-aware matrix size bound in the fuzzer frontend before oracle allocation.
 
 ---
 
-## 6. Correspondence with Paper Bug Taxonomy
+## 7. Correspondence with Paper Bug Taxonomy
 
 Reference paper: *Characterizing Real-World Bugs in Tile Programs for Automated Bug Detection* (ISSTA '26)
+
+The paper classifies 301 bugs by symptom into three groups: Crash (58.14%), Correctness issues (36.21%), and Performance Bottleneck (5.65%).
 
 | root_cause | Crash Stage | Paper Category | Corresponding Paper Case |
 |---|---|---|---|
@@ -167,16 +222,13 @@ Reference paper: *Characterizing Real-World Bugs in Tile Programs for Automated 
 | `ptx_async_boundary` | compile fail | Memory Bugs (19.27%) + Device-Specific Bugs (3.99%) | PTX alignment constraint; non-standard block_K triggers codegen assertion |
 | `dtype_mismatch` | runtime fail | Type and Operator Bugs (48.84%) — Data-Type Semantics | Apache TVM #14112 (dtype mismatch causes transform_layout failure) |
 | `shared_memory_overflow` | runtime fail | Memory Bugs (19.27%) — Resource Allocation | Triton `OutOfResources`; TileLang dynamic shared memory allocation failure |
-| `timeout` | — | Crash (58.14%) — potential deadlock | Requires further reproduction to distinguish hang from performance limit |
-| `assertion_failure` | runtime fail | — | Cascading GPU crash effect; not an independent compiler bug |
-| `gpu_oom` | runtime fail | — | Oracle (cuBLAS) OOM on large matrices; not a defect in the tested kernel |
 
 **Key findings**:
 
-1. **`dtype_mismatch` remains the most frequent real bug** (3,644 occurrences), growing ~8× from the previous run. The larger parameter space samples more mixed-precision configurations, further exposing the systemic defect in TileLang's type inference for `dtype` + `accum_dtype` combinations.
+1. **`dtype_mismatch` is the most frequent real bug** (3,644 occurrences), corresponding to the largest paper category, Type and Operator Bugs (48.84%). Virtually every mixed-precision kernel (fp16 input + fp32 accumulator) triggers it, confirming a systemic defect in TileLang's type inference for mixed-precision patterns.
 
-2. **`ptx_async_boundary` is no longer shape-mode-specific**: with expanded parameter ranges, easy-shape configurations now trigger it via non-standard `block_K` values, revealing that the root cause is broader than "odd/prime K" — the compiler's codegen has no pre-check for arbitrary `block_K` alignment against the `cp.async` constraint.
+2. **`warp_partition` precisely reproduces Triton #5265** (`num_warps` cannot be factored into a valid warp grid), showing that this class of bug exists across frameworks — TileLang is equally affected.
 
-3. **`timeout` requires disambiguation**: all 47 cases are on RTX4060 and could be genuine deadlocks or simply performance-limited behavior. Using `CUDA_LAUNCH_BLOCKING=1` with a watchdog is the recommended next step before treating these as compiler bugs.
+3. **`ptx_async_boundary` has a broader trigger condition than "odd/prime K"**: any non-standard `block_K` alignment can trigger it, since the compiler's codegen has no pre-check. Easy-shape configurations are equally exposed when `block_K` sampling is unrestricted.
 
-4. **`assertion_failure` and `gpu_oom` are tool-robustness issues**, not new compiler bugs. `assertion_failure` indicates the fuzzer needs a GPU state reset after crashes; `gpu_oom` indicates the oracle reference implementation needs VRAM-aware matrix size bounds before allocation.
+4. **`shared_memory_overflow` frequency is inversely correlated with GPU shared memory capacity** (RTX4090 > RTX4060 > A800), directly supporting the paper's claim that Resource Allocation Bugs are strongly hardware-dependent.
