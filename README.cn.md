@@ -181,10 +181,51 @@ python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 \
 
 ```python
 Config(
-    seed=42,              # 随机种子（None 表示不固定）
+    seed=42,              # 程序生成随机种子（None 表示不固定）
+    input_seed=0,         # 张量输入随机种子，写入每个生成的复现文件
     backends=["tilelang"],# 目标后端
     output_dir="results", # 输出目录
     compile_timeout=60,   # 编译超时（秒）
     execute_timeout=60,   # 执行超时（秒）
 )
 ```
+
+
+## 正确性与回归验证
+
+- `--input-seed` 控制 PyTorch 张量输入，独立于程序生成用的 `--seed`。新结果会保存该设置；恢复新格式结果时必须匹配。旧结果目录仍可恢复，历史文件保持原样。
+- 数值检查先验证 NaN/Inf 的位置与 Inf 符号，再比较有限值。参考值会按输出存储类型舍入；copy/transpose 还检查零的符号。
+- 动态序列参考实现解释完整 buffer 数据流，保留填充 lane、tile 内归约和中间类型转换。动态去重包含操作属性和 buffer 身份；旧格式缺少这些信息的签名不会抑制新的精确签名。
+- 恢复运行优先保留 `summary.json` 的累计计数。`bugs_unique` 是失败分类数，不是经过人工确认的独立编译器 bug 数。
+
+```bash
+# CPU 回归，包括参考语义、代码生成、去重和恢复运行
+python -B -m unittest discover -s tests -v
+
+# GPU 冒烟测试：两个后端、两种 dtype，每个用例使用独立 TileLang 缓存
+python -B tests/gpu_smoke.py
+
+# 可选：使用共享缓存，检查跨用例缓存行为
+python -B tests/gpu_smoke.py --shared-cache
+```
+
+GPU 冒烟测试将复现文件及失败日志保存到打印出的 `/tmp/tilesmith_gpu_smoke_*` 目录，不写入 fuzzing 结果目录。共享缓存下观察到的 TileLang dtype mismatch 需要单独排查；独立缓存测试用于验证生成代码及参考语义。
+
+## 论文导向的定向用例
+
+默认每次全新生成有 20% 概率选择定向用例（其余按原 pipeline/dynamic/single 比例生成）；通过用例也进入种子池变异。`--probe-prob 1` 只生成定向用例，`--probe-prob 0` 关闭全新定向生成。已有定向种子仍可变异。
+
+```bash
+python main.py --backend triton --probe-prob 1 --seed 42 -n 100
+python main.py --backend tilelang --probe-prob 1 --seed 42 -n 100
+python -B tests/gpu_smoke.py --filter probe
+```
+
+- 新增 `argmax` 与融合 `gemm_argmax`，int32 输出，并列最大值取第一个索引。Triton 转置布局路径显式生成 `tl.dot(x, tl.trans(y))` 后接 `tl.argmax`。使用小整数输入避免浮点近似导致 argmax 的参考答案不稳定。
+- copy、sum/max/min、softmax、argmax 定向测试 singleton、31/32/33、63/64/65、127/128/129 等边界。每行由一个完整 tile 处理，归约尾部按运算使用 0、负无穷或正无穷填充。
+- 输入包含连续、转置、双步长和偏移布局。TileLang 使用一维物理 buffer 加显式地址表达式，覆盖地址计算，但不等同于测试任意 stride 的前端 buffer 描述符。
+- 特殊值（NaN、Inf、正负零、次正规数）目前只进入 copy 的逐位检查；尚未覆盖这些值参与所有算术操作的语义。
+- 每个定向用例默认比较 128/256 threads 两个配置，在同一组输入上各运行 3 次；检查参考值、重复执行逐位一致性、线程配置之间的一致性、输出前后各 16 元素保护区以及输入存储未修改。保护区不替代内存检查器，不能保证发现所有越界读写。
+- 布局、输入模式、重复次数与配对开关写入 IR、去重键和保存文件，支持恢复。老格式结果仍可恢复；生成器扩展后不保证与旧版本产生相同的后续随机序列。
+
+这些扩展增加了论文所述 bug 的触发空间，**不代表已复现全部 Triton/TileLang 历史 bug**。warp specialization、Hopper producer warpgroup 寄存器回收、AMD 指令调度、编译 pass 配对、重复编译 IR/缓存稳定性、性能回归、多维 launch 以及更多 dtype 仍未系统覆盖。

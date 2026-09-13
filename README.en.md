@@ -181,7 +181,8 @@ Common options:
 
 ```python
 Config(
-    seed=42,              # Random seed (None = non-deterministic)
+    seed=42,              # Program generation seed (None = non-deterministic)
+    input_seed=0,         # Tensor seed embedded in each standalone reproducer
     backends=["tilelang"],# Target backend
     output_dir="results", # Output directory
     compile_timeout=60,   # Compilation timeout (seconds)
@@ -217,7 +218,7 @@ Loop 3–8 steps:
 Always starts with GEMM
 ```
 
-Each buffer carries a `torch_ref` (e.g. `"A.float() @ B.float()"`) that is updated with every op step and used for correctness verification at the end.
+The standalone dynamic reference interprets named-buffer dataflow, including tile padding, tile-local reductions, and intermediate dtype conversions. Legacy `torch_ref` strings are retained as metadata; they no longer define the final comparison.
 
 ### Step 2 — Mutation (`mutator/`)
 
@@ -275,3 +276,37 @@ Passing programs are saved to `passed/` and optionally added to `seed_pool`. Fai
 | `config.h` / `OpConf` | `config/config.py` |
 | Template JSON + instantiation | `TilePipeline` + `PipelineGenerator` |
 | Crash detection only | Crash + correctness (differential testing) |
+
+
+## Correctness and regression checks
+
+`--input-seed` controls PyTorch tensor inputs independently of `--seed`. New summaries record this setting and require it to match on resume. Old result directories remain readable; their existing reproducers are unchanged.
+
+Numeric comparisons validate NaN/Inf locations and infinity signs before measuring finite errors, rounding the reference to output storage precision. Copy and transpose also check signed zeros. Dynamic deduplication includes operation attributes and buffer identities. Resume preserves cumulative summary counts; `bugs_unique` counts failure categories, not confirmed distinct compiler bugs.
+
+```bash
+python -B -m unittest discover -s tests -v
+python -B tests/gpu_smoke.py
+# Optional: exercise shared cache behavior across cases.
+python -B tests/gpu_smoke.py --shared-cache
+```
+
+The GPU smoke runner uses a separate TileLang cache per case by default and writes reproducers/logs to its printed temporary directory, not the fuzzing results directory. TileLang dtype mismatches observed with a shared cache require separate investigation; isolated-cache tests validate emitted programs and reference semantics.
+
+## Paper-directed probes
+
+Fresh generation selects a directed probe with probability 20%; the remaining cases retain the existing pipeline/dynamic/single distribution. Passing probes also enter the mutation pool. Use `--probe-prob 1` for probes only, or `--probe-prob 0` to disable fresh probes (existing probe seeds can still mutate).
+
+```bash
+python main.py --backend triton --probe-prob 1 --seed 42 -n 100
+python main.py --backend tilelang --probe-prob 1 --seed 42 -n 100
+python -B tests/gpu_smoke.py --filter probe
+```
+
+Probes cover copy, row sum/max/min, softmax, argmax, and fused matmul→argmax. Index outputs are int32 with first-index tie breaking; small integer GEMM inputs avoid unstable near ties. Transposed Triton probes explicitly emit `tl.dot(x, tl.trans(y))` before argmax. Boundary dimensions include singleton, 31/32/33, 63/64/65, and 127/128/129 with operation-specific neutral padding.
+
+Inputs use contiguous, transposed, strided, and offset layouts. TileLang uses flat physical buffers and explicit indexing, which tests address lowering rather than arbitrary-stride frontend descriptors. NaN/Inf/signed-zero/subnormal patterns currently exercise bit-exact copies only.
+
+Each probe defaults to 128/256-thread variants, each executed three times on identical inputs. Checks cover reference results, repeat determinism, schedule agreement, 16-element output guards on either side, and input-storage integrity. Guards do not replace a memory sanitizer. Probe settings persist in IR, dedup signatures, and resumable results. Old results remain loadable; generator changes do not preserve the old version's subsequent random sequence.
+
+This expands trigger coverage without claiming reproduction of every historical bug. Warp specialization, Hopper producer-warpgroup register deallocation, AMD scheduling, compiler-pass pairs, repeated-compilation IR/cache stability, performance regressions, multidimensional launches, and additional dtypes remain incompletely covered.

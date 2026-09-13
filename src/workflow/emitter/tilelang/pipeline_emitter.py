@@ -332,7 +332,7 @@ class TileLangPipelineEmitter:
             lines.append(f'    if relative_err > _THRESHOLDS["reduce"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [pipeline_reduce]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         elif has_terminal_softmax:
-            lines.append(f"    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()")
+            lines.append(f"    max_diff = _max_diff(C, ref)")
             lines.append(f'    if max_diff > _THRESHOLDS["softmax"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [pipeline_softmax]: max_diff={{max_diff:.6f}}")')
         else:
@@ -364,7 +364,7 @@ class TileLangPipelineEmitter:
         # Output shape
         if has_terminal_reduce:
             out_shape = "(M,)"
-            out_dtype_str = "dtype"
+            out_dtype_str = "accum_dtype"
         else:
             out_shape = "(M, N)"
             out_dtype_str = "dtype"
@@ -397,7 +397,7 @@ class TileLangPipelineEmitter:
             f"    M, N = {p.M}, {p.N}",
             f"    block_M, block_N = {p.block_M}, {p.block_N}",
         ]
-        extra_vars = [f'    dtype = "{p.dtype.value}"']
+        extra_vars = [f'    dtype = "{p.dtype.value}"', f'    accum_dtype = "{p.acc_dtype}"']
 
         lines = []
         lines.append(f"def {p.name}():")
@@ -427,7 +427,7 @@ class TileLangPipelineEmitter:
                               has_terminal_softmax: bool) -> list:
         """Emit body of elementwise chain kernel."""
         lines = []
-        lines.append(f"{sp}acc = T.alloc_fragment((block_M, block_N), dtype)")
+        lines.append(f"{sp}acc = T.alloc_fragment((block_M, block_N), accum_dtype)")
 
         # Allocate extra fragment buffers
         for i, step in extra_inputs:
@@ -477,8 +477,8 @@ class TileLangPipelineEmitter:
         if terminal_step is not None:
             if terminal_step.kind == ComputeKind.SOFTMAX:
                 lines.extend([
-                    f"{sp}max_local = T.alloc_fragment((block_M,), dtype)",
-                    f"{sp}sum_local = T.alloc_fragment((block_M,), dtype)",
+                    f"{sp}max_local = T.alloc_fragment((block_M,), accum_dtype)",
+                    f"{sp}sum_local = T.alloc_fragment((block_M,), accum_dtype)",
                     f"{sp}T.reduce_max(acc, max_local, dim=1, clear=True)",
                     f"{sp}for i, j in T.Parallel(block_M, block_N):",
                     f"{sp}    acc[i, j] = T.exp(acc[i, j] - max_local[i])",
@@ -493,7 +493,7 @@ class TileLangPipelineEmitter:
                     ComputeKind.REDUCE_MAX: "T.reduce_max",
                     ComputeKind.REDUCE_MIN: "T.reduce_min",
                 }[terminal_step.kind]
-                lines.append(f"{sp}C_reduce = T.alloc_fragment((block_M,), dtype)")
+                lines.append(f"{sp}C_reduce = T.alloc_fragment((block_M,), accum_dtype)")
                 lines.append(f"{sp}{reduce_fn}(acc, C_reduce, dim=1, clear=True)")
                 lines.append(f"{sp}T.copy(C_reduce, C[by * block_M])")
             else:
@@ -560,12 +560,13 @@ class TileLangPipelineEmitter:
             lines.append(f'    if relative_err > _THRESHOLDS["reduce"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [chain_reduce]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         elif has_terminal_softmax:
-            lines.append(f"    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()")
+            lines.append(f"    max_diff = _max_diff(C, ref)")
             lines.append(f'    if max_diff > _THRESHOLDS["softmax"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [chain_softmax]: max_diff={{max_diff:.6f}}")')
         else:
             lines.append(f"    max_diff, ref_norm, relative_err = _finite_compare(C, ref)")
-            lines.append(f'    if relative_err > _THRESHOLDS["pipeline_fp16"]:')
+            threshold_key = "pipeline_fp32" if p.dtype == DataType.FLOAT32 else "pipeline_fp16"
+            lines.append(f'    if relative_err > _THRESHOLDS["{threshold_key}"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [chain]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         return lines
 

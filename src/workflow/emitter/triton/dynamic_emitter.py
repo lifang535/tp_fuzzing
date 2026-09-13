@@ -31,7 +31,7 @@ class TritonDynamicEmitter:
             "import triton.language as tl",
             "import torch",
             "",
-            _threshold_header(self.config),
+            _threshold_header(self.config, dynamic=True),
             "",
         ]
         lines.append(self._emit_kernel(seq))
@@ -111,126 +111,7 @@ class TritonDynamicEmitter:
                 f"{sp}acc = tl.load(a_ptrs, mask=mask, other=0.0).to(tl.float32)",
             ]
 
-        # Apply epilogue ops from steps
-        body_lines_done = False
-        for step in seq.steps:
-            if step.op_kind == "scale":
-                alpha = step.attrs.get("alpha", 1.0)
-                body_lines.append(f"{sp}acc = acc * {alpha}")
-            elif step.op_kind == "exp":
-                # Clamp before exp to prevent inf: float16→[-10,10], float32→[-80,80]
-                clamp_max = 10.0 if seq.dtype == "float16" else 80.0
-                body_lines.append(f"{sp}acc = tl.exp(acc)")
-            elif step.op_kind == "sqrt":
-                body_lines.append(f"{sp}acc = tl.sqrt(tl.abs(acc.to(tl.float32)))")
-            elif step.op_kind == "elemwise_add":
-                if step.attrs.get("use_global", False):
-                    d_name = step.inputs[1].name if len(step.inputs) > 1 else "D2"
-                    d_ptr = d_name.lower() + "_ptr"
-                    d_sm = f"stride_{d_name.lower()}m"
-                    d_sn = f"stride_{d_name.lower()}n"
-                    body_lines.append(f"{sp}d_ptrs = {d_ptr} + (offs_m[:, None] * {d_sm} + offs_n[None, :] * {d_sn})")
-                    body_lines.append(f"{sp}d = tl.load(d_ptrs, mask=(offs_m[:, None] < M) & (offs_n[None, :] < N), other=0.0).to(tl.float32)")
-                    body_lines.append(f"{sp}acc = acc + d")
-                else:
-                    # Two-fragment add: skip (already accumulated)
-                    pass
-            elif step.op_kind == "elemwise_mul":
-                if step.attrs.get("use_global", False):
-                    d_name = step.inputs[1].name if len(step.inputs) > 1 else "D2"
-                    d_ptr = d_name.lower() + "_ptr"
-                    d_sm = f"stride_{d_name.lower()}m"
-                    d_sn = f"stride_{d_name.lower()}n"
-                    body_lines.append(f"{sp}d_ptrs = {d_ptr} + (offs_m[:, None] * {d_sm} + offs_n[None, :] * {d_sn})")
-                    body_lines.append(f"{sp}d = tl.load(d_ptrs, mask=(offs_m[:, None] < M) & (offs_n[None, :] < N), other=0.0).to(tl.float32)")
-                    body_lines.append(f"{sp}acc = acc * d")
-            elif step.op_kind == "elemwise_max":
-                d_name = step.inputs[1].name if len(step.inputs) > 1 else "D2"
-                d_ptr = d_name.lower() + "_ptr"
-                d_sm = f"stride_{d_name.lower()}m"
-                d_sn = f"stride_{d_name.lower()}n"
-                body_lines.append(f"{sp}d_ptrs = {d_ptr} + (offs_m[:, None] * {d_sm} + offs_n[None, :] * {d_sn})")
-                body_lines.append(f"{sp}d = tl.load(d_ptrs, mask=(offs_m[:, None] < M) & (offs_n[None, :] < N), other=0.0).to(tl.float32)")
-                body_lines.append(f"{sp}acc = tl.maximum(acc, d)")
-            elif step.op_kind == "softmax":
-                body_lines.append(f"{sp}acc = tl.softmax(acc, 1)")
-            elif step.op_kind == "reduce_sum":
-                body_lines.append(f"{sp}result = tl.sum(acc, axis=1)")
-                body_lines.append(f"{sp}c_ptrs = c_ptr + offs_m * stride_cm")
-                body_lines.append(f"{sp}tl.atomic_add(c_ptrs, result, mask=offs_m < M)")
-                # Done — no more write-back needed
-                body_lines_done = True
-                break
-            elif step.op_kind == "reduce_max":
-                body_lines.append(f"{sp}result = tl.max(acc, axis=1)")
-                body_lines.append(f"{sp}c_ptrs = c_ptr + offs_m * stride_cm")
-                body_lines.append(f"{sp}tl.store(c_ptrs, result, mask=offs_m < M)")
-                body_lines_done = True
-                break
-
-            # ── Nested structure ops ────────────────────────────────────────
-            elif step.op_kind == "if_epilogue":
-                # Conditional branching: if acc > threshold → branch_a, else → branch_b
-                threshold = step.attrs.get("threshold", 0.0)
-                branch_a = step.attrs.get("branch_a", "exp")
-                branch_b = step.attrs.get("branch_b", "sqrt")
-
-                def _triton_branch_expr(op, val):
-                    if op == "exp": return f"tl.exp({val})"
-                    if op == "sqrt": return f"tl.sqrt(tl.abs({val}))"
-                    if op == "neg": return f"-{val}"
-                    if op == "scale": return f"{val} * 0.5"
-                    if op == "abs": return f"tl.abs({val})"
-                    return val
-
-                a_expr = _triton_branch_expr(branch_a, "acc")
-                b_expr = _triton_branch_expr(branch_b, "acc")
-                body_lines.append(f"{sp}# if_epilogue: {branch_a} if x>{threshold} else {branch_b}")
-                body_lines.append(f"{sp}acc = tl.where(acc > {threshold}, {a_expr}, {b_expr})")
-
-            elif step.op_kind == "double_pipeline":
-                # Second independent K-loop, results added to acc
-                body_lines.append(f"{sp}# double_pipeline: second K-loop")
-                body_lines.append(f"{sp}acc2 = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)")
-                if seq.loop_kind == "pipelined":
-                    body_lines.append(f"{sp}for k2 in tl.range(0, K, BLOCK_K, num_stages={seq.num_stages}):")
-                else:
-                    body_lines.append(f"{sp}for k2 in range(0, K, BLOCK_K):")
-                body_lines.append(f"{sp}    a2_ptrs = a_ptr + (offs_m[:, None] * stride_am + (k2 + offs_k[None, :]) * stride_ak)")
-                body_lines.append(f"{sp}    a2 = tl.load(a2_ptrs, mask=(offs_m[:, None] < M) & ((k2 + offs_k[None, :]) < K), other=0.0).to({tld})")
-                body_lines.append(f"{sp}    b2_ptrs = b_ptr + ((k2 + offs_k[:, None]) * stride_bk + offs_n[None, :] * stride_bn)")
-                body_lines.append(f"{sp}    b2 = tl.load(b2_ptrs, mask=((k2 + offs_k[:, None]) < K) & (offs_n[None, :] < N), other=0.0).to({tld})")
-                body_lines.append(f"{sp}    acc2 += tl.dot(a2, b2)")
-                body_lines.append(f"{sp}acc = acc + acc2")
-
-            elif step.op_kind == "accumulate_reduce":
-                # Reduce → broadcast pattern (online softmax / normalization)
-                mode = step.attrs.get("mode", "subtract_max")
-                if mode == "subtract_max":
-                    body_lines.append(f"{sp}# accumulate_reduce: subtract row max")
-                    body_lines.append(f"{sp}row_max = tl.max(acc, axis=1)[:, None]")
-                    body_lines.append(f"{sp}acc = acc - row_max")
-                else:  # divide_sum
-                    body_lines.append(f"{sp}# accumulate_reduce: divide by row sum")
-                    body_lines.append(f"{sp}row_sum = tl.sum(acc, axis=1)[:, None]")
-                    body_lines.append(f"{sp}acc = acc / (row_sum + 1e-6)")
-
-            # ── Memory ops (skip in Triton — handled differently) ──────────
-            elif step.op_kind in ("copy_g2s", "copy_s2f"):
-                pass  # Triton has no explicit shared memory; skip
-            elif step.op_kind == "copy_f2g":
-                pass  # Write-back handled at the end
-            elif step.op_kind == "gemm":
-                pass  # GEMM already handled at the start
-
-        # Write-back (if not already handled by reduce)
-        if not body_lines_done:
-            if has_terminal_softmax:
-                body_lines.append(f"{sp}c_ptrs = c_ptr + (offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn)")
-                body_lines.append(f"{sp}tl.store(c_ptrs, acc.to({tld}), mask=(offs_m[:, None] < M) & (offs_n[None, :] < N))")
-            else:
-                body_lines.append(f"{sp}c_ptrs = c_ptr + (offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn)")
-                body_lines.append(f"{sp}tl.store(c_ptrs, acc.to({tld}), mask=(offs_m[:, None] < M) & (offs_n[None, :] < N))")
+        body_lines.extend(self._emit_steps(seq))
 
         body_str = "\n".join(body_lines)
 
@@ -247,6 +128,99 @@ class TritonDynamicEmitter:
             f"\n\n"
             f"{launch_str}"
         )
+
+    def _emit_steps(self, seq):
+        """Lower the actual named-buffer dataflow instead of one implicit accumulator."""
+        lines = []
+
+        def emit(code):
+            lines.append('    ' + code)
+
+        def dtype(buf):
+            return f'tl.{buf.dtype}'
+
+        def load_global(buf, target):
+            prefix = buf.name.lower()
+            strides = ('am', 'ak') if buf.name == 'A' else ('bk', 'bn') if buf.name == 'B' else (prefix + 'm', prefix + 'n')
+            emit(f'{target}_ptrs = {prefix}_ptr + offs_m[:, None] * stride_{strides[0]} + offs_n[None, :] * stride_{strides[1]}')
+            emit(f'{target} = tl.load({target}_ptrs, mask=(offs_m[:, None] < M) & (offs_n[None, :] < N), other=0.0)')
+
+        def branch(op, x):
+            expressions = {'exp': f'tl.exp({x})', 'sqrt': f'tl.sqrt(tl.abs({x}))',
+                           'neg': f'(-{x})', 'scale': f'({x} * 0.5)', 'abs': f'tl.abs({x})'}
+            return expressions[op]
+
+        for i, step in enumerate(seq.steps):
+            kind, a = step.op_kind, step.attrs
+            if kind == 'gemm':
+                emit(f'{step.outputs[0].name} = acc')
+                continue
+            if kind == 'copy_g2s':
+                load_global(step.inputs[0], step.outputs[0].name)
+                continue
+            if kind == 'copy_s2f':
+                emit(f'{step.outputs[0].name} = {step.inputs[0].name}.to({dtype(step.outputs[0])})')
+                continue
+            x = step.inputs[0].name
+            if kind == 'copy_f2g':
+                emit('c_ptrs = c_ptr + offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn')
+                emit(f'tl.store(c_ptrs, {x}.to(tl.{seq.dtype}), mask=(offs_m[:, None] < M) & (offs_n[None, :] < N))')
+                continue
+            out = step.outputs[0]
+            xf = f'{x}.to(tl.float32)'
+            if kind == 'scale':
+                expr = f'{xf} * {a["alpha"]}'
+            elif kind == 'exp':
+                expr = f'tl.exp({xf})'
+            elif kind == 'sqrt':
+                expr = f'tl.sqrt(tl.abs({xf}))'
+            elif kind in ('elemwise_add', 'elemwise_mul', 'elemwise_max'):
+                rhs = step.inputs[1]
+                y = rhs.name
+                if rhs.scope == 'global':
+                    y = f'input_{i}'
+                    load_global(rhs, y)
+                yf = f'{y}.to(tl.float32)'
+                expr = f'{xf} + {yf}' if kind == 'elemwise_add' else f'{xf} * {yf}' if kind == 'elemwise_mul' else f'tl.maximum({xf}, {yf})'
+            elif kind == 'if_epilogue':
+                expr = f'tl.where({xf} > {a["threshold"]}, {branch(a["branch_a"], xf)}, {branch(a["branch_b"], xf)})'
+            elif kind == 'double_pipeline':
+                second = a['c2_name']
+                emit(f'{second} = tl.zeros((BLOCK_M, BLOCK_N), dtype=tl.float32)')
+                loop = f'tl.range(0, K, BLOCK_K, num_stages={a["num_stages"]})' if a['loop_kind'] == 'pipelined' else 'range(0, K, BLOCK_K)'
+                emit(f'for k2 in {loop}:')
+                emit('    a2_ptrs = a_ptr + offs_m[:, None] * stride_am + (k2 + offs_k[None, :]) * stride_ak')
+                emit('    b2_ptrs = b_ptr + (k2 + offs_k[:, None]) * stride_bk + offs_n[None, :] * stride_bn')
+                emit('    a2 = tl.load(a2_ptrs, mask=(offs_m[:, None] < M) & (k2 + offs_k[None, :] < K), other=0.0)')
+                emit('    b2 = tl.load(b2_ptrs, mask=(k2 + offs_k[:, None] < K) & (offs_n[None, :] < N), other=0.0)')
+                emit(f'    {second} += tl.dot(a2, b2)')
+                expr = f'{xf} + {second}'
+            elif kind == 'accumulate_reduce':
+                stat = a['row_stat_name']
+                if a['mode'] == 'subtract_max':
+                    emit(f'{stat} = tl.max({xf}, axis=1)[:, None]')
+                    expr = f'{xf} - {stat}'
+                elif a['mode'] == 'divide_sum':
+                    emit(f'{stat} = tl.sum({xf}, axis=1)[:, None]')
+                    expr = f'{xf} / ({stat} + 1e-6)'
+                else:
+                    raise ValueError(f'Unknown reduction mode: {a["mode"]}')
+            elif kind == 'softmax':
+                emit(f'soft_exp = tl.exp({xf} - tl.max({xf}, axis=1)[:, None]).to({dtype(out)})')
+                expr = 'soft_exp.to(tl.float32) / tl.sum(soft_exp.to(tl.float32), axis=1)[:, None]'
+            elif kind in ('reduce_sum', 'reduce_max'):
+                fn = 'sum' if kind == 'reduce_sum' else 'max'
+                emit(f'{out.name} = tl.{fn}({xf}, axis=1)')
+                emit('c_ptrs = c_ptr + offs_m * stride_cm')
+                emit(f'tl.store(c_ptrs, {out.name}, mask=offs_m < M)')
+                continue
+            else:
+                raise ValueError(f'Unsupported dynamic op: {kind}')
+            emit(f'{out.name} = ({expr}).to({dtype(out)})')
+            if kind == 'softmax':
+                emit('c_ptrs = c_ptr + offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn')
+                emit(f'tl.store(c_ptrs, {out.name}.to(tl.{seq.dtype}), mask=(offs_m[:, None] < M) & (offs_n[None, :] < N))')
+        return lines
 
     def _emit_launch_test(self, seq: DynamicSequence, td: str, tld: str,
                            has_terminal_reduce: bool, has_terminal_softmax: bool,
@@ -281,7 +255,7 @@ class TritonDynamicEmitter:
         if d_strides.strip():
             lines.append(f"       {d_strides}")
         lines.append(f"        {c_strides}")
-        lines.append(f"        BLOCK_M={seq.block_M}, BLOCK_N={seq.block_N}, BLOCK_K={seq.block_K},")
+        lines.append(f"        num_warps={seq.threads // 32}, BLOCK_M={seq.block_M}, BLOCK_N={seq.block_N}, BLOCK_K={seq.block_K},")
         lines.append(f"    )")
         extra_return = "".join(f", {g.name}" for g in extra_inputs)
         lines.append(f"    return A, B{extra_return}, C")
@@ -298,7 +272,7 @@ class TritonDynamicEmitter:
             lines.append(f'    if relative_err > _THRESHOLDS["reduce"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_dynamic_reduce]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         elif has_terminal_softmax:
-            lines.append(f"    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()")
+            lines.append(f"    max_diff = _max_diff(C, ref)")
             lines.append(f'    if max_diff > _THRESHOLDS["softmax"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_dynamic_softmax]: max_diff={{max_diff:.6f}}")')
         else:

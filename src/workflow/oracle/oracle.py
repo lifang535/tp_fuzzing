@@ -3,6 +3,7 @@ Test Oracle — Executes generated programs and detects bugs.
 """
 
 import os
+import signal
 import sys
 import subprocess
 import tempfile
@@ -42,7 +43,15 @@ class BugReport:
         err = self.error_message.lower()
         raw = self.error_message  # preserve case for some checks
 
-        if "wrong result" in err:
+        if "wrong result" in err and "repeat determinism" in err:
+            self.root_cause = "nondeterminism"
+        elif "wrong result" in err and "schedule invariance" in err:
+            self.root_cause = "schedule_mismatch"
+        elif "wrong result" in err and "canary" in err:
+            self.root_cause = "output_out_of_bounds"
+        elif "wrong result" in err and "input storage modified" in err:
+            self.root_cause = "input_corruption"
+        elif "wrong result" in err:
             self.root_cause = "wrong_result"
 
         # TileLang / TVM internal errors
@@ -172,9 +181,17 @@ class Oracle:
             )
 
             if result.returncode != 0:
-                error_msg = result.stderr.strip()
+                error_msg = result.stderr.strip() or result.stdout.strip()
+                if result.returncode < 0:
+                    signum = -result.returncode
+                    try:
+                        signame = signal.Signals(signum).name
+                    except ValueError:
+                        signame = "unknown"
+                    error_msg += f"\nProcess terminated by signal {signum} ({signame})"
                 bug_type = self._classify_error(error_msg)
                 params, dtype_str, compute_kind_str = self._get_meta(program)
+                params["input_seed"] = self.config.input_seed
                 report = BugReport(
                     bug_type=bug_type,
                     error_message=error_msg[-2000:],
@@ -188,6 +205,7 @@ class Oracle:
 
         except subprocess.TimeoutExpired:
             params, dtype_str, compute_kind_str = self._get_meta(program)
+            params["input_seed"] = self.config.input_seed
             report = BugReport(
                 bug_type=BugType.TIMEOUT,
                 error_message="Execution timed out",

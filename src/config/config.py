@@ -37,6 +37,10 @@ class Config:
 
     # ── Generation strategy ─────────────────────────────────────────────
     # Probability of generating a pipeline (multi-step) kernel vs single-op.
+    # Directed probes are sampled first; other probabilities apply conditionally.
+    coverage_probe_prob: float = 0.20
+    probe_repeat_count: int = 3
+    probe_schedule_pair: bool = True
     pipeline_prob: float = 0.40
     # Probability of generating a dynamic sequence (MLIRSmith-style) vs single-op.
     # Remaining probability (1 - pipeline_prob - dynamic_prob) → single op.
@@ -166,6 +170,8 @@ class Config:
 
     # ── Runtime ────────────────────────────────────────────────────────
     backends: List[str] = field(default_factory=lambda: ["tilelang"])
+    # Tensor inputs use an independent seed, embedded in every saved test.
+    input_seed: int = 0
     seed: int | None = None
     output_dir: str = "results"
 

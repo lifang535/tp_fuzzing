@@ -12,6 +12,15 @@ Usage:
     python main.py --resume 2026.06.29-16.41_triton_easy-shape_seed=42 -n 200  # Continue previous run
 """
 
+"""
+python main.py --backend tilelang --easy-shape --seed 42 --resume 2026.07.08-15.44_tilelang_easy-shape_seed=42 -n 100000  # Continue previous run
+python main.py --backend tilelang              --seed 42 --resume 2026.07.08-15.44_tilelang_hard-shape_seed=42 -n 100000  # Continue previous run
+
+python main.py --backend tilelang --easy-shape --seed 42 -n 100000  # Continue previous run
+python main.py --backend tilelang              --seed 42 -n 100000  # Continue previous run
+
+"""
+
 import argparse
 import sys
 
@@ -27,7 +36,11 @@ def main():
              "When resuming, the fuzzer replays the generation sequence until this many "
              "previously-unseen programs have been tested.",
     )
+    parser.add_argument("--probe-prob", type=float, default=0.20,
+                        help="Probability of a directed coverage probe (0 disables, 1 probes only)")
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--input-seed", type=int, default=0,
+                        help="Independent PyTorch tensor seed embedded in saved tests (default: 0)")
     parser.add_argument("-o", "--output", type=str, default="results")
     parser.add_argument("--dump", action="store_true", help="Print generated code without executing")
     parser.add_argument("--backend", type=str, default="tilelang", choices=["tilelang", "triton"])
@@ -49,6 +62,8 @@ def main():
     )
     args = parser.parse_args()
 
+    if not 0 <= args.probe_prob <= 1:
+        parser.error("--probe-prob must be between 0 and 1")
     if args.list_kernels:
         from src.ir import ComputeKind
         print("Supported kernel kinds:")
@@ -58,6 +73,8 @@ def main():
 
     config = Config(
         seed=args.seed,
+        coverage_probe_prob=args.probe_prob,
+        input_seed=args.input_seed,
         output_dir=args.output,
         backends=[args.backend],
         easy_shape=args.easy_shape,
@@ -65,7 +82,7 @@ def main():
 
     if args.dump:
         import random
-        if args.seed:
+        if args.seed is not None:
             random.seed(args.seed)
         from src.workflow.generator import ProgramGenerator
         from src.workflow.emitter import get_emitter

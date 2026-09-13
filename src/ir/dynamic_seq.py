@@ -126,12 +126,18 @@ class DynamicSequence:
                    for s in self.steps)
 
     @property
+    def step_specs(self) -> list:
+        """Serializable operation attributes and buffer identities (also used by dedup)."""
+        def desc(buf):
+            return (buf.name, buf.scope, buf.dtype)
+        return [(s.op_kind, [desc(b) for b in s.inputs],
+                 [desc(b) for b in s.outputs], dict(s.attrs)) for s in self.steps]
+
+    @property
     def final_torch_ref(self) -> str:
-        """The torch expression for the final output buffer."""
-        ob = self.output_buffer
-        if ob is None:
-            return "torch.zeros(M, N, device='cuda')"
-        return ob.torch_ref
+        inputs = "{" + ", ".join(f"{b.name!r}: {b.name}" for b in self.pool.global_in) + "}"
+        output_dtype = self.acc_dtype if self.output_buffer and len(self.output_buffer.shape) == 1 else self.dtype
+        return f"_dynamic_reference({inputs}, {self.step_specs!r}, {self.block_N}, {output_dtype!r})"
 
     @property
     def params_dict(self) -> dict:
@@ -141,6 +147,7 @@ class DynamicSequence:
             "threads": self.threads, "num_stages": self.num_stages,
             "loop_kind": self.loop_kind,
             "sequence": [s.op_kind for s in self.steps],
+            "sequence_steps": self.step_specs,
             "sequence_alphas": [s.attrs.get("alpha", 1.0) if s.op_kind == "scale" else 1.0 for s in self.steps],
         }
 
@@ -679,7 +686,7 @@ class IfEpilogueOpGen(OpGenBase):
         a_op, b_op, a_desc, b_desc = random.choice(branch_pairs)
 
         def torch_expr(op, val):
-            if op == "exp":  return f"torch.exp({val}.clamp(-80,80))"
+            if op == "exp":  return f"torch.exp({val})"
             if op == "sqrt": return f"torch.sqrt({val}.abs())"
             if op == "neg":  return f"(-{val})"
             if op == "scale": return f"({val} * 0.5)"
@@ -707,9 +714,9 @@ class IfEpilogueOpGen(OpGenBase):
 class DoublePipelineOpGen(OpGenBase):
     """
     Double pipeline — analogous to MLIRSmith's nested affine.for.
-    Runs a SECOND independent K-loop over a different region of A and B,
+    Runs a SECOND independent K-loop over A and B,
     accumulates into a second fragment, then adds the two results:
-      C2 = A[:, K//2:] @ B[K//2:, :]
+      C2 = A @ B
       C_final = C1 + C2
     This tests whether TileLang correctly handles multiple pipeline stages
     writing to the same output tile.
@@ -737,8 +744,7 @@ class DoublePipelineOpGen(OpGenBase):
         c2_ref = f"(({A_ref}) @ ({B_ref}))"
         frag.torch_ref = f"(({old_ref}).float() + {c2_ref}.float())"
 
-        c2_buf = TileBuffer(name=c2, shape=frag.shape, dtype=acc_dtype, scope="fragment", torch_ref=c2_ref)
-        pool.fragment.append(c2_buf)
+        # c2 is a temporary; the updated input fragment remains the active result.
 
         return KernelStep(
             op_kind="double_pipeline",

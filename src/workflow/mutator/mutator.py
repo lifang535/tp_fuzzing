@@ -31,6 +31,9 @@ class Mutator:
             return self._mutate_dynamic(program)
         if isinstance(program, TilePipeline):
             return self._mutate_pipeline(program)
+        if any(k.coverage_probe for k in program.kernels):
+            from src.workflow.generator.probes import mutate_probe
+            return mutate_probe(program)
         return self._mutate_program(program)
 
     def _mutate_dynamic(self, seq):
@@ -46,6 +49,8 @@ class Mutator:
 
         def _fix_warp(params):
             """Ensure threads is compatible with block_M and block_N."""
+            if self.backend != "tilelang":
+                return
             if not tilelang_check_warp_partition(params["block_M"], params["block_N"], params["threads"]):
                 for t in [128, 256]:
                     if tilelang_check_warp_partition(params["block_M"], params["block_N"], t):
@@ -243,7 +248,7 @@ class Mutator:
                     break
 
         # Enforce warp partition constraint
-        if not tilelang_check_warp_partition(p.block_M, p.block_N, p.threads):
+        if self.backend == "tilelang" and not tilelang_check_warp_partition(p.block_M, p.block_N, p.threads):
             for t in [128, 256]:
                 if tilelang_check_warp_partition(p.block_M, p.block_N, t):
                     p.threads = t
@@ -338,7 +343,7 @@ class Mutator:
         if k.block_K not in valid_k:
             k.block_K = min(valid_k, key=lambda x: abs(x - k.block_K))
 
-        if not tilelang_check_warp_partition(k.block_M, k.block_N, k.threads):
+        if self.backend == "tilelang" and not tilelang_check_warp_partition(k.block_M, k.block_N, k.threads):
             for t in [128, 256]:
                 if tilelang_check_warp_partition(k.block_M, k.block_N, t):
                     k.threads = t
@@ -350,9 +355,11 @@ class Mutator:
 
         # Transpose allocates two shared buffers (A + B transposed), double the cost
         shmem_multiplier = 2 if k.compute_kind == ComputeKind.TRANSPOSE else 1
-        if not tilelang_check_shared_memory(k.block_M, k.block_N, k.block_K, k.dtype, num_stages=4):
+        check_fn = tilelang_check_shared_memory if self.backend == "tilelang" else triton_check_shared_memory
+        stages = k.num_stages if k.loop_kind == LoopKind.PIPELINED else 1
+        if not check_fn(k.block_M, k.block_N, k.block_K, k.dtype, num_stages=stages):
             for bk in sorted(valid_k):
-                if tilelang_check_shared_memory(k.block_M, k.block_N, bk, k.dtype, num_stages=4):
+                if check_fn(k.block_M, k.block_N, bk, k.dtype, num_stages=stages):
                     k.block_K = bk
                     break
         # For transpose: check A_shared + B_shared both fit

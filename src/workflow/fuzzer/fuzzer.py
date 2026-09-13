@@ -2,6 +2,7 @@
 TileSmith Fuzzer — Main fuzzing loop.
 """
 
+import hashlib
 import json
 import pickle
 import random
@@ -27,7 +28,10 @@ class FuzzingStats:
         self.unique_bugs: List[BugReport] = []
         self.start_time = time.time()
 
-    def summary(self, historical_bugs_total: int = 0, historical_bugs_unique: int = 0) -> str:
+    def summary(self, historical_bugs_total: int = 0, historical_bugs_unique: int = 0,
+                total_categories: int = None) -> str:
+        if total_categories is None:
+            total_categories = historical_bugs_unique + len({b.root_cause for b in self.bugs_found})
         elapsed = time.time() - self.start_time
         return (
             f"=== TileSmith Fuzzing Stats ===\n"
@@ -35,7 +39,7 @@ class FuzzingStats:
             f"Generated: {self.total_generated}\n"
             f"Tested: {self.total_tested}\n"
             f"Bugs (total): {historical_bugs_total + len(self.bugs_found)}\n"
-            f"Bugs (unique): {historical_bugs_unique + len(self.unique_bugs)}\n"
+            f"Failure categories: {total_categories}\n"
             f"Throughput: {self.total_tested / max(elapsed, 1):.2f} tests/sec\n"
         )
 
@@ -119,6 +123,20 @@ class TileSmith:
                     self.known_root_causes[root_cause] = self.known_root_causes.get(root_cause, 0) + dir_count
 
         total_count = passed_count + failed_count
+        # Reports are deduplicated/limited, so their file count may be much
+        # smaller than the actual number of historical executions.
+        summary_path = self.output_dir / "summary.json"
+        if summary_path.exists():
+            try:
+                with open(summary_path) as f:
+                    summary = json.load(f)
+            except (OSError, json.JSONDecodeError):
+                summary = {}
+            if "input_seed" in summary and summary["input_seed"] != self.config.input_seed:
+                raise ValueError(f"Resume input seed mismatch: use --input-seed {summary['input_seed']}")
+            total_count = max(total_count, summary.get("total_tested", 0))
+            for cause, count in summary.get("root_causes", {}).items():
+                self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
 
         self.stats.total_tested = total_count
         self.stats.total_generated = self.stats.total_tested
@@ -260,6 +278,11 @@ class TileSmith:
                 loop_kind=LoopKind(lk) if isinstance(lk, str) else lk,
                 dtype=DataType(dtype_str) if isinstance(dtype_str, str) else dtype_str,
                 alpha=params.get("alpha", 1.0),
+                coverage_probe=params.get("coverage_probe", False),
+                input_layout=params.get("input_layout", "contiguous"),
+                input_pattern=params.get("input_pattern", "normal"),
+                repeat_count=params.get("repeat_count", 3),
+                schedule_pair=params.get("schedule_pair", True),
             )
             return TileProgram(kernels=[kernel])
 
@@ -275,10 +298,42 @@ class TileSmith:
                            torch_ref_update="")
                 for op, a in zip(ops, alphas)
             ]
+            specs = params.get("sequence_steps")
+            pool = TileValuePool()
+            if specs is not None:
+                from src.ir import TileBuffer
+                buffers = {}
+                reduced = {out[0] for kind, ins, outs, attrs in specs
+                           if kind in ("reduce_sum", "reduce_max", "reduce_min") for out in outs}
+                def buffer(desc):
+                    name, scope, dtype = desc
+                    key = (scope, name)
+                    if key not in buffers:
+                        if scope == "global":
+                            shape = ((params["M"], params["K"]) if name == "A" else
+                                     (params["K"], params["N"]) if name == "B" else
+                                     (params["M"], params["N"]))
+                            destination = pool.global_in
+                        else:
+                            shape = ((params["block_M"],) if name in reduced else
+                                     (params["block_M"], params["block_N"]))
+                            destination = pool.shared if scope == "shared" else pool.fragment
+                        buffers[key] = TileBuffer(name, shape, dtype, scope, "")
+                        destination.append(buffers[key])
+                    return buffers[key]
+                steps = [KernelStep(kind, [buffer(b) for b in ins], [buffer(b) for b in outs], attrs, "")
+                         for kind, ins, outs, attrs in specs]
+                # The terminal/writeback buffer defines the result, including
+                # historical sequences that wrote an earlier fragment.
+                if steps:
+                    final = steps[-1].inputs[0] if steps[-1].op_kind == "copy_f2g" else steps[-1].outputs[0]
+                    if final in pool.fragment:
+                        pool.fragment.remove(final)
+                        pool.fragment.append(final)
             lk = params.get("loop_kind", "pipelined")
             return DynamicSequence(
                 steps=steps,
-                pool=TileValuePool(),
+                pool=pool,
                 M=params["M"], N=params["N"], K=params["K"],
                 block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
                 threads=params["threads"], num_stages=params["num_stages"],
@@ -420,8 +475,8 @@ class TileSmith:
 
                 if verbose and new_tested % 100 == 0:
                     total_bugs = self._historical_bugs_total + len(self.stats.bugs_found)
-                    total_unique = self._historical_bugs_unique + len(self.stats.unique_bugs)
-                    print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} unique={total_unique}")
+                    total_unique = len(self.known_root_causes)
+                    print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} categories={total_unique}")
 
         finally:
             bugs_total = sum(self.known_root_causes.values())
@@ -429,6 +484,8 @@ class TileSmith:
 
             summary = {
                 "backend": self.backend,
+                "input_seed": self.config.input_seed,
+                "coverage_probe_prob": self.config.coverage_probe_prob,
                 "total_tested": self.stats.total_tested,
                 "bugs_total": bugs_total,
                 "bugs_unique": bugs_unique,
@@ -460,7 +517,7 @@ class TileSmith:
             print()
             print(self.stats.summary(
                 max(0, bugs_total - len(self.stats.bugs_found)),
-                max(0, bugs_unique - len(self.stats.unique_bugs)),
+                total_categories=bugs_unique,
             ))
 
         return self.stats
@@ -469,10 +526,7 @@ class TileSmith:
         """Create a hashable dedup signature for TileProgram, TilePipeline, or DynamicSequence.
         All enum fields are converted to their string .value so the sig matches _make_sig_from_dict."""
         if isinstance(program, DynamicSequence):
-            steps_sig = tuple(
-                (s.op_kind, s.attrs.get("alpha", 1.0) if s.op_kind == "scale" else 1.0)
-                for s in program.steps
-            )
+            steps_sig = json.dumps(program.step_specs, sort_keys=True, separators=(",", ":"))
             return (steps_sig, program.M, program.N, program.K,
                     program.block_M, program.block_N, program.block_K,
                     program.threads, program.loop_kind, program.num_stages, program.dtype)
@@ -497,6 +551,8 @@ class TileSmith:
             kernel.num_stages,
             kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype,
             kernel.alpha,
+            *((kernel.input_layout, kernel.input_pattern, kernel.repeat_count, kernel.schedule_pair)
+              if kernel.coverage_probe else ()),
         )
 
     @staticmethod
@@ -528,12 +584,14 @@ class TileSmith:
                 type_ = "single_op"
 
         if type_ == "dynamic":
-            ops = params.get("sequence", [])
-            alphas = params.get("sequence_alphas", [1.0] * len(ops))
-            steps_sig = tuple(
-                (op, a if op == "scale" else 1.0)
-                for op, a in zip(ops, alphas)
-            )
+            specs = params.get("sequence_steps")
+            if specs is None:
+                # Old reports omit branch/dataflow details. Do not let their coarse
+                # signatures suppress new programs whose semantics we now retain.
+                steps_sig = ("legacy_dynamic", tuple(params.get("sequence", [])),
+                             tuple(params.get("sequence_alphas", [])))
+            else:
+                steps_sig = json.dumps(specs, sort_keys=True, separators=(",", ":"))
             return (steps_sig, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype)
 
         if type_ == "pipeline":
@@ -545,7 +603,10 @@ class TileSmith:
         # single_op
         compute_kind = d.get("compute_kind", params.get("compute_kind", ""))
         alpha = params.get("alpha", 1.0)
-        return (compute_kind, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype, alpha)
+        return (compute_kind, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype, alpha) + (
+            (params.get("input_layout", "contiguous"), params.get("input_pattern", "normal"),
+             params.get("repeat_count", 3), params.get("schedule_pair", True))
+            if params.get("coverage_probe", False) else ())
 
     def _generate_test_case(self):
         if not self.seed_pool:
@@ -583,7 +644,8 @@ class TileSmith:
             params = (f"M{program.M},N{program.N},K{program.K},"
                       f"bM{program.block_M},bN{program.block_N},bK{program.block_K},"
                       f"t{program.threads},{program.loop_kind},s{program.num_stages},{program.dtype}")
-            return f"dynamic_{ops}_{params}"
+            digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
+            return f"dynamic_{ops}_{params}"[:210] + f"_{digest}"
         if isinstance(program, TilePipeline):
             ops = "+".join(_step_label_pipeline(s) for s in program.steps)
             lk = program.loop_kind.value if hasattr(program.loop_kind, "value") else program.loop_kind
@@ -601,6 +663,9 @@ class TileSmith:
             params = (f"M{kernel.M},N{kernel.N},K{kernel.K},"
                       f"bM{kernel.block_M},bN{kernel.block_N},bK{kernel.block_K},"
                       f"t{kernel.threads},{lk},s{kernel.num_stages},{dt}{alpha_suffix}")
+            if kernel.coverage_probe:
+                digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
+                return f"probe_{op}_{params}_{kernel.input_layout}_{kernel.input_pattern}_{digest}"
             return f"single_{op}_{params}"
         return "single_unknown"
 
@@ -632,28 +697,8 @@ class TileSmith:
         name = f"passed_{kind_label}"
         code = self.oracle._emit_code(program)
 
-        if isinstance(program, DynamicSequence):
-            meta = {
-                "type": "dynamic",
-                "sequence": [s.op_kind for s in program.steps],
-                "params": program.params_dict,
-                "dtype": program.dtype,
-            }
-        elif isinstance(program, TilePipeline):
-            meta = {
-                "type": "pipeline",
-                "pipeline": [s.kind.value for s in program.steps],
-                "params": program.params_dict,
-                "dtype": program.dtype.value,
-            }
-        else:
-            kernel = program.kernels[0]
-            meta = {
-                "type": "single_op",
-                "compute_kind": kernel.compute_kind.value,
-                "params": kernel.params_dict,
-                "dtype": kernel.dtype.value,
-            }
+        meta = self._program_to_dict(program)
+        meta["input_seed"] = self.config.input_seed
 
         with open(passed_dir / f"{name}.json", "w") as f:
             json.dump(meta, f, indent=2)

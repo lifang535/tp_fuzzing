@@ -25,7 +25,7 @@ def valid_block_k() -> list:
 
 
 def valid_threads() -> list:
-    return [128]
+    return [128, 256]
 
 
 # ── Constraint checks ────────────────────────────────────────────────────────
@@ -95,7 +95,7 @@ def generate_valid_params(dim_pool: list, dtype) -> dict:
                 else:
                     num_stages = 1
 
-        threads = 128
+        threads = random.choice(valid_threads())
 
         return {
             "M": M, "N": N, "K": K,

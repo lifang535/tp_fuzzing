@@ -46,6 +46,8 @@ class ComputeKind(Enum):
 
     # Batch 3 — compound
     SOFTMAX = "softmax"        # B[i,j] = softmax(A[i,:])
+    ARGMAX = "argmax"          # First index of the row maximum (int32 output)
+    GEMM_ARGMAX = "gemm_argmax" # Fused float32 matmul accumulator -> argmax
     WHERE = "where"            # C = where(A > 0, A, B)
 
 
@@ -119,6 +121,20 @@ class TileKernel:
     # Op-specific parameters
     alpha: float = 1.0  # Used by SCALE op
 
+    # Directed paper-derived probes use explicit physical strides and oracles.
+    coverage_probe: bool = False
+    input_layout: str = "contiguous"
+    input_pattern: str = "normal"
+    repeat_count: int = 3
+    schedule_pair: bool = True
+
+    def __post_init__(self):
+        if self.compute_kind in (ComputeKind.ARGMAX, ComputeKind.GEMM_ARGMAX):
+            self.coverage_probe = True
+            if self.input_pattern == "normal":
+                self.input_pattern = "integer"
+            self.block_N = max(32, self.block_N, 1 << (self.N - 1).bit_length())
+
     @property
     def acc_dtype(self) -> str:
         return "float32" if self.dtype == DataType.FLOAT16 else self.dtype.value
@@ -126,7 +142,7 @@ class TileKernel:
     @property
     def output_shape(self) -> tuple:
         """Shape of the kernel's primary output tensor."""
-        if self.compute_kind in REDUCE_OPS:
+        if self.compute_kind in REDUCE_OPS | {ComputeKind.ARGMAX, ComputeKind.GEMM_ARGMAX}:
             return (self.M,)
         elif self.compute_kind == ComputeKind.TRANSPOSE:
             return (self.N, self.M)
@@ -142,6 +158,9 @@ class TileKernel:
             "loop_kind": self.loop_kind.value,
             "compute_kind": self.compute_kind.value,
             "alpha": self.alpha,
+            **({"coverage_probe": True, "input_layout": self.input_layout,
+                "input_pattern": self.input_pattern, "repeat_count": self.repeat_count,
+                "schedule_pair": self.schedule_pair} if self.coverage_probe else {}),
         }
 
 

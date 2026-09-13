@@ -26,7 +26,7 @@ class TileLangDynamicEmitter:
             "import tilelang.language as T",
             "import torch",
             "",
-            _threshold_header(self.config),
+            _threshold_header(self.config, dynamic=True),
             "",
         ]
         lines.append(self._emit_kernel(seq))
@@ -78,7 +78,7 @@ class TileLangDynamicEmitter:
         elif kind == "accumulate_reduce":
             return self._emit_accumulate_reduce(step, sp)
         else:
-            return [f"{sp}# unknown op: {kind}"]
+            raise ValueError(f"Unsupported dynamic op: {kind}")
 
     def _emit_gemm(self, step: KernelStep, sp: str) -> list:
         a = step.attrs
@@ -201,7 +201,7 @@ class TileLangDynamicEmitter:
             f"{sp}{d_frag_name} = T.alloc_fragment((block_M, block_N), dtype)",
             f"{sp}T.copy({d_name}[by * block_M, bx * block_N], {d_frag_name})",
             f"{sp}for i, j in T.Parallel(block_M, block_N):",
-            f"{sp}    {frag_a}[i, j] = {frag_a}[i, j] if {frag_a}[i, j] > {d_frag_name}[i, j] else {d_frag_name}[i, j]",
+            f"{sp}    {frag_a}[i, j] = T.max({frag_a}[i, j], {d_frag_name}[i, j])",
         ]
 
     def _emit_softmax(self, step: KernelStep, sp: str) -> list:
@@ -215,6 +215,7 @@ class TileLangDynamicEmitter:
             f"{sp}T.reduce_sum({frag}, sum_local, dim=1, clear=True)",
             f"{sp}for i, j in T.Parallel(block_M, block_N):",
             f"{sp}    {frag}[i, j] = {frag}[i, j] / sum_local[i]",
+            f"{sp}T.copy({frag}, C[by * block_M, bx * block_N])",
         ]
 
     def _emit_reduce_sum(self, step: KernelStep, sp: str) -> list:
@@ -272,7 +273,7 @@ class TileLangDynamicEmitter:
         loop_kind = a.get("loop_kind", "pipelined")
 
         lines = [
-            f"{sp}# double_pipeline: second K-loop over latter half of K",
+            f"{sp}# double_pipeline: second full K-loop",
             f"{sp}{a2} = T.alloc_shared((block_M, block_K), dtype)",
             f"{sp}{b2} = T.alloc_shared((block_K, block_N), dtype)",
             f"{sp}{c2} = T.alloc_fragment((block_M, block_N), accum_dtype)",
@@ -434,7 +435,7 @@ class TileLangDynamicEmitter:
             lines.append(f'    if relative_err > _THRESHOLDS["reduce"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [dynamic_reduce]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         elif has_terminal_softmax:
-            lines.append(f"    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()")
+            lines.append(f"    max_diff = _max_diff(C, ref)")
             lines.append(f'    if max_diff > _THRESHOLDS["softmax"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [dynamic_softmax]: max_diff={{max_diff:.6f}}")')
         else:

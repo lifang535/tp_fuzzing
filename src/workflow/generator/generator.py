@@ -78,6 +78,10 @@ class ProgramGenerator:
     """Top-level generator — produces valid TilePrograms or TilePipelines."""
 
     def __init__(self, config: Config = DEFAULT_CONFIG, backend: str = "tilelang"):
+        if not 0 <= config.coverage_probe_prob <= 1:
+            raise ValueError("coverage_probe_prob must be between 0 and 1")
+        if config.coverage_probe_prob and config.probe_repeat_count < 2:
+            raise ValueError("probe_repeat_count must be at least 2")
         self.config = config
         self.backend = backend
         self.type_gen = TypeGenerator(config)
@@ -91,6 +95,9 @@ class ProgramGenerator:
           30% → DynamicSequence (pool-driven, MLIRSmith-style)
           30% → single-kernel TileProgram
         """
+        if self.config.coverage_probe_prob and random.random() < self.config.coverage_probe_prob:
+            from .probes import generate_probe
+            return generate_probe(self.config)
         r = random.random()
         if r < self.config.pipeline_prob:
             dtype = self.type_gen.random_dtype()

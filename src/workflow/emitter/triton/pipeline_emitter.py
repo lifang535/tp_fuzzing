@@ -105,7 +105,8 @@ class TritonPipelineEmitter:
         # Terminal or write-back
         if terminal_step is not None:
             if terminal_step.kind == ComputeKind.SOFTMAX:
-                body_lines.append(f"{sp}acc = tl.softmax(acc, 1)")
+                body_lines.append(f"{sp}soft_exp = tl.exp(acc - tl.max(acc, axis=1)[:, None])")
+                body_lines.append(f"{sp}acc = soft_exp / tl.sum(soft_exp, axis=1)[:, None]")
                 body_lines.append(f"{sp}c_ptrs = c_ptr + (offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn)")
                 body_lines.append(f"{sp}tl.store(c_ptrs, acc.to({tld}), mask=(offs_m[:, None] < M) & (offs_n[None, :] < N))")
             elif terminal_step.kind == ComputeKind.REDUCE_SUM:
@@ -201,7 +202,7 @@ class TritonPipelineEmitter:
         if d_strides.strip():
             lines.append(f"       {d_strides}")
         lines.append(f"        {c_strides}")
-        lines.append(f"        BLOCK_M={p.block_M}, BLOCK_N={p.block_N}, BLOCK_K={p.block_K},")
+        lines.append(f"        num_warps={p.threads // 32}, BLOCK_M={p.block_M}, BLOCK_N={p.block_N}, BLOCK_K={p.block_K},")
         lines.append(f"    )")
         extra_return = "".join(f", D{i}" for i, _ in extra_inputs)
         lines.append(f"    return A, B{extra_return}, C")
@@ -253,7 +254,7 @@ class TritonPipelineEmitter:
             lines.append(f'    if relative_err > _THRESHOLDS["reduce"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_pipeline_reduce]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         elif has_terminal_softmax:
-            lines.append(f"    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()")
+            lines.append(f"    max_diff = _max_diff(C, ref)")
             lines.append(f'    if max_diff > _THRESHOLDS["softmax"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_pipeline_softmax]: max_diff={{max_diff:.6f}}")')
         else:
@@ -313,7 +314,8 @@ class TritonPipelineEmitter:
 
         if terminal_step is not None:
             if terminal_step.kind == ComputeKind.SOFTMAX:
-                body_lines.append(f"{sp}acc = tl.softmax(acc, 1)")
+                body_lines.append(f"{sp}soft_exp = tl.exp(acc - tl.max(acc, axis=1)[:, None])")
+                body_lines.append(f"{sp}acc = soft_exp / tl.sum(soft_exp, axis=1)[:, None]")
                 body_lines.append(f"{sp}c_ptrs = c_ptr + offs_m[:, None] * stride_cm + offs_n[None, :] * stride_cn")
                 body_lines.append(f"{sp}tl.store(c_ptrs, acc.to({tld}), mask=mask)")
             elif terminal_step.kind == ComputeKind.REDUCE_SUM:
@@ -376,7 +378,7 @@ class TritonPipelineEmitter:
         if d_strides.strip():
             lines.append(f"       {d_strides}")
         lines.append(f"        {c_strides}")
-        lines.append(f"        BLOCK_M={p.block_M}, BLOCK_N={p.block_N},")
+        lines.append(f"        num_warps={p.threads // 32}, BLOCK_M={p.block_M}, BLOCK_N={p.block_N},")
         lines.append(f"    )")
         extra_return = "".join(f", D{i}" for i, _ in extra_inputs)
         lines.append(f"    return A{extra_return}, C")
@@ -428,12 +430,13 @@ class TritonPipelineEmitter:
             lines.append(f'    if relative_err > _THRESHOLDS["reduce"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_chain_reduce]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         elif has_terminal_softmax:
-            lines.append(f"    max_diff = (C.to(torch.float32) - ref.to(torch.float32)).abs().max().item()")
+            lines.append(f"    max_diff = _max_diff(C, ref)")
             lines.append(f'    if max_diff > _THRESHOLDS["softmax"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_chain_softmax]: max_diff={{max_diff:.6f}}")')
         else:
             lines.append(f"    max_diff, ref_norm, relative_err = _finite_compare(C, ref)")
-            lines.append(f'    if relative_err > _THRESHOLDS["pipeline_fp16"]:')
+            threshold_key = "pipeline_fp32" if p.dtype == DataType.FLOAT32 else "pipeline_fp16"
+            lines.append(f'    if relative_err > _THRESHOLDS["{threshold_key}"]:')
             lines.append(f'        raise RuntimeError(f"WRONG RESULT [triton_chain]: max_diff={{max_diff:.6f}}, relative_err={{relative_err:.4f}}")')
         return lines
 

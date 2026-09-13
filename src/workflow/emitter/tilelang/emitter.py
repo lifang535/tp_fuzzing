@@ -39,6 +39,9 @@ class TileLangEmitter:
         return "\n".join(lines)
 
     def _emit_kernel(self, k: TileKernel) -> str:
+        if k.coverage_probe or k.compute_kind in (ComputeKind.ARGMAX, ComputeKind.GEMM_ARGMAX):
+            from src.workflow.emitter.probes import emit_probe
+            return emit_probe(k, "tilelang", self.config)
         op_cls = OP_REGISTRY.get(k.compute_kind)
         if op_cls is None:
             raise ValueError(f"No op class registered for {k.compute_kind}")
