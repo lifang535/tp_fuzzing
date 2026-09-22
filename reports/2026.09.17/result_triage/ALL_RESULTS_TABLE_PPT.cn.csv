@@ -1,0 +1,14 @@
+﻿root_cause,后端,发生阶段,判定,触发原因（简述）
+dtype_mismatch,TileLang,运行时,真实机制,缓存未区分 dtype，复用了错误类型的 kernel
+ptx_async_boundary,TileLang,编译时,真实机制,fp16 边界拷贝被降成非法的 2 字节 cp.async
+wrong_result,两者,结果校验,混合，需区分,K=8 GEMM 列重复、负常量 dot 错算；也含 oracle 误报
+schedule_mismatch,TileLang,调度对比,部分真实,不同调度触发 K=8 GEMM 错算；部分仍待确认
+nondeterminism,TileLang,重复执行,真实,共享内存同步缺失，相同输入产生不同结果
+segfault,两者,编译时,部分真实,Triton 优化阶段崩溃；NVCC 子进程崩溃待定位
+shared_memory_overflow,两者,加载/启动,排除,生成调度申请的共享内存超过硬件上限
+warp_partition,TileLang,编译时,暂排除,tile 过小，无法满足指定线程数的 warp 划分约束
+gpu_oom,TileLang,参考计算,排除,PyTorch 参考计算显存分配失败
+assertion_failure,TileLang,运行时,排除,设备不可用或 OOM，被日志分类器误判为断言
+other,TileLang,检查阶段,排除,检查器无法将特殊 stride 张量转换为字节视图
+layout_inference,TileLang,编译时,待确认,布局推导失败，需区分编译器缺陷与不支持的组合
+timeout,两者,阶段不明,待确认,编译、参考计算或执行超时，尚不能认定死锁

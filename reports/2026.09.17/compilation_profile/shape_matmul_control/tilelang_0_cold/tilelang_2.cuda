@@ -1,0 +1,236 @@
+#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940
+#define _tl_orig_alignas alignas
+#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)
+#include <cuda.h>
+#undef alignas
+#define alignas _tl_orig_alignas
+#endif
+#include <tl_templates/cuda/instruction/mma.h>
+#include <math_constants.h>
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/scan.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void impl_kernel(const half_t* __restrict__ mem0, half_t* __restrict__ out_e20);
+extern "C" __global__ void __launch_bounds__(32, 1) impl_kernel(const half_t* __restrict__ mem0, half_t* __restrict__ out_e20) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  void* e16_a_shared = ((void*)((char*)buf_dyn_shmem + 0));
+  void* e8_a_shared = ((void*)((char*)buf_dyn_shmem + 0));
+  void* e16_b_shared = ((void*)((char*)buf_dyn_shmem + 512));
+  void* e8_b_shared = ((void*)((char*)buf_dyn_shmem + 1024));
+  int e1[16];
+  signed char e2[16];
+  half_t e3[16];
+  half_t e4[16];
+  half_t e5[16];
+  half_t e6[16];
+  float e7[8];
+  float e8[8];
+  float e9_wide[8];
+  float e9[2];
+  int e9_nan[8];
+  int e9_nan_count[2];
+  float e10[2];
+  float e11[8];
+  float e12[8];
+  float e13[8];
+  half_t e14[8];
+  half_t e15[8];
+  float e16[8];
+  float e17[8];
+  float e18[8];
+  float e19[8];
+  half_t e20[8];
+  #pragma unroll
+  for (int i = 0; i < 16; ++i) {
+    e1[i] = ((((24 - (i & 3)) - (((int)threadIdx.x) * 4)) - ((i >> 2) * 128)) & 511);
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 16; ++i_1) {
+    e2[i_1] = (signed char)1;
+  }
+  #pragma unroll
+  for (int i_2 = 0; i_2 < 16; ++i_2) {
+    half_t condval;
+    if (((((((bool)e2[i_2]) && (0 <= e1[i_2])) && (e1[i_2] < 512)) && (-16 <= e1[i_2])) && (e1[i_2] < 528))) {
+      condval = mem0[(((((int64_t)((int)blockIdx.x)) * (int64_t)544) + ((int64_t)e1[((int64_t)i_2)])) + (int64_t)16)];
+    } else {
+      condval = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e3[i_2] = condval;
+  }
+  #pragma unroll
+  for (int i_3 = 0; i_3 < 16; ++i_3) {
+    e4[i_3] = (e3[i_3] * e3[i_3]);
+  }
+  #pragma unroll
+  for (int i_4 = 0; i_4 < 16; ++i_4) {
+    e5[i_4] = e4[i_4];
+  }
+  #pragma unroll
+  for (int i_5 = 0; i_5 < 16; ++i_5) {
+    e6[i_5] = e5[(((i_5 & 3) * 4) + (i_5 >> 2))];
+  }
+  #pragma unroll
+  for (int i_6 = 0; i_6 < 8; ++i_6) {
+    e7[i_6] = 0x1p-3f/*1.250000e-01*/;
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_7 = 0; i_7 < 16; ++i_7) {
+    ((half_t*)e8_a_shared)[((((((((int)threadIdx.x) & 3) * 128) + ((i_7 >> 2) * 32)) + (((((i_7 & 3) >> 1) + (((int)threadIdx.x) & 1)) & 1) * 16)) + ((((i_7 >> 3) + (i_7 & 1)) & 1) * 8)) + (((int)threadIdx.x) >> 2))] = e6[i_7];
+  }
+  #pragma unroll
+  for (int i_8 = 0; i_8 < 4; ++i_8) {
+    for (int vec = 0; vec < 4; ++vec) {
+      ((half_t*)e8_b_shared)[(((((i_8 * 128) + ((((int)threadIdx.x) >> 2) * 16)) + ((((((int)threadIdx.x) >> 4) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 1) * 4)) + vec)] = e5[((i_8 * 4) + vec)];
+    }
+  }
+  #pragma unroll
+  for (int i_9 = 0; i_9 < 2; ++i_9) {
+    for (int vec_1 = 0; vec_1 < 4; ++vec_1) {
+      e8[((i_9 * 4) + vec_1)] = e7[((i_9 * 4) + vec_1)];
+    }
+  }
+  {
+    half_t A_local[8];
+    half_t B_local[8];
+    __syncthreads();
+    for (int ki = 0; ki < 2; ++ki) {
+      tl::ptx_ldmatrix_x4((&(((half_t*)e8_a_shared)[((((((int)threadIdx.x) & 15) * 32) + (((((((int)threadIdx.x) & 7) >> 2) + ki) & 1) * 16)) + ((((((int)threadIdx.x) >> 4) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 8))])), (&(A_local[0])));
+      tl::ptx_ldmatrix_x4_trans((&(((half_t*)e8_b_shared)[(((ki * 256) + ((((int)threadIdx.x) & 15) * 16)) + ((((((int)threadIdx.x) >> 4) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 8))])), (&(B_local[0])));
+      tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(e8 + 0), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + 0));
+      tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(e8 + 4), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + 4));
+    }
+  }
+  #pragma unroll
+  for (int i_10 = 0; i_10 < 8; ++i_10) {
+    e9_wide[i_10] = e8[i_10];
+  }
+  #pragma unroll
+  for (int i_11 = 0; i_11 < 2; ++i_11) {
+    e9[i_11] = -CUDART_INF_F;
+    #pragma unroll
+    for (int rv = 0; rv < 4; ++rv) {
+      e9[i_11] = max(e9[i_11], e9_wide[((((rv & 1) * 4) + (i_11 * 2)) + (rv >> 1))]);
+    }
+    e9[i_11] = tl::AllReduce<tl::MaxOp, 4, 1, 0>::run(e9[i_11]);
+  }
+  #pragma unroll
+  for (int i_12 = 0; i_12 < 8; ++i_12) {
+    int condval_1;
+    if ((e9_wide[i_12] != e9_wide[i_12])) {
+      condval_1 = 1;
+    } else {
+      condval_1 = 0;
+    }
+    e9_nan[i_12] = condval_1;
+  }
+  #pragma unroll
+  for (int i_13 = 0; i_13 < 2; ++i_13) {
+    e9_nan_count[i_13] = 0;
+    #pragma unroll
+    for (int rv_1 = 0; rv_1 < 4; ++rv_1) {
+      e9_nan_count[i_13] = (e9_nan_count[i_13] + e9_nan[((((rv_1 & 1) * 4) + (i_13 * 2)) + (rv_1 >> 1))]);
+    }
+    e9_nan_count[i_13] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(e9_nan_count[i_13]);
+  }
+  #pragma unroll
+  for (int i_14 = 0; i_14 < 2; ++i_14) {
+    float condval_2;
+    if ((0 < e9_nan_count[i_14])) {
+      condval_2 = CUDART_NAN_F;
+    } else {
+      condval_2 = e9[i_14];
+    }
+    e9[i_14] = condval_2;
+  }
+  #pragma unroll
+  for (int i_15 = 0; i_15 < 2; ++i_15) {
+    e10[i_15] = e9[i_15];
+  }
+  #pragma unroll
+  for (int i_16 = 0; i_16 < 8; ++i_16) {
+    e11[i_16] = (e8[i_16] - e10[((i_16 & 3) >> 1)]);
+  }
+  #pragma unroll
+  for (int i_17 = 0; i_17 < 8; ++i_17) {
+    e12[i_17] = 0x1p-3f/*1.250000e-01*/;
+  }
+  #pragma unroll
+  for (int i_18 = 0; i_18 < 8; ++i_18) {
+    e13[i_18] = (e11[i_18] * e12[i_18]);
+  }
+  #pragma unroll
+  for (int i_19 = 0; i_19 < 2; ++i_19) {
+    for (int vec_2 = 0; vec_2 < 4; ++vec_2) {
+      e14[((i_19 * 4) + vec_2)] = ((half_t)e7[((i_19 * 4) + vec_2)]);
+    }
+  }
+  #pragma unroll
+  for (int i_20 = 0; i_20 < 2; ++i_20) {
+    for (int vec_3 = 0; vec_3 < 4; ++vec_3) {
+      e15[((i_20 * 4) + vec_3)] = ((half_t)e13[((i_20 * 4) + vec_3)]);
+    }
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_21 = 0; i_21 < 4; ++i_21) {
+    for (int vec_4 = 0; vec_4 < 2; ++vec_4) {
+      ((half_t*)e16_a_shared)[((((((i_21 & 1) * 128) + ((((int)threadIdx.x) >> 2) * 16)) + ((((((int)threadIdx.x) >> 4) + (i_21 >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + vec_4)] = e15[((i_21 * 2) + vec_4)];
+    }
+  }
+  #pragma unroll
+  for (int i_22 = 0; i_22 < 4; ++i_22) {
+    for (int vec_5 = 0; vec_5 < 2; ++vec_5) {
+      ((half_t*)e16_b_shared)[((((((i_22 & 1) * 128) + ((((int)threadIdx.x) >> 2) * 16)) + ((((((int)threadIdx.x) >> 4) + (i_22 >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + vec_5)] = e14[((i_22 * 2) + vec_5)];
+    }
+  }
+  #pragma unroll
+  for (int i_23 = 0; i_23 < 2; ++i_23) {
+    for (int vec_6 = 0; vec_6 < 4; ++vec_6) {
+      e16[((i_23 * 4) + vec_6)] = e7[((i_23 * 4) + vec_6)];
+    }
+  }
+  {
+    half_t A_local_1[8];
+    half_t B_local_1[8];
+    __syncthreads();
+    tl::ptx_ldmatrix_x4((&(((half_t*)e16_a_shared)[(((((int)threadIdx.x) & 15) * 16) + ((((((int)threadIdx.x) >> 4) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 8))])), (&(A_local_1[0])));
+    tl::ptx_ldmatrix_x4_trans((&(((half_t*)e16_b_shared)[(((((int)threadIdx.x) & 15) * 16) + ((((((int)threadIdx.x) >> 4) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 8))])), (&(B_local_1[0])));
+    tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(e16 + 0), reinterpret_cast<const unsigned*>(A_local_1 + 0), reinterpret_cast<const unsigned*>(B_local_1 + 0));
+    tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(e16 + 4), reinterpret_cast<const unsigned*>(A_local_1 + 0), reinterpret_cast<const unsigned*>(B_local_1 + 4));
+  }
+  #pragma unroll
+  for (int i_24 = 0; i_24 < 8; ++i_24) {
+    e17[i_24] = e16[i_24];
+  }
+  #pragma unroll
+  for (int i_25 = 0; i_25 < 8; ++i_25) {
+    e18[i_25] = e17[i_25];
+  }
+  #pragma unroll
+  for (int i_26 = 0; i_26 < 8; ++i_26) {
+    e19[i_26] = (e18[i_26] * e7[i_26]);
+  }
+  #pragma unroll
+  for (int i_27 = 0; i_27 < 2; ++i_27) {
+    for (int vec_7 = 0; vec_7 < 4; ++vec_7) {
+      e20[((i_27 * 4) + vec_7)] = ((half_t)e19[((i_27 * 4) + vec_7)]);
+    }
+  }
+  #pragma unroll
+  for (int i_28 = 0; i_28 < 4; ++i_28) {
+    for (int vec_8 = 0; vec_8 < 2; ++vec_8) {
+      out_e20[(((((((((int)blockIdx.x) * 288) + ((i_28 & 1) * 128)) + ((((int)threadIdx.x) >> 2) * 16)) + ((i_28 >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2)) + vec_8) + 16)] = e20[((i_28 * 2) + vec_8)];
+    }
+  }
+}
+

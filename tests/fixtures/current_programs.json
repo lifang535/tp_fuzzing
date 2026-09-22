@@ -1,0 +1,7194 @@
+[
+ {
+  "case": "tilelang/v3/0",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 3,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 13826,
+    "N": 13747,
+    "K": 9116,
+    "block_M": 64,
+    "block_N": 64,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "abs",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "for",
+      "result": "v8",
+      "operands": [
+       "v2"
+      ],
+      "attrs": {
+       "trip_count": 0,
+       "start": 2,
+       "step": 3
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v1",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "tile_transpose",
+          "result": "v5",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v6",
+          "operands": [
+           "v5",
+           "v2",
+           "v2"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "add",
+          "result": "v7",
+          "operands": [
+           "v6",
+           "v3"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v7"
+       }
+      ]
+     },
+     {
+      "kind": "if",
+      "result": "v15",
+      "operands": [
+       "v8"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 4,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v9"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v10",
+          "operands": [
+           "v9",
+           "v9",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "div",
+          "result": "v11",
+          "operands": [
+           "v10",
+           "v8"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v12",
+          "operands": [
+           "v8",
+           "v2",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "abs",
+          "result": "v13",
+          "operands": [
+           "v12"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       },
+       {
+        "arguments": [
+         "v14"
+        ],
+        "operations": [],
+        "yield_value": "v14"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v1",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "exp",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "abs",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_min",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "mul",
+        "result": "v4",
+        "operands": [
+         "v3",
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_softmax",
+        "result": "v5",
+        "operands": [
+         "v4"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v13",
+        "operands": [
+         "v5"
+        ],
+        "attrs": {
+         "predicate": "column",
+         "modulus": 3,
+         "parity": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "neg",
+            "result": "v7",
+            "operands": [
+             "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "abs",
+            "result": "v8",
+            "operands": [
+             "arg1"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_softmax",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v10",
+            "operands": [
+             "v8"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v11",
+            "operands": [
+             "v10"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v11"
+         },
+         {
+          "arguments": [
+           "v12"
+          ],
+          "operations": [],
+          "yield_value": "v12"
+         }
+        ]
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   }
+  },
+  "emission": "b5daec1cec79f8542c11cb623dcb9682e147367616cfe2236c38ae306b1402a6"
+ },
+ {
+  "case": "tilelang/v3/1",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 3,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 236,
+    "N": 1930,
+    "K": 1930,
+    "block_M": 64,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 3,
+    "loop_kind": "pipelined",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "abs",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "for",
+      "result": "v8",
+      "operands": [
+       "v2"
+      ],
+      "attrs": {
+       "trip_count": 0,
+       "start": 2,
+       "step": 3
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v1",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "tile_transpose",
+          "result": "v5",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v6",
+          "operands": [
+           "v5",
+           "v2",
+           "v2"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "add",
+          "result": "v7",
+          "operands": [
+           "v6",
+           "v3"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v7"
+       }
+      ]
+     },
+     {
+      "kind": "if",
+      "result": "v15",
+      "operands": [
+       "v8"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 4,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v9"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v10",
+          "operands": [
+           "v9",
+           "v9",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "div",
+          "result": "v11",
+          "operands": [
+           "v10",
+           "v8"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v12",
+          "operands": [
+           "v8",
+           "v2",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "abs",
+          "result": "v13",
+          "operands": [
+           "v12"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       },
+       {
+        "arguments": [
+         "v14"
+        ],
+        "operations": [],
+        "yield_value": "v14"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v1",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "exp",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "abs",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_min",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "mul",
+        "result": "v4",
+        "operands": [
+         "v3",
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_softmax",
+        "result": "v5",
+        "operands": [
+         "v4"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v13",
+        "operands": [
+         "v5"
+        ],
+        "attrs": {
+         "predicate": "column",
+         "modulus": 3,
+         "parity": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "neg",
+            "result": "v7",
+            "operands": [
+             "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "abs",
+            "result": "v8",
+            "operands": [
+             "arg1"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_softmax",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v10",
+            "operands": [
+             "v8"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v11",
+            "operands": [
+             "v10"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v11"
+         },
+         {
+          "arguments": [
+           "v12"
+          ],
+          "operations": [],
+          "yield_value": "v12"
+         }
+        ]
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   }
+  },
+  "emission": "c7fbe675f8027e289320fca562d7133e10db62067d2b71ea2414cb4f8f4737a1"
+ },
+ {
+  "case": "tilelang/v4/0",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 4,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 7224,
+    "N": 4573,
+    "K": 13826,
+    "block_M": 128,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "reduce_tile",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "axis": 1,
+       "reduction": "sum"
+      },
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "v14",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 2,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v5",
+          "operands": [
+           "v1",
+           "v4"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "to_tile",
+          "result": "v6",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v6"
+       },
+       {
+        "arguments": [
+         "v7"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "v12",
+          "operands": [
+           "v1"
+          ],
+          "attrs": {
+           "trip_count": 1,
+           "start": 2,
+           "step": 1
+          },
+          "regions": [
+           {
+            "arguments": [
+             "v8"
+            ],
+            "operations": [
+             {
+              "kind": "call",
+              "result": "v9",
+              "operands": [
+               "v8",
+               "v8"
+              ],
+              "attrs": {
+               "callee": "fn_0"
+              },
+              "regions": []
+             },
+             {
+              "kind": "to_tile",
+              "result": "v10",
+              "operands": [
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "add",
+              "result": "v11",
+              "operands": [
+               "v10",
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "v11"
+           }
+          ]
+         },
+         {
+          "kind": "to_tile",
+          "result": "v13",
+          "operands": [
+           "v7"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       }
+      ]
+     },
+     {
+      "kind": "to_tile",
+      "result": "v15",
+      "operands": [
+       "v14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v15"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1"
+      ],
+      "operations": [
+       {
+        "kind": "reduce_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "axis": 1,
+         "reduction": "max"
+        },
+        "regions": []
+       },
+       {
+        "kind": "cast",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {
+         "dtype": "float16"
+        },
+        "regions": []
+       },
+       {
+        "kind": "broadcast_tile",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v4",
+        "operands": [],
+        "attrs": {
+         "source": "B",
+         "dtype": "float32",
+         "row_offset": 3,
+         "col_offset": 2
+        },
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v5",
+        "operands": [],
+        "attrs": {
+         "source": "A",
+         "dtype": "float32",
+         "row_offset": 0,
+         "col_offset": 0
+        },
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v12",
+        "operands": [
+         "arg1"
+        ],
+        "attrs": {
+         "predicate": "row",
+         "modulus": 4,
+         "parity": 3
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "cast",
+            "result": "v7",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "dtype": "float32"
+            },
+            "regions": []
+           },
+           {
+            "kind": "broadcast_tile",
+            "result": "v8",
+            "operands": [
+             "v7"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "reduce_tile",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "axis": 1,
+             "reduction": "min"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v10",
+            "operands": [
+             "v1"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v10"
+         },
+         {
+          "arguments": [
+           "v11"
+          ],
+          "operations": [],
+          "yield_value": "v11"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v13",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "normal",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   },
+   "typed": true
+  },
+  "emission": "2e7d9ee565397355008e13827839384ec5dbd3990d09579bb63f3f5ee9973fea"
+ },
+ {
+  "case": "tilelang/v4/1",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 4,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 7224,
+    "N": 4573,
+    "K": 13826,
+    "block_M": 128,
+    "block_N": 32,
+    "block_K": 8,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "reduce_tile",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "axis": 1,
+       "reduction": "sum"
+      },
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "v14",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 2,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v5",
+          "operands": [
+           "v1",
+           "v4"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "to_tile",
+          "result": "v6",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v6"
+       },
+       {
+        "arguments": [
+         "v7"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "v12",
+          "operands": [
+           "v1"
+          ],
+          "attrs": {
+           "trip_count": 1,
+           "start": 2,
+           "step": 1
+          },
+          "regions": [
+           {
+            "arguments": [
+             "v8"
+            ],
+            "operations": [
+             {
+              "kind": "call",
+              "result": "v9",
+              "operands": [
+               "v8",
+               "v8"
+              ],
+              "attrs": {
+               "callee": "fn_0"
+              },
+              "regions": []
+             },
+             {
+              "kind": "to_tile",
+              "result": "v10",
+              "operands": [
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "minimum",
+              "result": "v11",
+              "operands": [
+               "v10",
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "v11"
+           }
+          ]
+         },
+         {
+          "kind": "to_tile",
+          "result": "v13",
+          "operands": [
+           "v7"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       }
+      ]
+     },
+     {
+      "kind": "to_tile",
+      "result": "v15",
+      "operands": [
+       "v14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v15"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1"
+      ],
+      "operations": [
+       {
+        "kind": "reduce_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "axis": 1,
+         "reduction": "max"
+        },
+        "regions": []
+       },
+       {
+        "kind": "cast",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {
+         "dtype": "float16"
+        },
+        "regions": []
+       },
+       {
+        "kind": "broadcast_tile",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v4",
+        "operands": [],
+        "attrs": {
+         "source": "B",
+         "dtype": "float32",
+         "row_offset": 3,
+         "col_offset": 2
+        },
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v5",
+        "operands": [],
+        "attrs": {
+         "source": "A",
+         "dtype": "float32",
+         "row_offset": 0,
+         "col_offset": 0
+        },
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v12",
+        "operands": [
+         "arg1"
+        ],
+        "attrs": {
+         "predicate": "row",
+         "modulus": 4,
+         "parity": 3
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "cast",
+            "result": "v7",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "dtype": "float32"
+            },
+            "regions": []
+           },
+           {
+            "kind": "broadcast_tile",
+            "result": "v8",
+            "operands": [
+             "v7"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "reduce_tile",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "axis": 1,
+             "reduction": "min"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v10",
+            "operands": [
+             "v1"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v10"
+         },
+         {
+          "arguments": [
+           "v11"
+          ],
+          "operations": [],
+          "yield_value": "v11"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v13",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "normal",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   },
+   "typed": true
+  },
+  "emission": "a6e71e358ba886abbadbd38e35716d23bbee29deb208f3f1108827cdf9344fb8"
+ },
+ {
+  "case": "tilelang/probe/0",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 129,
+    "N": 129,
+    "K": 16,
+    "block_M": 32,
+    "block_N": 256,
+    "block_K": 32,
+    "threads": 256,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "coverage_probe": true,
+    "input_layout": "transposed",
+    "input_pattern": "subnormal",
+    "repeat_count": 3,
+    "schedule_pair": true,
+    "cache_cycle": true,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "probe",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "v1"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "942eda44344b371a82e46602d044182e3150b9323935617a9db661536b9b2d3b"
+ },
+ {
+  "case": "tilelang/probe/1",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 129,
+    "N": 33,
+    "K": 16,
+    "block_M": 32,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 256,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "coverage_probe": true,
+    "input_layout": "transposed",
+    "input_pattern": "subnormal",
+    "repeat_count": 3,
+    "schedule_pair": true,
+    "cache_cycle": true,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "probe",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "v1"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "a49a0f73446e75b6712930a8b262cffad69407a0ec4019675ca6a852784cc16f"
+ },
+ {
+  "case": "tilelang/extended/0",
+  "backend": "tilelang",
+  "program": {
+   "type": "extended",
+   "version": 1,
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e1",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 174,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e2",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": true
+      },
+      "regions": []
+     },
+     {
+      "op": "load",
+      "results": [
+       {
+        "name": "e3",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e2"
+      ],
+      "attrs": {
+       "buffer": "mem0"
+      },
+      "regions": []
+     },
+     {
+      "op": "add",
+      "results": [
+       {
+        "name": "e4",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e3",
+       "e3"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e5",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e4"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e6",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e5"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e7",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 0.5
+      },
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e8",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e6",
+       "e7"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e9",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 1
+      },
+      "regions": []
+     },
+     {
+      "op": "bitxor",
+      "results": [
+       {
+        "name": "e10",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e9"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e11",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 3
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e12",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e10",
+       "e11"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e13",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 63,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "parameter",
+      "results": [
+       {
+        "name": "e14",
+        "type": {
+         "dtype": "int32",
+         "shape": []
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "name": "limit"
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e15",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e13",
+       "e14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "and",
+      "results": [
+       {
+        "name": "e16",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e12",
+       "e15"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e17",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": -0.125
+      },
+      "regions": []
+     },
+     {
+      "op": "select",
+      "results": [
+       {
+        "name": "e18",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e16",
+       "e8",
+       "e17"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e19",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e18",
+       "e18"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "reduce",
+      "results": [
+       {
+        "name": "e20",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e19"
+      ],
+      "attrs": {
+       "axis": 0,
+       "kind": "min"
+      },
+      "regions": []
+     }
+    ],
+    "returns": [
+     "e19",
+     "e10",
+     "e16",
+     "e20"
+    ]
+   },
+   "buffers": [
+    {
+     "name": "mem0",
+     "dtype": "float32",
+     "size": 256,
+     "role": "input",
+     "base": null,
+     "offset": 0,
+     "stride": 1
+    }
+   ],
+   "functions": [],
+   "observations": [
+    "e3",
+    "e8",
+    "e2",
+    "e1"
+   ],
+   "blocks": 2,
+   "input_pattern": "normal",
+   "runtime_cases": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     255
+    ],
+    [
+     2,
+     256
+    ]
+   ],
+   "configuration_pair": true,
+   "observation_pair": true,
+   "family": "arithmetic"
+  },
+  "emission": "6693f65e400d615471f79c3d506bac967e7e2b88a8c675685e59e12582ea67ce"
+ },
+ {
+  "case": "tilelang/extended/1",
+  "backend": "tilelang",
+  "program": {
+   "type": "extended",
+   "version": 1,
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e1",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 174,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e2",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": true
+      },
+      "regions": []
+     },
+     {
+      "op": "load",
+      "results": [
+       {
+        "name": "e3",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e2"
+      ],
+      "attrs": {
+       "buffer": "mem0"
+      },
+      "regions": []
+     },
+     {
+      "op": "add",
+      "results": [
+       {
+        "name": "e4",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e3",
+       "e3"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e5",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e4"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e6",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e5"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e7",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 0.5
+      },
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e8",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e6",
+       "e7"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e9",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 1
+      },
+      "regions": []
+     },
+     {
+      "op": "bitxor",
+      "results": [
+       {
+        "name": "e10",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e9"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e11",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 3
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e12",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e10",
+       "e11"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e13",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 63,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "parameter",
+      "results": [
+       {
+        "name": "e14",
+        "type": {
+         "dtype": "int32",
+         "shape": []
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "name": "limit"
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e15",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e13",
+       "e14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "and",
+      "results": [
+       {
+        "name": "e16",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e12",
+       "e15"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e17",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": -0.125
+      },
+      "regions": []
+     },
+     {
+      "op": "select",
+      "results": [
+       {
+        "name": "e18",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e16",
+       "e8",
+       "e17"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e19",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e18",
+       "e18"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "reduce",
+      "results": [
+       {
+        "name": "e20",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e19"
+      ],
+      "attrs": {
+       "axis": 0,
+       "kind": "min"
+      },
+      "regions": []
+     }
+    ],
+    "returns": [
+     "e19",
+     "e10",
+     "e16",
+     "e20"
+    ]
+   },
+   "buffers": [
+    {
+     "name": "mem0",
+     "dtype": "float32",
+     "size": 256,
+     "role": "input",
+     "base": null,
+     "offset": 0,
+     "stride": 1
+    }
+   ],
+   "functions": [],
+   "observations": [
+    "e3",
+    "e8",
+    "e2",
+    "e1"
+   ],
+   "blocks": 2,
+   "input_pattern": "boundary",
+   "runtime_cases": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     255
+    ],
+    [
+     2,
+     256
+    ]
+   ],
+   "configuration_pair": true,
+   "observation_pair": true,
+   "family": "arithmetic"
+  },
+  "emission": "09494e5300159f4fb4b8b9bc84fcec92b9bdb47492dc6f6d6871a9b1781912f4"
+ },
+ {
+  "case": "tilelang/nested_program/float16",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "entry",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "chosen",
+      "operands": [
+       "entry"
+      ],
+      "attrs": {
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "yes_arg"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "loop_out",
+          "operands": [
+           "yes_arg"
+          ],
+          "attrs": {
+           "trip_count": 3
+          },
+          "regions": [
+           {
+            "arguments": [
+             "carry"
+            ],
+            "operations": [
+             {
+              "kind": "add",
+              "result": "sum",
+              "operands": [
+               "carry",
+               "entry"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "sum"
+           }
+          ]
+         }
+        ],
+        "yield_value": "loop_out"
+       },
+       {
+        "arguments": [
+         "no_arg"
+        ],
+        "operations": [
+         {
+          "kind": "neg",
+          "result": "negative",
+          "operands": [
+           "no_arg"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "negative"
+       }
+      ]
+     },
+     {
+      "kind": "add",
+      "result": "final",
+      "operands": [
+       "chosen",
+       "entry"
+      ],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "final"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "e345ad609470bc6b8cbb547f20958125b60f3b8610709082239bb8110c1462f6"
+ },
+ {
+  "case": "tilelang/nested_program/float32",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "entry",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "chosen",
+      "operands": [
+       "entry"
+      ],
+      "attrs": {
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "yes_arg"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "loop_out",
+          "operands": [
+           "yes_arg"
+          ],
+          "attrs": {
+           "trip_count": 3
+          },
+          "regions": [
+           {
+            "arguments": [
+             "carry"
+            ],
+            "operations": [
+             {
+              "kind": "add",
+              "result": "sum",
+              "operands": [
+               "carry",
+               "entry"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "sum"
+           }
+          ]
+         }
+        ],
+        "yield_value": "loop_out"
+       },
+       {
+        "arguments": [
+         "no_arg"
+        ],
+        "operations": [
+         {
+          "kind": "neg",
+          "result": "negative",
+          "operands": [
+           "no_arg"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "negative"
+       }
+      ]
+     },
+     {
+      "kind": "add",
+      "result": "final",
+      "operands": [
+       "chosen",
+       "entry"
+      ],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "final"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "c508c83e2548ed553c2ab125125eca1ce7efaddab6fe942804066e777364e5ac"
+ },
+ {
+  "case": "tilelang/function_program/float16",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 2,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "neg",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v3",
+      "operands": [
+       "v1",
+       "v2",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_1"
+      },
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v4",
+      "operands": [
+       "v3",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v4"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "x",
+       "y"
+      ],
+      "operations": [
+       {
+        "kind": "add",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "a"
+     }
+    },
+    {
+     "name": "fn_1",
+     "body": {
+      "arguments": [
+       "x",
+       "y",
+       "z"
+      ],
+      "operations": [
+       {
+        "kind": "call",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       },
+       {
+        "kind": "for",
+        "result": "b",
+        "operands": [
+         "a"
+        ],
+        "attrs": {
+         "trip_count": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "carry"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "c",
+            "operands": [
+             "carry",
+             "z"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "c"
+         }
+        ]
+       },
+       {
+        "kind": "if",
+        "result": "out",
+        "operands": [
+         "b"
+        ],
+        "attrs": {
+         "parity": 0
+        },
+        "regions": [
+         {
+          "arguments": [
+           "arg"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "yes",
+            "operands": [
+             "arg",
+             "x"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "yes"
+         },
+         {
+          "arguments": [
+           "other"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "no",
+            "operands": [
+             "other",
+             "y"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "no"
+         }
+        ]
+       }
+      ],
+      "yield_value": "out"
+     }
+    }
+   ]
+  },
+  "emission": "555e1d3aea66b9fac5f525b36917ac2669ae7aac4a50da7becd1ced6b39de097"
+ },
+ {
+  "case": "tilelang/function_program/float32",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 2,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "neg",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v3",
+      "operands": [
+       "v1",
+       "v2",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_1"
+      },
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v4",
+      "operands": [
+       "v3",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v4"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "x",
+       "y"
+      ],
+      "operations": [
+       {
+        "kind": "add",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "a"
+     }
+    },
+    {
+     "name": "fn_1",
+     "body": {
+      "arguments": [
+       "x",
+       "y",
+       "z"
+      ],
+      "operations": [
+       {
+        "kind": "call",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       },
+       {
+        "kind": "for",
+        "result": "b",
+        "operands": [
+         "a"
+        ],
+        "attrs": {
+         "trip_count": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "carry"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "c",
+            "operands": [
+             "carry",
+             "z"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "c"
+         }
+        ]
+       },
+       {
+        "kind": "if",
+        "result": "out",
+        "operands": [
+         "b"
+        ],
+        "attrs": {
+         "parity": 0
+        },
+        "regions": [
+         {
+          "arguments": [
+           "arg"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "yes",
+            "operands": [
+             "arg",
+             "x"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "yes"
+         },
+         {
+          "arguments": [
+           "other"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "no",
+            "operands": [
+             "other",
+             "y"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "no"
+         }
+        ]
+       }
+      ],
+      "yield_value": "out"
+     }
+    }
+   ]
+  },
+  "emission": "38024aebe5cd887c9425d09559c20f20346cbd8d9a94e5233437f24138ab8e86"
+ },
+ {
+  "case": "triton/v3/0",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 3,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 3359,
+    "N": 7224,
+    "K": 3359,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "abs",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "for",
+      "result": "v8",
+      "operands": [
+       "v2"
+      ],
+      "attrs": {
+       "trip_count": 0,
+       "start": 2,
+       "step": 3
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v1",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "tile_transpose",
+          "result": "v5",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v6",
+          "operands": [
+           "v5",
+           "v2",
+           "v2"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "add",
+          "result": "v7",
+          "operands": [
+           "v6",
+           "v3"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v7"
+       }
+      ]
+     },
+     {
+      "kind": "if",
+      "result": "v15",
+      "operands": [
+       "v8"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 4,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v9"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v10",
+          "operands": [
+           "v9",
+           "v9",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "div",
+          "result": "v11",
+          "operands": [
+           "v10",
+           "v8"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v12",
+          "operands": [
+           "v8",
+           "v2",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "abs",
+          "result": "v13",
+          "operands": [
+           "v12"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       },
+       {
+        "arguments": [
+         "v14"
+        ],
+        "operations": [],
+        "yield_value": "v14"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v1",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "exp",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "abs",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_min",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "mul",
+        "result": "v4",
+        "operands": [
+         "v3",
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_softmax",
+        "result": "v5",
+        "operands": [
+         "v4"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v13",
+        "operands": [
+         "v5"
+        ],
+        "attrs": {
+         "predicate": "column",
+         "modulus": 3,
+         "parity": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "neg",
+            "result": "v7",
+            "operands": [
+             "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "abs",
+            "result": "v8",
+            "operands": [
+             "arg1"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_softmax",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v10",
+            "operands": [
+             "v8"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v11",
+            "operands": [
+             "v10"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v11"
+         },
+         {
+          "arguments": [
+           "v12"
+          ],
+          "operations": [],
+          "yield_value": "v12"
+         }
+        ]
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   }
+  },
+  "emission": "6d8340c0e2bf5c13480e853f347a6814a1bf34d7c870d9771aab8a5cd247bc14"
+ },
+ {
+  "case": "triton/v3/1",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 3,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 1030,
+    "N": 1030,
+    "K": 10828,
+    "block_M": 16,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "pipelined",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "abs",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "for",
+      "result": "v8",
+      "operands": [
+       "v2"
+      ],
+      "attrs": {
+       "trip_count": 0,
+       "start": 2,
+       "step": 3
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v1",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "tile_transpose",
+          "result": "v5",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v6",
+          "operands": [
+           "v5",
+           "v2",
+           "v2"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "add",
+          "result": "v7",
+          "operands": [
+           "v6",
+           "v3"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v7"
+       }
+      ]
+     },
+     {
+      "kind": "if",
+      "result": "v15",
+      "operands": [
+       "v8"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 4,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v9"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v10",
+          "operands": [
+           "v9",
+           "v9",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "div",
+          "result": "v11",
+          "operands": [
+           "v10",
+           "v8"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v12",
+          "operands": [
+           "v8",
+           "v2",
+           "v1"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "abs",
+          "result": "v13",
+          "operands": [
+           "v12"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       },
+       {
+        "arguments": [
+         "v14"
+        ],
+        "operations": [],
+        "yield_value": "v14"
+       }
+      ]
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v1",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "exp",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "abs",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_min",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "mul",
+        "result": "v4",
+        "operands": [
+         "v3",
+         "v1"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "row_softmax",
+        "result": "v5",
+        "operands": [
+         "v4"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v13",
+        "operands": [
+         "v5"
+        ],
+        "attrs": {
+         "predicate": "column",
+         "modulus": 3,
+         "parity": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "neg",
+            "result": "v7",
+            "operands": [
+             "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "abs",
+            "result": "v8",
+            "operands": [
+             "arg1"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_softmax",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v10",
+            "operands": [
+             "v8"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "row_min",
+            "result": "v11",
+            "operands": [
+             "v10"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v11"
+         },
+         {
+          "arguments": [
+           "v12"
+          ],
+          "operations": [],
+          "yield_value": "v12"
+         }
+        ]
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   }
+  },
+  "emission": "8e582d75934a3b7d2649d84d1b87f64defa5b299ca37aa351aaf9f153d0c06c2"
+ },
+ {
+  "case": "triton/v4/0",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 4,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 13826,
+    "N": 13747,
+    "K": 9116,
+    "block_M": 32,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "reduce_tile",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "axis": 1,
+       "reduction": "sum"
+      },
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "v14",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 2,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v5",
+          "operands": [
+           "v1",
+           "v4"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "to_tile",
+          "result": "v6",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v6"
+       },
+       {
+        "arguments": [
+         "v7"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "v12",
+          "operands": [
+           "v1"
+          ],
+          "attrs": {
+           "trip_count": 1,
+           "start": 2,
+           "step": 1
+          },
+          "regions": [
+           {
+            "arguments": [
+             "v8"
+            ],
+            "operations": [
+             {
+              "kind": "call",
+              "result": "v9",
+              "operands": [
+               "v8",
+               "v8"
+              ],
+              "attrs": {
+               "callee": "fn_0"
+              },
+              "regions": []
+             },
+             {
+              "kind": "to_tile",
+              "result": "v10",
+              "operands": [
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "add",
+              "result": "v11",
+              "operands": [
+               "v10",
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "v11"
+           }
+          ]
+         },
+         {
+          "kind": "to_tile",
+          "result": "v13",
+          "operands": [
+           "v7"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       }
+      ]
+     },
+     {
+      "kind": "to_tile",
+      "result": "v15",
+      "operands": [
+       "v14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v15"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1"
+      ],
+      "operations": [
+       {
+        "kind": "reduce_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "axis": 1,
+         "reduction": "max"
+        },
+        "regions": []
+       },
+       {
+        "kind": "cast",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {
+         "dtype": "float16"
+        },
+        "regions": []
+       },
+       {
+        "kind": "broadcast_tile",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v4",
+        "operands": [],
+        "attrs": {
+         "source": "B",
+         "dtype": "float32",
+         "row_offset": 3,
+         "col_offset": 2
+        },
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v5",
+        "operands": [],
+        "attrs": {
+         "source": "A",
+         "dtype": "float32",
+         "row_offset": 0,
+         "col_offset": 0
+        },
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v12",
+        "operands": [
+         "arg1"
+        ],
+        "attrs": {
+         "predicate": "row",
+         "modulus": 4,
+         "parity": 3
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "cast",
+            "result": "v7",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "dtype": "float32"
+            },
+            "regions": []
+           },
+           {
+            "kind": "broadcast_tile",
+            "result": "v8",
+            "operands": [
+             "v7"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "reduce_tile",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "axis": 1,
+             "reduction": "min"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v10",
+            "operands": [
+             "v1"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v10"
+         },
+         {
+          "arguments": [
+           "v11"
+          ],
+          "operations": [],
+          "yield_value": "v11"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v13",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   },
+   "typed": true
+  },
+  "emission": "fa40244c724d57f10a4ee06879b30a994c113986cf323eccf08cc5072a515355"
+ },
+ {
+  "case": "triton/v4/1",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 4,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 1930,
+    "N": 1930,
+    "K": 7502,
+    "block_M": 256,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "pipelined",
+    "compute_kind": "gemm",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "reduce_tile",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "axis": 1,
+       "reduction": "sum"
+      },
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "v14",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "predicate": "checkerboard",
+       "modulus": 2,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "call",
+          "result": "v4",
+          "operands": [
+           "v3",
+           "v3"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "call",
+          "result": "v5",
+          "operands": [
+           "v1",
+           "v4"
+          ],
+          "attrs": {
+           "callee": "fn_0"
+          },
+          "regions": []
+         },
+         {
+          "kind": "to_tile",
+          "result": "v6",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v6"
+       },
+       {
+        "arguments": [
+         "v7"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "v12",
+          "operands": [
+           "v1"
+          ],
+          "attrs": {
+           "trip_count": 1,
+           "start": 2,
+           "step": 1
+          },
+          "regions": [
+           {
+            "arguments": [
+             "v8"
+            ],
+            "operations": [
+             {
+              "kind": "call",
+              "result": "v9",
+              "operands": [
+               "v8",
+               "v8"
+              ],
+              "attrs": {
+               "callee": "fn_0"
+              },
+              "regions": []
+             },
+             {
+              "kind": "to_tile",
+              "result": "v10",
+              "operands": [
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "add",
+              "result": "v11",
+              "operands": [
+               "v10",
+               "v8"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "v11"
+           }
+          ]
+         },
+         {
+          "kind": "to_tile",
+          "result": "v13",
+          "operands": [
+           "v7"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v13"
+       }
+      ]
+     },
+     {
+      "kind": "to_tile",
+      "result": "v15",
+      "operands": [
+       "v14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v16",
+      "operands": [
+       "v15",
+       "v15"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v16"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1"
+      ],
+      "operations": [
+       {
+        "kind": "reduce_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "axis": 1,
+         "reduction": "max"
+        },
+        "regions": []
+       },
+       {
+        "kind": "cast",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {
+         "dtype": "float16"
+        },
+        "regions": []
+       },
+       {
+        "kind": "broadcast_tile",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v4",
+        "operands": [],
+        "attrs": {
+         "source": "B",
+         "dtype": "float32",
+         "row_offset": 3,
+         "col_offset": 2
+        },
+        "regions": []
+       },
+       {
+        "kind": "load_input",
+        "result": "v5",
+        "operands": [],
+        "attrs": {
+         "source": "A",
+         "dtype": "float32",
+         "row_offset": 0,
+         "col_offset": 0
+        },
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v12",
+        "operands": [
+         "arg1"
+        ],
+        "attrs": {
+         "predicate": "row",
+         "modulus": 4,
+         "parity": 3
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v6"
+          ],
+          "operations": [
+           {
+            "kind": "cast",
+            "result": "v7",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "dtype": "float32"
+            },
+            "regions": []
+           },
+           {
+            "kind": "broadcast_tile",
+            "result": "v8",
+            "operands": [
+             "v7"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "reduce_tile",
+            "result": "v9",
+            "operands": [
+             "v6"
+            ],
+            "attrs": {
+             "axis": 1,
+             "reduction": "min"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v10",
+            "operands": [
+             "v1"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v10"
+         },
+         {
+          "arguments": [
+           "v11"
+          ],
+          "operations": [],
+          "yield_value": "v11"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v13",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "v13"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true
+   },
+   "typed": true
+  },
+  "emission": "07f908d93ae56525e12f6a9a97df3dd4ade323c8f167cc5405b20f2d04b23582"
+ },
+ {
+  "case": "triton/probe/0",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 129,
+    "N": 129,
+    "K": 16,
+    "block_M": 32,
+    "block_N": 256,
+    "block_K": 32,
+    "threads": 256,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "coverage_probe": true,
+    "input_layout": "transposed",
+    "input_pattern": "subnormal",
+    "repeat_count": 3,
+    "schedule_pair": true,
+    "cache_cycle": true,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "probe",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "v1"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "e8120f5ef66e9c71840bbc615ea1c528b574a445daad22746eb935dfb2fa16f3"
+ },
+ {
+  "case": "triton/probe/1",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 129,
+    "N": 33,
+    "K": 16,
+    "block_M": 32,
+    "block_N": 64,
+    "block_K": 32,
+    "threads": 256,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "coverage_probe": true,
+    "input_layout": "transposed",
+    "input_pattern": "subnormal",
+    "repeat_count": 3,
+    "schedule_pair": true,
+    "cache_cycle": true,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "probe",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "v1"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "7d5ae2e31f244ffb03c9ea540e481829532a1df8f4be7fdfff7ae9cc33fbb181"
+ },
+ {
+  "case": "triton/extended/0",
+  "backend": "triton",
+  "program": {
+   "type": "extended",
+   "version": 1,
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e1",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 174,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e2",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": true
+      },
+      "regions": []
+     },
+     {
+      "op": "load",
+      "results": [
+       {
+        "name": "e3",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e2"
+      ],
+      "attrs": {
+       "buffer": "mem0"
+      },
+      "regions": []
+     },
+     {
+      "op": "add",
+      "results": [
+       {
+        "name": "e4",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e3",
+       "e3"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e5",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e4"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e6",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e5"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e7",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 0.5
+      },
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e8",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e6",
+       "e7"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e9",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 1
+      },
+      "regions": []
+     },
+     {
+      "op": "bitxor",
+      "results": [
+       {
+        "name": "e10",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e9"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e11",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 3
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e12",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e10",
+       "e11"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e13",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 63,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "parameter",
+      "results": [
+       {
+        "name": "e14",
+        "type": {
+         "dtype": "int32",
+         "shape": []
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "name": "limit"
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e15",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e13",
+       "e14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "and",
+      "results": [
+       {
+        "name": "e16",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e12",
+       "e15"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e17",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": -0.125
+      },
+      "regions": []
+     },
+     {
+      "op": "select",
+      "results": [
+       {
+        "name": "e18",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e16",
+       "e8",
+       "e17"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e19",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e18",
+       "e18"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "reduce",
+      "results": [
+       {
+        "name": "e20",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e19"
+      ],
+      "attrs": {
+       "axis": 0,
+       "kind": "min"
+      },
+      "regions": []
+     }
+    ],
+    "returns": [
+     "e19",
+     "e10",
+     "e16",
+     "e20"
+    ]
+   },
+   "buffers": [
+    {
+     "name": "mem0",
+     "dtype": "float32",
+     "size": 256,
+     "role": "input",
+     "base": null,
+     "offset": 0,
+     "stride": 1
+    }
+   ],
+   "functions": [],
+   "observations": [
+    "e3",
+    "e8",
+    "e2",
+    "e1"
+   ],
+   "blocks": 2,
+   "input_pattern": "normal",
+   "runtime_cases": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     255
+    ],
+    [
+     2,
+     256
+    ]
+   ],
+   "configuration_pair": true,
+   "observation_pair": true,
+   "family": "arithmetic"
+  },
+  "emission": "d525fac6f957303271635e98bcdafb66b7aa8290bf0139e3bd68dbbc7c05cbc4"
+ },
+ {
+  "case": "triton/extended/1",
+  "backend": "triton",
+  "program": {
+   "type": "extended",
+   "version": 1,
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e1",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 174,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e2",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": true
+      },
+      "regions": []
+     },
+     {
+      "op": "load",
+      "results": [
+       {
+        "name": "e3",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e2"
+      ],
+      "attrs": {
+       "buffer": "mem0"
+      },
+      "regions": []
+     },
+     {
+      "op": "add",
+      "results": [
+       {
+        "name": "e4",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e3",
+       "e3"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e5",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e4"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "cast",
+      "results": [
+       {
+        "name": "e6",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e5"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e7",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 0.5
+      },
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e8",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e6",
+       "e7"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e9",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 1
+      },
+      "regions": []
+     },
+     {
+      "op": "bitxor",
+      "results": [
+       {
+        "name": "e10",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e1",
+       "e9"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e11",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": 3
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e12",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e10",
+       "e11"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "index",
+      "results": [
+       {
+        "name": "e13",
+        "type": {
+         "dtype": "int32",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "shift": 63,
+       "reverse": true
+      },
+      "regions": []
+     },
+     {
+      "op": "parameter",
+      "results": [
+       {
+        "name": "e14",
+        "type": {
+         "dtype": "int32",
+         "shape": []
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "name": "limit"
+      },
+      "regions": []
+     },
+     {
+      "op": "lt",
+      "results": [
+       {
+        "name": "e15",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e13",
+       "e14"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "and",
+      "results": [
+       {
+        "name": "e16",
+        "type": {
+         "dtype": "bool",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e12",
+       "e15"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "constant",
+      "results": [
+       {
+        "name": "e17",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [],
+      "attrs": {
+       "value": -0.125
+      },
+      "regions": []
+     },
+     {
+      "op": "select",
+      "results": [
+       {
+        "name": "e18",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e16",
+       "e8",
+       "e17"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "mul",
+      "results": [
+       {
+        "name": "e19",
+        "type": {
+         "dtype": "float16",
+         "shape": [
+          16,
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e18",
+       "e18"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "op": "reduce",
+      "results": [
+       {
+        "name": "e20",
+        "type": {
+         "dtype": "float32",
+         "shape": [
+          16
+         ]
+        }
+       }
+      ],
+      "operands": [
+       "e19"
+      ],
+      "attrs": {
+       "axis": 0,
+       "kind": "min"
+      },
+      "regions": []
+     }
+    ],
+    "returns": [
+     "e19",
+     "e10",
+     "e16",
+     "e20"
+    ]
+   },
+   "buffers": [
+    {
+     "name": "mem0",
+     "dtype": "float32",
+     "size": 256,
+     "role": "input",
+     "base": null,
+     "offset": 0,
+     "stride": 1
+    }
+   ],
+   "functions": [],
+   "observations": [
+    "e3",
+    "e8",
+    "e2",
+    "e1"
+   ],
+   "blocks": 2,
+   "input_pattern": "boundary",
+   "runtime_cases": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     255
+    ],
+    [
+     2,
+     256
+    ]
+   ],
+   "configuration_pair": true,
+   "observation_pair": true,
+   "family": "arithmetic"
+  },
+  "emission": "974c7b494be2d51cd0b97390e414daa8e673f72f5cf6daca9b62c7f6268897a2"
+ },
+ {
+  "case": "triton/nested_program/float16",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "entry",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "chosen",
+      "operands": [
+       "entry"
+      ],
+      "attrs": {
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "yes_arg"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "loop_out",
+          "operands": [
+           "yes_arg"
+          ],
+          "attrs": {
+           "trip_count": 3
+          },
+          "regions": [
+           {
+            "arguments": [
+             "carry"
+            ],
+            "operations": [
+             {
+              "kind": "add",
+              "result": "sum",
+              "operands": [
+               "carry",
+               "entry"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "sum"
+           }
+          ]
+         }
+        ],
+        "yield_value": "loop_out"
+       },
+       {
+        "arguments": [
+         "no_arg"
+        ],
+        "operations": [
+         {
+          "kind": "neg",
+          "result": "negative",
+          "operands": [
+           "no_arg"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "negative"
+       }
+      ]
+     },
+     {
+      "kind": "add",
+      "result": "final",
+      "operands": [
+       "chosen",
+       "entry"
+      ],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "final"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "1b0901ddddeef86c676b7de25eb257d9845124bfe71696483ca166cc3c1095ec"
+ },
+ {
+  "case": "triton/nested_program/float32",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 1,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "entry",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "chosen",
+      "operands": [
+       "entry"
+      ],
+      "attrs": {
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "yes_arg"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "loop_out",
+          "operands": [
+           "yes_arg"
+          ],
+          "attrs": {
+           "trip_count": 3
+          },
+          "regions": [
+           {
+            "arguments": [
+             "carry"
+            ],
+            "operations": [
+             {
+              "kind": "add",
+              "result": "sum",
+              "operands": [
+               "carry",
+               "entry"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "sum"
+           }
+          ]
+         }
+        ],
+        "yield_value": "loop_out"
+       },
+       {
+        "arguments": [
+         "no_arg"
+        ],
+        "operations": [
+         {
+          "kind": "neg",
+          "result": "negative",
+          "operands": [
+           "no_arg"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "negative"
+       }
+      ]
+     },
+     {
+      "kind": "add",
+      "result": "final",
+      "operands": [
+       "chosen",
+       "entry"
+      ],
+      "attrs": {},
+      "regions": []
+     }
+    ],
+    "yield_value": "final"
+   },
+   "legacy": null,
+   "input_scale": 0.1
+  },
+  "emission": "b7c562cb8b4ef6496b2cdccfa09c134b4876416dd53bce43b33c07f1f5bc388d"
+ },
+ {
+  "case": "triton/function_program/float16",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 2,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "neg",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v3",
+      "operands": [
+       "v1",
+       "v2",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_1"
+      },
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v4",
+      "operands": [
+       "v3",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v4"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "x",
+       "y"
+      ],
+      "operations": [
+       {
+        "kind": "add",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "a"
+     }
+    },
+    {
+     "name": "fn_1",
+     "body": {
+      "arguments": [
+       "x",
+       "y",
+       "z"
+      ],
+      "operations": [
+       {
+        "kind": "call",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       },
+       {
+        "kind": "for",
+        "result": "b",
+        "operands": [
+         "a"
+        ],
+        "attrs": {
+         "trip_count": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "carry"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "c",
+            "operands": [
+             "carry",
+             "z"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "c"
+         }
+        ]
+       },
+       {
+        "kind": "if",
+        "result": "out",
+        "operands": [
+         "b"
+        ],
+        "attrs": {
+         "parity": 0
+        },
+        "regions": [
+         {
+          "arguments": [
+           "arg"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "yes",
+            "operands": [
+             "arg",
+             "x"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "yes"
+         },
+         {
+          "arguments": [
+           "other"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "no",
+            "operands": [
+             "other",
+             "y"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "no"
+         }
+        ]
+       }
+      ],
+      "yield_value": "out"
+     }
+    }
+   ]
+  },
+  "emission": "bf3593f47bfe6505fee59a45e7336bfc7e19fc45145254301db97cb6a67efc37"
+ },
+ {
+  "case": "triton/function_program/float32",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 2,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 33,
+    "N": 35,
+    "K": 33,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "copy",
+    "alpha": 1.0,
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "neg",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v3",
+      "operands": [
+       "v1",
+       "v2",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_1"
+      },
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v4",
+      "operands": [
+       "v3",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_0"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v4"
+   },
+   "legacy": null,
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "x",
+       "y"
+      ],
+      "operations": [
+       {
+        "kind": "add",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "a"
+     }
+    },
+    {
+     "name": "fn_1",
+     "body": {
+      "arguments": [
+       "x",
+       "y",
+       "z"
+      ],
+      "operations": [
+       {
+        "kind": "call",
+        "result": "a",
+        "operands": [
+         "x",
+         "y"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       },
+       {
+        "kind": "for",
+        "result": "b",
+        "operands": [
+         "a"
+        ],
+        "attrs": {
+         "trip_count": 2
+        },
+        "regions": [
+         {
+          "arguments": [
+           "carry"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "c",
+            "operands": [
+             "carry",
+             "z"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "c"
+         }
+        ]
+       },
+       {
+        "kind": "if",
+        "result": "out",
+        "operands": [
+         "b"
+        ],
+        "attrs": {
+         "parity": 0
+        },
+        "regions": [
+         {
+          "arguments": [
+           "arg"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "yes",
+            "operands": [
+             "arg",
+             "x"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "yes"
+         },
+         {
+          "arguments": [
+           "other"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "no",
+            "operands": [
+             "other",
+             "y"
+            ],
+            "attrs": {
+             "callee": "fn_0"
+            },
+            "regions": []
+           }
+          ],
+          "yield_value": "no"
+         }
+        ]
+       }
+      ],
+      "yield_value": "out"
+     }
+    }
+   ]
+  },
+  "emission": "d115f5d86a6c20630050e61d3d9047dcb59a9dce775255574996941b76cd84f2"
+ },
+ {
+  "case": "tilelang/pass_swizzle/typed",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 4,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 1229,
+    "N": 10612,
+    "K": 2374,
+    "block_M": 64,
+    "block_N": 64,
+    "block_K": 64,
+    "threads": 128,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "gemm",
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v2",
+      "operands": [
+       "v1",
+       "v1",
+       "v1"
+      ],
+      "attrs": {
+       "callee": "fn_1"
+      },
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "v7",
+      "operands": [
+       "v2"
+      ],
+      "attrs": {
+       "predicate": "column",
+       "modulus": 2,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "cast",
+          "result": "v4",
+          "operands": [
+           "v3"
+          ],
+          "attrs": {
+           "dtype": "float16"
+          },
+          "regions": []
+         },
+         {
+          "kind": "to_tile",
+          "result": "v5",
+          "operands": [
+           "v4"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v5"
+       },
+       {
+        "arguments": [
+         "v6"
+        ],
+        "operations": [],
+        "yield_value": "v6"
+       }
+      ]
+     },
+     {
+      "kind": "to_tile",
+      "result": "v8",
+      "operands": [
+       "v7"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v9",
+      "operands": [
+       "v8",
+       "v2"
+      ],
+      "attrs": {
+       "callee": "fn_2"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v9"
+   },
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "reduce_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "axis": 1,
+         "reduction": "min"
+        },
+        "regions": []
+       },
+       {
+        "kind": "cast",
+        "result": "v2",
+        "operands": [
+         "v1"
+        ],
+        "attrs": {
+         "dtype": "float32"
+        },
+        "regions": []
+       },
+       {
+        "kind": "store_tile",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "to_tile",
+        "result": "v4",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "v4"
+     }
+    },
+    {
+     "name": "fn_1",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "for",
+        "result": "v5",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "trip_count": 0,
+         "start": 0,
+         "step": 3
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v1"
+          ],
+          "operations": [
+           {
+            "kind": "cast",
+            "result": "v2",
+            "operands": [
+             "v1"
+            ],
+            "attrs": {
+             "dtype": "float32"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v3",
+            "operands": [
+             "arg2"
+            ],
+            "attrs": {},
+            "regions": []
+           },
+           {
+            "kind": "add",
+            "result": "v4",
+            "operands": [
+             "v3",
+             "v1"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v4"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v6",
+        "operands": [
+         "v5"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v7",
+        "operands": [
+         "v5",
+         "arg0",
+         "arg1"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       }
+      ],
+      "yield_value": "v7"
+     }
+    },
+    {
+     "name": "fn_2",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1"
+      ],
+      "operations": [
+       {
+        "kind": "broadcast_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "reduce_tile",
+        "result": "v2",
+        "operands": [
+         "arg1"
+        ],
+        "attrs": {
+         "axis": 1,
+         "reduction": "max"
+        },
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v3",
+        "operands": [
+         "arg0",
+         "arg0",
+         "arg1"
+        ],
+        "attrs": {
+         "callee": "fn_1"
+        },
+        "regions": []
+       },
+       {
+        "kind": "broadcast_tile",
+        "result": "v4",
+        "operands": [
+         "v3"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "to_tile",
+        "result": "v5",
+        "operands": [
+         "v4"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v6",
+        "operands": [
+         "v5",
+         "v3",
+         "v4"
+        ],
+        "attrs": {
+         "callee": "fn_1"
+        },
+        "regions": []
+       }
+      ],
+      "yield_value": "v6"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "normal",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": false,
+    "pass_sweep": true,
+    "swizzle_sweep": true
+   },
+   "typed": true
+  },
+  "emission": "f1b3c053f5c18336180581ef0ccff4cc673f4558de5d7561464ac5c80e43ed54"
+ },
+ {
+  "case": "tilelang/pass_swizzle/native",
+  "backend": "tilelang",
+  "program": {
+   "type": "region",
+   "version": 3,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 31,
+    "N": 12420,
+    "K": 6100,
+    "block_M": 32,
+    "block_N": 32,
+    "block_K": 32,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "copy",
+    "dtype": "float32",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "load",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "sqrt",
+      "result": "v2",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "tile_transpose",
+      "result": "v3",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "abs",
+      "result": "v4",
+      "operands": [
+       "v3"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "row_softmax",
+      "result": "v5",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "exp",
+      "result": "v6",
+      "operands": [
+       "v5"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "add",
+      "result": "v7",
+      "operands": [
+       "v2",
+       "v2"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "if",
+      "result": "v29",
+      "operands": [
+       "v1"
+      ],
+      "attrs": {
+       "predicate": "column",
+       "modulus": 4,
+       "parity": 0
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v8"
+        ],
+        "operations": [
+         {
+          "kind": "for",
+          "result": "v18",
+          "operands": [
+           "v2"
+          ],
+          "attrs": {
+           "trip_count": 4,
+           "start": 2,
+           "step": 2
+          },
+          "regions": [
+           {
+            "arguments": [
+             "v9"
+            ],
+            "operations": [
+             {
+              "kind": "cos",
+              "result": "v10",
+              "operands": [
+               "v9"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "where",
+              "result": "v11",
+              "operands": [
+               "v10",
+               "v10",
+               "v1"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "exp2",
+              "result": "v12",
+              "operands": [
+               "v11"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "floor",
+              "result": "v13",
+              "operands": [
+               "v1"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "row_max",
+              "result": "v14",
+              "operands": [
+               "v13"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "abs",
+              "result": "v15",
+              "operands": [
+               "v14"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "ceil",
+              "result": "v16",
+              "operands": [
+               "v15"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "add",
+              "result": "v17",
+              "operands": [
+               "v16",
+               "v9"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "v17"
+           }
+          ]
+         },
+         {
+          "kind": "for",
+          "result": "v27",
+          "operands": [
+           "v18"
+          ],
+          "attrs": {
+           "trip_count": 2,
+           "start": 0,
+           "step": 3
+          },
+          "regions": [
+           {
+            "arguments": [
+             "v19"
+            ],
+            "operations": [
+             {
+              "kind": "exp",
+              "result": "v20",
+              "operands": [
+               "v1"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "row_softmax",
+              "result": "v21",
+              "operands": [
+               "v20"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "exp2",
+              "result": "v22",
+              "operands": [
+               "v21"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "div",
+              "result": "v23",
+              "operands": [
+               "v22",
+               "v6"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "where",
+              "result": "v24",
+              "operands": [
+               "v4",
+               "v19",
+               "v21"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "neg",
+              "result": "v25",
+              "operands": [
+               "v24"
+              ],
+              "attrs": {},
+              "regions": []
+             },
+             {
+              "kind": "add",
+              "result": "v26",
+              "operands": [
+               "v25",
+               "v19"
+              ],
+              "attrs": {},
+              "regions": []
+             }
+            ],
+            "yield_value": "v26"
+           }
+          ]
+         }
+        ],
+        "yield_value": "v27"
+       },
+       {
+        "arguments": [
+         "v28"
+        ],
+        "operations": [],
+        "yield_value": "v28"
+       }
+      ]
+     }
+    ],
+    "yield_value": "v29"
+   },
+   "input_scale": 0.1,
+   "execution": {
+    "input_pattern": "normal",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": false,
+    "pass_sweep": true,
+    "swizzle_sweep": true
+   }
+  },
+  "emission": "5e60193577f4753c74c0ec98aefc4bf8d0f4b2782340dd917866459c1229b00c"
+ },
+ {
+  "case": "triton/pass_swizzle/typed",
+  "backend": "triton",
+  "program": {
+   "type": "region",
+   "version": 4,
+   "value_type": "tile<float32>",
+   "spec": {
+    "M": 3111,
+    "N": 3111,
+    "K": 15259,
+    "block_M": 16,
+    "block_N": 256,
+    "block_K": 16,
+    "threads": 128,
+    "num_stages": 2,
+    "loop_kind": "pipelined",
+    "compute_kind": "gemm",
+    "dtype": "float16",
+    "name": "kernel_0"
+   },
+   "body": {
+    "arguments": [],
+    "operations": [
+     {
+      "kind": "gemm",
+      "result": "v1",
+      "operands": [],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "load_input",
+      "result": "v2",
+      "operands": [],
+      "attrs": {
+       "source": "A",
+       "dtype": "float32",
+       "row_offset": 1,
+       "col_offset": 1
+      },
+      "regions": []
+     },
+     {
+      "kind": "for",
+      "result": "v6",
+      "operands": [
+       "v2"
+      ],
+      "attrs": {
+       "trip_count": 1,
+       "start": 1,
+       "step": 3
+      },
+      "regions": [
+       {
+        "arguments": [
+         "v3"
+        ],
+        "operations": [
+         {
+          "kind": "to_tile",
+          "result": "v4",
+          "operands": [
+           "v3"
+          ],
+          "attrs": {},
+          "regions": []
+         },
+         {
+          "kind": "add",
+          "result": "v5",
+          "operands": [
+           "v4",
+           "v3"
+          ],
+          "attrs": {},
+          "regions": []
+         }
+        ],
+        "yield_value": "v5"
+       }
+      ]
+     },
+     {
+      "kind": "to_tile",
+      "result": "v7",
+      "operands": [
+       "v6"
+      ],
+      "attrs": {},
+      "regions": []
+     },
+     {
+      "kind": "call",
+      "result": "v8",
+      "operands": [
+       "v7"
+      ],
+      "attrs": {
+       "callee": "fn_2"
+      },
+      "regions": []
+     }
+    ],
+    "yield_value": "v8"
+   },
+   "input_scale": 0.1,
+   "functions": [
+    {
+     "name": "fn_0",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1",
+       "arg2"
+      ],
+      "operations": [
+       {
+        "kind": "store_tile",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v6",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "predicate": "checkerboard",
+         "modulus": 2,
+         "parity": 1
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v2"
+          ],
+          "operations": [
+           {
+            "kind": "cast",
+            "result": "v3",
+            "operands": [
+             "v2"
+            ],
+            "attrs": {
+             "dtype": "float32"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v4",
+            "operands": [
+             "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v4"
+         },
+         {
+          "arguments": [
+           "v5"
+          ],
+          "operations": [],
+          "yield_value": "v5"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v7",
+        "operands": [
+         "v6"
+        ],
+        "attrs": {},
+        "regions": []
+       }
+      ],
+      "yield_value": "v7"
+     }
+    },
+    {
+     "name": "fn_1",
+     "body": {
+      "arguments": [
+       "arg0",
+       "arg1"
+      ],
+      "operations": [
+       {
+        "kind": "cast",
+        "result": "v1",
+        "operands": [
+         "arg1"
+        ],
+        "attrs": {
+         "dtype": "float16"
+        },
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v2",
+        "operands": [
+         "arg0",
+         "arg0",
+         "arg1"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       },
+       {
+        "kind": "broadcast_tile",
+        "result": "v3",
+        "operands": [
+         "v2"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v4",
+        "operands": [
+         "arg0",
+         "arg0",
+         "arg1"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       },
+       {
+        "kind": "to_tile",
+        "result": "v5",
+        "operands": [
+         "v4"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v6",
+        "operands": [
+         "v5",
+         "v4",
+         "v2"
+        ],
+        "attrs": {
+         "callee": "fn_0"
+        },
+        "regions": []
+       }
+      ],
+      "yield_value": "v6"
+     }
+    },
+    {
+     "name": "fn_2",
+     "body": {
+      "arguments": [
+       "arg0"
+      ],
+      "operations": [
+       {
+        "kind": "cast",
+        "result": "v1",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "dtype": "float16"
+        },
+        "regions": []
+       },
+       {
+        "kind": "if",
+        "result": "v6",
+        "operands": [
+         "arg0"
+        ],
+        "attrs": {
+         "predicate": "row",
+         "modulus": 3,
+         "parity": 0
+        },
+        "regions": [
+         {
+          "arguments": [
+           "v2"
+          ],
+          "operations": [
+           {
+            "kind": "call",
+            "result": "v3",
+            "operands": [
+             "v2",
+             "arg0"
+            ],
+            "attrs": {
+             "callee": "fn_1"
+            },
+            "regions": []
+           },
+           {
+            "kind": "to_tile",
+            "result": "v4",
+            "operands": [
+             "v3"
+            ],
+            "attrs": {},
+            "regions": []
+           }
+          ],
+          "yield_value": "v4"
+         },
+         {
+          "arguments": [
+           "v5"
+          ],
+          "operations": [],
+          "yield_value": "v5"
+         }
+        ]
+       },
+       {
+        "kind": "to_tile",
+        "result": "v7",
+        "operands": [
+         "v6"
+        ],
+        "attrs": {},
+        "regions": []
+       },
+       {
+        "kind": "call",
+        "result": "v8",
+        "operands": [
+         "arg0",
+         "v7"
+        ],
+        "attrs": {
+         "callee": "fn_1"
+        },
+        "regions": []
+       }
+      ],
+      "yield_value": "v8"
+     }
+    }
+   ],
+   "execution": {
+    "input_pattern": "integer",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": false,
+    "pass_sweep": true
+   },
+   "typed": true
+  },
+  "emission": "2a622d6045e0184eb86e5d0856f41e0e960d0c4826163d74e10b8270de6b2d06"
+ }
+]

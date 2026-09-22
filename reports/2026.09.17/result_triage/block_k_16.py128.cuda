@@ -1,0 +1,50 @@
+#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940
+#define _tl_orig_alignas alignas
+#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)
+#include <cuda.h>
+#undef alignas
+#define alignas _tl_orig_alignas
+#endif
+#include <tl_templates/cuda/instruction/mma.h>
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/scan.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void impl_kernel(const half_t* __restrict__ A, const half_t* __restrict__ B, float* __restrict__ C);
+extern "C" __global__ void __launch_bounds__(128, 1) impl_kernel(const half_t* __restrict__ A, const half_t* __restrict__ B, float* __restrict__ C) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  void* aa = ((void*)((char*)buf_dyn_shmem + 0));
+  void* bb = ((void*)((char*)buf_dyn_shmem + 1024));
+  float cc[8];
+  #pragma unroll
+  for (int i = 0; i < 2; ++i) {
+    float broadcast_var = 0x0p+0f/*0.000000e+00*/;
+    *(float4*)(cc + (i * 4)) = make_float4(broadcast_var, broadcast_var, broadcast_var, broadcast_var);
+  }
+  for (int ki = 0; ki < 2; ++ki) {
+    __syncthreads();
+    *(uint2*)(((half_t*)aa) + ((((((int)threadIdx.x) >> 2) * 16) + (((((((int)threadIdx.x) & 31) >> 4) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 1) * 4))) = *(uint2*)(A + ((((((int)threadIdx.x) >> 2) * 32) + (ki * 16)) + ((((int)threadIdx.x) & 3) * 4)));
+    *(uint2*)(((half_t*)bb) + (((((((int)threadIdx.x) >> 3) * 32) + (((((((int)threadIdx.x) & 63) >> 5) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 8)) + ((((int)threadIdx.x) & 1) * 4))) = *(uint2*)(B + ((ki * 512) + (((int)threadIdx.x) * 4)));
+    {
+      half_t A_local[8];
+      half_t B_local[8];
+      __syncthreads();
+      tl::ptx_ldmatrix_x4((&(((half_t*)aa)[(((((((int)threadIdx.x) & 63) >> 5) * 256) + ((((int)threadIdx.x) & 15) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 8))])), (&(A_local[0])));
+      tl::ptx_ldmatrix_x4_trans((&(((half_t*)bb)[((((((int)threadIdx.x) & 15) * 32) + ((((((int)threadIdx.x) >> 6) + ((((int)threadIdx.x) & 7) >> 2)) & 1) * 16)) + (((((((int)threadIdx.x) & 31) >> 4) + ((((int)threadIdx.x) & 3) >> 1)) & 1) * 8))])), (&(B_local[0])));
+      tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(cc + 0), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + 0));
+      tl::mma_sync<tl::DataType::kFloat16, tl::DataType::kFloat16, tl::DataType::kFloat32, 16, 8, 16, false, true>(reinterpret_cast<float*>(cc + 4), reinterpret_cast<const unsigned*>(A_local + 0), reinterpret_cast<const unsigned*>(B_local + 4));
+    }
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 4; ++i_1) {
+    *(float2*)(C + ((((((((((int)threadIdx.x) & 63) >> 5) * 512) + ((i_1 & 1) * 256)) + (((((int)threadIdx.x) & 31) >> 2) * 32)) + ((((int)threadIdx.x) >> 6) * 16)) + ((i_1 >> 1) * 8)) + ((((int)threadIdx.x) & 3) * 2))) = *(float2*)(cc + (i_1 * 2));
+  }
+}
+

@@ -1,0 +1,81 @@
+{
+  "backend": "triton",
+  "success": true,
+  "torch": "2.4.0+cu124",
+  "backend_version": "3.0.0",
+  "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "capability": [
+    8,
+    9
+  ],
+  "stages": {
+    "import.torch": {
+      "calls": 1,
+      "seconds": 1.3518412069997794,
+      "exclusive_seconds": 1.3518412069997794
+    },
+    "import.backend": {
+      "calls": 1,
+      "seconds": 0.09468119499979366,
+      "exclusive_seconds": 0.09468119499979366
+    },
+    "runtime.cuda_context": {
+      "calls": 1,
+      "seconds": 0.1595420119992923,
+      "exclusive_seconds": 0.1595420119992923
+    },
+    "instrumentation.setup": {
+      "calls": 1,
+      "seconds": 0.00010577900047792355,
+      "exclusive_seconds": 0.00010577900047792355
+    },
+    "module.load": {
+      "calls": 1,
+      "seconds": 0.016680437999639253,
+      "exclusive_seconds": 0.016680437999639253
+    },
+    "runtime.inputs": {
+      "calls": 4,
+      "seconds": 0.027766216999225435,
+      "exclusive_seconds": 0.027766216999225435
+    },
+    "runtime.reference": {
+      "calls": 2,
+      "seconds": 0.18307384800027648,
+      "exclusive_seconds": 0.18307384800027648
+    },
+    "prepare_variant": {
+      "calls": 4,
+      "seconds": 0.00018996500148205087,
+      "exclusive_seconds": 0.00018996500148205087
+    },
+    "triton.compile_total": {
+      "calls": 2,
+      "seconds": 0.33417162300065684,
+      "exclusive_seconds": 0.33417162300065684
+    },
+    "runtime.kernel": {
+      "calls": 12,
+      "seconds": 0.40190457700100524,
+      "exclusive_seconds": 0.0677329540003484
+    },
+    "runtime.compare": {
+      "calls": 46,
+      "seconds": 0.12552746399978787,
+      "exclusive_seconds": 0.12552746399978787
+    },
+    "harness.total": {
+      "calls": 1,
+      "seconds": 0.8194677629999205,
+      "exclusive_seconds": 0.08100569199814345
+    },
+    "worker": {
+      "calls": 1,
+      "seconds": 2.5548073390000354,
+      "exclusive_seconds": 0.11248894500113238
+    }
+  },
+  "span_accounting_valid": true
+}

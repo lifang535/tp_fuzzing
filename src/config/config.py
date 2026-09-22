@@ -36,39 +36,111 @@ class Config:
     thread_choices: List[int] = field(default_factory=lambda: [128, 256])
 
     # ── Generation strategy ─────────────────────────────────────────────
-    # Probability of generating a pipeline (multi-step) kernel vs single-op.
-    # Directed probes are sampled first; other probabilities apply conditionally.
+    # One recursive function-template generator. Probes are restricted whole-function templates.
+    region_max_depth: int = 2
+    region_min_length: int = 3
+    region_max_length: int = 8
+    region_max_ops: int = 24
+    region_control_prob: float = 0.25
+    region_input_scale: float = 0.1
+    region_input_seed_count: int = 2
+    region_repeat_count: int = 3
+    region_schedule_pair: bool = True
+    # MLIRSmith-style schedule sweep: fresh native regions are also executed
+    # across alternate num_stages (region_stage_sweep), loop_kind
+    # (region_loop_sweep) and physical layout pairs (region_layout_sweep)
+    # configurations sharing one reference.
+    region_stage_sweep: bool = True
+    region_loop_sweep: bool = True
+    region_layout_sweep: bool = True
+    region_layout_prob: float = 0.35  # Non-contiguous layout probability per used input.
+    region_gemm_prob: float = 0.50  # Otherwise start a native region with load.
+    region_typed_prob: float = 0.35  # New type/shape/memory ops within ordinary regions; 0 generates v3.
+    region_scratch_max_bytes: int = 64 * 1024 * 1024  # Bound generated per-block global scratch.
+    latest_value_prob: float = 0.60  # Other choices reuse visible SSA values.
+    local_mutate_prob: float = 0.35  # Conditional on not selecting dtype mutation.
+    function_min_count: int = 1  # Auxiliary functions; the entry kernel is additional.
+    function_max_count: int = 3
+    function_call_prob: float = 0.30
+    structural_feedback: bool = True
+    # MLIRSmith DiversityCriteria-style coverage-first weighting: a structural
+    # feature that has never been attempted gets this fixed additive boost on
+    # top of the passed-count decay (one-shot — the boost is lost once the
+    # feature has been tried, even if it failed). 0 restores legacy weighting.
+    uncovered_boost: float = 50.0
     coverage_probe_prob: float = 0.20
+    # Extended exploration IR: disabled by default in the library;
+    # the CLI opts new campaigns into a 25% mixture.
+    extended_prob: float = 0.0
+    extended_configuration_pair: bool = True
+    extended_observation_pair: bool = True
+    # MLIRSmith-style pass configuration sweep for extended programs:
+    # 0 = a single configuration (no pairs at all, the historical
+    # --no-extended-configurations behavior); 1 = the threads/stages pair;
+    # 2 = additionally compile with a second pass configuration
+    # (tl.disable_loop_unswitching on tilelang, enable_fp_fusion on triton).
+    # tilelang's opt_level knob is not plumbable through tilelang.compile
+    # (every s_tir pass declares opt_level=0), so pass_configs pairs are the
+    # only way to reach the RC2 pass-pipeline bug class.
+    extended_config_depth: int = 1
+    extended_fast_math_pair: bool = False  # tl.enable_fast_math pair, changes numerics
+    # MLIRSmith-style accumulator-width sweep (RC5): per base configuration an
+    # fp16-accumulation copy of the program (tilelang T.gemm fp16 fragment,
+    # triton tl.dot fp16 accumulator) checked against its own interpretation,
+    # plus a triton ieee->tf32 input-precision variant. Enabled by default
+    # after the GPU smoke verified fp16 accumulation on this machine; matmul-
+    # less programs produce no variants.
+    extended_precision_pair: bool = True
+    # MLIRSmith-style algebraic-identity sweep (RC5): a distributivity copy of
+    # each matmul-less extended program (mul(x, add/sub(y, z)) rewritten into
+    # add/sub(mul(x, y), mul(x, z))) checked against its own interpretation.
+    # Programs without a matching float pattern produce no variants.
+    extended_identity_pair: bool = True
+    # MLIRSmith-style random pass-pipeline sampling: each extended program is
+    # additionally compiled with this many deterministic-random compiler
+    # configurations (random subsets of the verified semantic-preserving
+    # pass_configs pool, see backends/common/knobs.py), checked as plain
+    # variants against the shared reference baseline (configuration_mismatch).
+    # 0 disables. Sampling is a pure function of (program, seed). Raised to 2
+    # (2026-09-21): one sample rarely covers the pool; the two samples are
+    # deterministic per program, so campaign cost grows ~linearly.
+    random_config_count: int = 2
+    # ── New op surfaces ─────────────────────────────────────────────────
+    # Bounded instance grids (Track C): per-(op, backend) round-robin cursors
+    # make every corner of each new op's attribute domain appear exactly once
+    # per round. When off, corners are sampled uniformly at random.
+    instance_grid: bool = True
+    # Global-memory atomics in extended programs (commutative scratch races).
+    extended_atomic_prob: float = 0.25
+    # Scalar fused multiply-add chains in extended programs.
+    extended_fma_prob: float = 0.30
+    # Triton shape primitives (flip everywhere; join/split/interleave triton).
+    extended_shape_op_prob: float = 0.30
+    # int8 x int8 matmul (int32 accumulator) in extended matmul programs.
+    extended_int8_prob: float = 0.30
+    # int8 + int8 GEMM-only native region programs (exact int32 reference).
+    region_int8_prob: float = 0.15
+    # Region pass-config variant pair (tilelang get_tir + tilelang.compile;
+    # triton enable_fp_fusion), the tilelang T.use_swizzle variant pair and
+    # the tilelang GemmWarpPolicy pair (FullRow / FullCol — the sm_89-active
+    # warp-level knob; warp *specialization* itself is TMA-gated on sm_90+).
+    region_pass_config: bool = True
+    region_swizzle_pair: bool = True
+    region_warp_policy_pair: bool = True
+    compile_only: bool = False
+    save_artifacts: bool = True  # Persist Extended evidence; otherwise use temporary files.
     probe_repeat_count: int = 3
     probe_schedule_pair: bool = True
-    pipeline_prob: float = 0.40
-    # Probability of generating a dynamic sequence (MLIRSmith-style) vs single-op.
-    # Remaining probability (1 - pipeline_prob - dynamic_prob) → single op.
-    dynamic_prob: float = 0.30
-    # Probability of mutating a seed from the pool vs fresh generation.
-    mutate_prob: float = 0.60
+    probe_cache_cycle: bool = True
+    # With a non-empty seed pool, choose mutation and fresh generation equally.
+    mutate_prob: float = 0.50
+    # Within mutation, explicitly switch storage dtype while retaining the IR.
+    # Used only when supported_dtypes contains a different dtype.
+    dtype_mutate_prob: float = 0.25
     # Probability of adding a passing program to the seed pool.
     seed_add_prob: float = 0.30
     # Maximum seed pool size.
     seed_pool_max: int = 200
-
-    # ── Pipeline generation (template-based) ───────────────────────────
-    # Probability of choosing GEMM-epilogue vs elementwise-chain strategy.
-    pipeline_gemm_epilogue_prob: float = 0.60
-    # Max number of epilogue ops after GEMM (0 to this value, inclusive).
-    pipeline_max_epilogue_ops: int = 2
-    # Max number of ops in an elementwise chain (1 to this value, inclusive).
-    pipeline_max_elemwise_ops: int = 2
-    # Probability of adding a terminal op (reduce/softmax) at the end.
-    pipeline_terminal_prob: float = 0.40
-
-    # ── Dynamic sequence (MLIRSmith-style) ──────────────────────────────
-    # Max steps in a dynamically-generated op sequence (including GEMM).
-    # Increasing this produces longer chains but slows compilation.
-    dynamic_max_steps_min: int = 3
-    dynamic_max_steps_max: int = 8
-    # Diversity boost weight for uncovered op kinds (analogous to MLIRSmith's +5*priority_base).
-    diversity_boost: float = 50.0
 
     # ── SCALE op scalar range ───────────────────────────────────────────
     # alpha is sampled uniformly from [scale_alpha_min, scale_alpha_max].
@@ -82,39 +154,20 @@ class Config:
 
     # ── Bug deduplication ───────────────────────────────────────────────
     # Maximum times the same root_cause is reported before being marked "dup".
-    max_same_root_cause: int = 1e6
+    # Every occurrence still counts in summary.json root_causes; only example
+    # *saving* (failed/{root_cause}/*.py,*.json) is capped. Systematic
+    # front-end rejections — a version-gapped DSL binding, a cache collision —
+    # can fire hundreds of identical reports per campaign; keeping a handful
+    # of reproducers per root cause preserves disk and review signal.
+    max_same_root_cause: int = 10
 
     # ── Oracle timeouts ─────────────────────────────────────────────────
     compile_timeout: int = 60   # seconds for compilation
     execute_timeout: int = 60   # seconds for execution
 
-    # ── Numerics ────────────────────────────────────────────────────────
-    # exp() input clamp range to prevent inf overflow.
-    # float16: exp(10) ≈ 22026 < 65504 (float16 max), exp(11.09) overflows.
-    # float32: exp(80) ≈ 5.5e34 < 3.4e38 (float32 max), exp(88.7) overflows.
-    exp_clamp_fp16: float = 10.0
-    exp_clamp_fp32: float = 80.0
-
-    # ── Correctness thresholds (epsilon) ───────────────────────────────
-    #
-    # Two comparison strategies are used depending on the op:
-    #
-    #   Relative error:  max_diff / (mean(|ref|) + 1e-6) > threshold
-    #     Used for: GEMM, reduce, pipeline chains — where the output magnitude
-    #     varies widely and absolute error would be meaningless.
-    #
-    #   Absolute error:  max_diff > threshold
-    #     Used for: copy, transpose (should be exact), elementwise ops
-    #     (output is bounded and comparable in magnitude).
-    #
-    # GEMM (relative):
-    #   float16: MMA accumulates in float32, then casts back. With K=1024 and
-    #            float16 inputs, normal round-off can reach ~0.5% relative error.
-    #            We allow up to 10% — anything larger indicates boundary overflow.
-    #   float32: tf32 MMA has ~0.1% round-off. 5% leaves ample room.
-    gemm_rtol_fp16: float = 0.10
-    gemm_rtol_fp32: float = 0.05
-
+    # ── Correctness thresholds ─────────────────────────────────────────
+    # GEMM-entry regions compare relative error; load-entry regions compare
+    # absolute error. Probes use operation-specific checks (copy is bitwise).
     # Reduce ops (relative):
     #   float16 reduce_sum/max/min over a tile — cumulative rounding can be
     #   larger than elementwise ops, but still small. 10% is conservative.
@@ -125,12 +178,6 @@ class Config:
     #   float16 softmax has ~0.005 absolute error in normal conditions.
     softmax_atol: float = 1e-2
 
-    # Copy / Transpose (absolute):
-    #   No arithmetic — should be bitwise exact. Only floating-point
-    #   layout/precision conversions can introduce tiny errors.
-    copy_atol: float = 1e-5
-    transpose_atol: float = 1e-5
-
     # Elementwise ops (absolute): add, mul, max, sub, scale, exp, sqrt, where
     #   Single floating-point operation per element.
     #   float16: 1 ULP ≈ 0.001 near 1.0 — use 1e-3.
@@ -138,11 +185,9 @@ class Config:
     #   We use 1e-3 for both to handle float16 without special-casing.
     elemwise_atol: float = 1e-3
 
-    # Pipeline chains (relative):
-    #   Multiple ops applied sequentially amplify round-off. Use the same
-    #   looser threshold as GEMM since pipelines usually start with GEMM.
-    pipeline_rtol_fp16: float = 0.10
-    pipeline_rtol_fp32: float = 0.05
+    # GEMM-entry Region programs (relative error).
+    region_rtol_fp16: float = 0.10
+    region_rtol_fp32: float = 0.05
 
     # ── Supported dtypes ────────────────────────────────────────────────
     # bfloat16 excluded: unstable on TileLang 0.1.11 + sm_89 (Ada Lovelace).
@@ -150,10 +195,7 @@ class Config:
 
     # ── Easy-shape mode ─────────────────────────────────────────────────
     # When enabled (--easy-shape), dim_pool is sampled from power-of-2 values
-    # (256, 512, 1024, 2048) instead of arbitrary integers in [1, 2048].
-    # These "nice" shapes are divisible by all common block sizes, so fewer
-    # kernels hit boundary-handling code paths. Expected effect: higher pass
-    # rate, useful for verifying the fuzzer itself or as a warm-up corpus.
+    # in 1..16384. Shapes below a tile still exercise boundary handling.
     easy_shape: bool = False
     # The pool of "nice" shapes used in easy-shape mode.
     easy_shape_values: List[int] = field(default_factory=lambda: [
@@ -167,6 +209,23 @@ class Config:
     # padding, warp-level buffers). 0.5 = use at most 50% of hardware max,
     # which eliminates shared_memory_overflow false positives in practice.
     shmem_safety_fraction: float = 0.50
+
+    # ── Historical trigger sampling ────────────────────────────────────
+    # Probability that region spec sampling skips schedule/shared-memory
+    # pre-validation and draws tile/thread/stage combinations directly from
+    # the configured choices. The pre-validation filters are conservative:
+    # they exclude exactly the combinations that historically reached the
+    # warp_partition and shared_memory_overflow bug classes, so this mode
+    # keeps those classes generable. 0.0 = always validate.
+    unchecked_spec_prob: float = 0.30
+    # Probability of forcing a boundary shape after tile selection. Random
+    # dim pools almost never produce a shape smaller than its tile, and that
+    # boundary is exactly where the historical ptx_async_boundary crashes
+    # (tilelang cp.async byte-width) and other tail-handling bugs live.
+    # GEMM-entry programs (which carry the cp.async trigger) get twice this
+    # probability, and the bias branch completes the trigger shape: a tail of
+    # exactly one element (M=1 or K=1), with a preference for fp16 + pipelined.
+    boundary_shape_prob: float = 0.10
 
     # ── Runtime ────────────────────────────────────────────────────────
     backends: List[str] = field(default_factory=lambda: ["tilelang"])

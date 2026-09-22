@@ -1,0 +1,30 @@
+{
+  "captured_at": "2026-09-17T20:38:22.136603+08:00",
+  "total": 2295,
+  "original_categories": {
+    "dtype_mismatch": 489,
+    "gpu_oom": 56,
+    "layout_inference": 163,
+    "ptx_async_boundary": 49,
+    "shared_memory_overflow": 559,
+    "timeout": 138,
+    "wrong_result": 797,
+    "other": 10,
+    "segfault": 15,
+    "nondeterminism": 1,
+    "schedule_mismatch": 17,
+    "assertion_failure": 1
+  },
+  "triage": {
+    "已确认缺陷机制，同类记录": 538,
+    "非有效目标编译器bug": 629,
+    "布局编译失败候选，待缩减": 163,
+    "超时证据不足": 138,
+    "K=8已知错误机制候选": 218,
+    "待确认": 588,
+    "历史NVCC崩溃，待缩减": 2,
+    "疑似数值不稳定，暂不报目标bug": 1,
+    "已复现目标编译器bug": 16,
+    "数值容差候选，待确认": 2
+  }
+}

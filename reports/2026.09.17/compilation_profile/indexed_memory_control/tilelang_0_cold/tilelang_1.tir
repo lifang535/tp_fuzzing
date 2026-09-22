@@ -1,0 +1,107 @@
+# from tvm.script import tirx as T
+
+@T.prim_func
+def impl(mem0: T.Buffer((3, 544), "float16"), mem1: T.Buffer((3, 1060), "float16"), out_e17: T.Buffer((3, 544), "float16"), out_e3: T.Buffer((3, 544), "float16"), out_e8: T.Buffer((3, 544), "float16"), out_e12: T.Buffer((3, 544), "float16"), out_e13: T.Buffer((3, 544), "int32"), out_e2: T.Buffer((3, 544), "bool"), steps: T.int32, limit: T.int32):
+    # with T.sblock("root"):
+    bx = T.launch_thread("blockIdx.x", 3)
+    tx = T.launch_thread("threadIdx.x", 128)
+    ty = T.launch_thread("threadIdx.y", 1)
+    tz = T.launch_thread("threadIdx.z", 1)
+    with T.sblock("tilelang_root"):
+        T.reads()
+        T.writes()
+        e1 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e2 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e3 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e4 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e5 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e6 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e7 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e8 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e9 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e10 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e11 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e12 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e13 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e14 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e15 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e16 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e17 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e1[i, j] = (511 - (i * 16 + j) + 25) % 512
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e2[i, j] = T.bool(True)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e3[i, j] = T.if_then_else(e2[i, j] and (e1[i, j] >= 0 and e1[i, j] < 512), mem0[bx, 16 + e1[i, j]], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e4[i, j] = e3[i, j] * e3[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e5[i, j] = (511 - (i * 16 + j) + 89) % 512
+        e6[0] = limit
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e7[i, j] = e5[i, j] < e6[0]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                if e7[i, j] and (e5[i, j] >= 0 and e5[i, j] < 512):
+                    mem1[bx, 17 + e5[i, j] * 2] = e4[i, j]
+        T.tvm_storage_sync("shared")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e8[i, j] = T.if_then_else(e7[i, j] and (e5[i, j] >= 0 and e5[i, j] < 512), mem1[bx, 17 + e5[i, j] * 2], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e9[i, j] = T.float16(0.125)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e10[i, j] = e8[i, j] + e9[i, j]
+        T.tvm_storage_sync("shared")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                if e7[i, j] and (e5[i, j] >= 0 and e5[i, j] < 512):
+                    mem1[bx, 18 + e5[i, j]] = e10[i, j]
+        T.tvm_storage_sync("shared")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e11[i, j] = T.bool(True)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e12[i, j] = T.if_then_else(e11[i, j] and (e5[i, j] >= 0 and e5[i, j] < 512), mem1[bx, 17 + e5[i, j] * 2], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e13[i, j] = 1
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e14[i, j] = T.bitwise_xor(e5[i, j], e13[i, j])
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e15[i, j] = T.if_then_else(e7[i, j] and (e14[i, j] >= 0 and e14[i, j] < 512), mem1[bx, 18 + e14[i, j]], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e16[i, j] = e12[i, j] + e15[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e17[i, j] = e16[i, j] * e9[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e17[bx, 16 + (i * 16 + j)] = e17[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e3[bx, 16 + (i * 16 + j)] = e3[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e8[bx, 16 + (i * 16 + j)] = e8[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e12[bx, 16 + (i * 16 + j)] = e12[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e13[bx, 16 + (i * 16 + j)] = e13[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e2[bx, 16 + (i * 16 + j)] = e2[i, j]

@@ -1,0 +1,464 @@
+{
+  "type": "extended",
+  "version": 1,
+  "body": {
+    "arguments": [],
+    "operations": [
+      {
+        "op": "index",
+        "results": [
+          {
+            "name": "e1",
+            "type": {
+              "dtype": "int32",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "shift": 25,
+          "reverse": true
+        },
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e2",
+            "type": {
+              "dtype": "bool",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": true
+        },
+        "regions": []
+      },
+      {
+        "op": "load",
+        "results": [
+          {
+            "name": "e3",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e1",
+          "e2"
+        ],
+        "attrs": {
+          "buffer": "mem0"
+        },
+        "regions": []
+      },
+      {
+        "op": "mul",
+        "results": [
+          {
+            "name": "e4",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e3",
+          "e3"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "cast",
+        "results": [
+          {
+            "name": "e5",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e4"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "transpose",
+        "results": [
+          {
+            "name": "e6",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                16,
+                32
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e5"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e7",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": 0.125
+        },
+        "regions": []
+      },
+      {
+        "op": "matmul",
+        "results": [
+          {
+            "name": "e8",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e6",
+          "e5",
+          "e7"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "reduce",
+        "results": [
+          {
+            "name": "e9",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e8"
+        ],
+        "attrs": {
+          "axis": 1,
+          "kind": "max"
+        },
+        "regions": []
+      },
+      {
+        "op": "reshape",
+        "results": [
+          {
+            "name": "e10",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                1
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e9"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "sub",
+        "results": [
+          {
+            "name": "e11",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e8",
+          "e10"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e12",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": 0.125
+        },
+        "regions": []
+      },
+      {
+        "op": "mul",
+        "results": [
+          {
+            "name": "e13",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e11",
+          "e12"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "cast",
+        "results": [
+          {
+            "name": "e14",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e7"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "cast",
+        "results": [
+          {
+            "name": "e15",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e13"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "matmul",
+        "results": [
+          {
+            "name": "e16",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e15",
+          "e14",
+          "e7"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "reshape",
+        "results": [
+          {
+            "name": "e17",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e16"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "reshape",
+        "results": [
+          {
+            "name": "e18",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e17"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "mul",
+        "results": [
+          {
+            "name": "e19",
+            "type": {
+              "dtype": "float32",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e18",
+          "e7"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "cast",
+        "results": [
+          {
+            "name": "e20",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                16,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e19"
+        ],
+        "attrs": {},
+        "regions": []
+      }
+    ],
+    "returns": [
+      "e20"
+    ]
+  },
+  "buffers": [
+    {
+      "name": "mem0",
+      "dtype": "float16",
+      "size": 512,
+      "role": "input",
+      "base": null,
+      "offset": 0,
+      "stride": 1
+    }
+  ],
+  "functions": [],
+  "observations": [
+    "e3",
+    "e8",
+    "e13",
+    "e2",
+    "e1"
+  ],
+  "blocks": 3,
+  "input_pattern": "boundary",
+  "runtime_cases": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      511
+    ],
+    [
+      3,
+      512
+    ]
+  ],
+  "configuration_pair": true,
+  "observation_pair": true,
+  "family": "shape_matmul"
+}

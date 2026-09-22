@@ -1,0 +1,549 @@
+# from tvm.script import tirx as T
+
+@T.prim_func
+def impl(mem0: T.Buffer((2, 544), "float32"), mem1: T.Buffer((2, 544), "float32"), mem2: T.Buffer((2, 544), "int32"), mem3: T.Buffer((2, 1060), "float16"), mem6: T.Buffer((2, 288), "float16"), mem7: T.Buffer((2, 33), "int32"), mem8: T.Buffer((2, 288), "float16"), out_e122: T.Buffer((2, 288), "float16"), out_e18: T.Buffer((2, 544), "int32"), out_e24: T.Buffer((2, 544), "bool"), out_e115: T.Buffer((2, 33), "float32"), out_e116: T.Buffer((2, 33), "int32"), steps: T.int32, limit: T.int32):
+    # with T.sblock("root"):
+    bid = T.launch_thread("blockIdx.x", 2)
+    tx = T.launch_thread("threadIdx.x", 32)
+    ty = T.launch_thread("threadIdx.y", 1)
+    tz = T.launch_thread("threadIdx.z", 1)
+    with T.sblock("tilelang_root"):
+        T.reads()
+        T.writes()
+        e1 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e2 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e3 = T.sblock_alloc_buffer((32, 16), scope="local.fragment")
+        e4 = T.sblock_alloc_buffer((32, 16), scope="local.fragment")
+        e5 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e6 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e7 = T.sblock_alloc_buffer((32, 16), scope="local.fragment")
+        e8 = T.sblock_alloc_buffer((32, 16), scope="local.fragment")
+        e9 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e10 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e11 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e12 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e13 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e14 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e15 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e16 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e17 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e18 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e19 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e20 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e21 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e22 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e23 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e24 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e25 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e26 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e27 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e28 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e29 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e30 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e31 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e32 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e33 = T.sblock_alloc_buffer((32, 16), "bool", scope="local.fragment")
+        e34 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e35 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e36 = T.sblock_alloc_buffer((32, 16), "int32", scope="local.fragment")
+        e37 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e38 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e39 = T.sblock_alloc_buffer((32, 16), "float16", scope="local.fragment")
+        e40 = T.sblock_alloc_buffer((16, 32), "float16", scope="local.fragment")
+        e41 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e42 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e43 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e44 = T.sblock_alloc_buffer((16, 1), scope="local.fragment")
+        e45 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e46 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e47 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e48 = T.sblock_alloc_buffer((16, 16), "int32", scope="local.fragment")
+        e49 = T.sblock_alloc_buffer((16, 16), "bool", scope="local.fragment")
+        e50 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e51 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e52 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e53 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e54 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e55 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e64 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e65 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e66 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e67 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e68 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e69 = T.sblock_alloc_buffer((1,), "bool", scope="local.fragment")
+        e70 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e71 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e72 = T.sblock_alloc_buffer((1,), "bool", scope="local.fragment")
+        e92 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e93 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e94 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e83 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e78 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e79 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e81 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e82 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e84 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e85 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e86 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e87 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e88 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e89 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e90 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e91 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e114 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e115 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e116 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e105 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e100 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e101 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e103 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e104 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e106 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e107 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e108 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e109 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e110 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e111 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e112 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e113 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e117 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e118 = T.sblock_alloc_buffer((16, 16), "int32", scope="local.fragment")
+        e119 = T.sblock_alloc_buffer((16, 16), "bool", scope="local.fragment")
+        e120 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e121 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e122 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e73 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e74 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e75 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e76 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e77 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e80 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e95 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e96 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e97 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e98 = T.sblock_alloc_buffer((1,), "int32", scope="local.fragment")
+        e99 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e102 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e42_a_shared = T.sblock_alloc_buffer((16, 32), "float16", scope="shared.dyn")
+        e42_b_shared = T.sblock_alloc_buffer((32, 16), "float16", scope="shared.dyn")
+        e43_wide = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e43_nan = T.sblock_alloc_buffer((16, 16), "int32", scope="local.fragment")
+        e43_nan_count = T.sblock_alloc_buffer((16,), "int32", scope="local.fragment")
+        e52_a_shared = T.sblock_alloc_buffer((16, 16), "float16", scope="shared.dyn")
+        e52_b_shared = T.sblock_alloc_buffer((16, 16), "float16", scope="shared.dyn")
+        e114_iteration = T.sblock_alloc_buffer((1,), "int32", scope="local.var")
+        e58 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e59 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e60 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e61 = T.sblock_alloc_buffer((16, 1), scope="local.fragment")
+        e62 = T.sblock_alloc_buffer((16, 1), "float16", scope="local.fragment")
+        e63 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e58_wide = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e60_wide = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e58_1 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e59_1 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e60_1 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e61_1 = T.sblock_alloc_buffer((16, 1), scope="local.fragment")
+        e62_1 = T.sblock_alloc_buffer((16, 1), "float16", scope="local.fragment")
+        e63_1 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e58_wide_1 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e60_wide_1 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e58_2 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e59_2 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        e60_2 = T.sblock_alloc_buffer((1,), scope="local.fragment")
+        e61_2 = T.sblock_alloc_buffer((16, 1), scope="local.fragment")
+        e62_2 = T.sblock_alloc_buffer((16, 1), "float16", scope="local.fragment")
+        e63_2 = T.sblock_alloc_buffer((16, 16), "float16", scope="local.fragment")
+        e58_wide_2 = T.sblock_alloc_buffer((16, 16), scope="local.fragment")
+        e60_wide_2 = T.sblock_alloc_buffer((16,), scope="local.fragment")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e1[i, j] = (511 - (i * 16 + j) + 44) % 512
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e2[i, j] = T.bool(True)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e3[i, j] = T.if_then_else(e2[i, j] and (e1[i, j] >= 0 and e1[i, j] < 512), mem0[bid, 16 + e1[i, j]], T.float32(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e4[i, j] = e3[i, j] + e3[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e5[i, j] = (i * 16 + j + 370) % 512
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e6[i, j] = T.bool(True)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e7[i, j] = T.if_then_else(e6[i, j] and (e5[i, j] >= 0 and e5[i, j] < 512), mem1[bid, 16 + e5[i, j]], T.float32(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e8[i, j] = e4[i, j] * e7[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e9[i, j] = T.Cast("float16", e8[i, j])
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e10[i, j] = e9[i, j] + e9[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e11[i, j] = e10[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e12[i, j] = T.float16(0.5)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e13[i, j] = e11[i, j] * e12[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e14[i, j] = (511 - (i * 16 + j) + 389) % 512
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e15[i, j] = T.bool(True)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e16[i, j] = T.if_then_else(e15[i, j] and (e14[i, j] >= 0 and e14[i, j] < 512), mem2[bid, 16 + e14[i, j]], 0)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e17[i, j] = 7
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e18[i, j] = T.bitwise_xor(e16[i, j], e17[i, j])
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e19[i, j] = 3
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e20[i, j] = e18[i, j] < e19[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e21[i, j] = (511 - (i * 16 + j) + 166) % 512
+        e22[0] = limit
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e23[i, j] = e21[i, j] < e22[0]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e24[i, j] = e20[i, j] and e23[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e25[i, j] = T.float16(-0.125)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e26[i, j] = T.if_then_else(e24[i, j], e13[i, j], e25[i, j])
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e27[i, j] = (i * 16 + j + 363) % 512
+        e28[0] = limit
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e29[i, j] = e27[i, j] < e28[0]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                if e29[i, j] and (e27[i, j] >= 0 and e27[i, j] < 512):
+                    mem3[bid, 17 + e27[i, j] * 2] = e26[i, j]
+        T.tvm_storage_sync("shared")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e30[i, j] = T.if_then_else(e29[i, j] and (e27[i, j] >= 0 and e27[i, j] < 512), mem3[bid, 17 + e27[i, j] * 2], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e31[i, j] = T.float16(0.125)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e32[i, j] = e30[i, j] + e31[i, j]
+        T.tvm_storage_sync("shared")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                if e29[i, j] and (e27[i, j] >= 0 and e27[i, j] < 512):
+                    mem3[bid, 18 + e27[i, j]] = e32[i, j]
+        T.tvm_storage_sync("shared")
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e33[i, j] = T.bool(True)
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e34[i, j] = T.if_then_else(e33[i, j] and (e27[i, j] >= 0 and e27[i, j] < 512), mem3[bid, 17 + e27[i, j] * 2], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e35[i, j] = 7
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e36[i, j] = T.bitwise_xor(e27[i, j], e35[i, j])
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e37[i, j] = T.if_then_else(e29[i, j] and (e36[i, j] >= 0 and e36[i, j] < 512), mem3[bid, 18 + e36[i, j]], T.float16(0.0))
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e38[i, j] = e34[i, j] + e37[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                e39[i, j] = e38[i, j]
+        for i in T.parallel(16):
+            for j in T.parallel(32):
+                e40[i, j] = e39[j, i]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e41[i, j] = T.float32(0.0)
+        T.copy(T.region(e40[0, 0], 1, 16, 32), T.region(e42_a_shared[0, 0], 2, 16, 32))
+        T.copy(T.region(e34[0, 0], 1, 32, 16), T.region(e42_b_shared[0, 0], 2, 32, 16))
+        T.copy(T.region(e41[0, 0], 1, 16, 16), T.region(e42[0, 0], 2, 16, 16))
+        T.gemm(T.region(e42_a_shared[0, 0], 1, 16, 32), T.region(e42_b_shared[0, 0], 1, 32, 16), T.region(e42[0, 0], 3, 16, 16), T.bool(False), T.bool(False), 16, 16, 32, 0, T.bool(False), 32, 16, 0, 0, 1, 0, 0, 0, 0)
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e43_wide[i, j] = e42[i, j]
+        T.reduce(T.region(e43_wide[0, 0], 1, 16, 16), T.region(e43[0], 2, 16), "max", 1, T.bool(True))
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e43_nan[i, j] = T.if_then_else(T.isnan(e43_wide[i, j]), 1, 0)
+        T.reduce(T.region(e43_nan[0, 0], 1, 16, 16), T.region(e43_nan_count[0], 2, 16), "sum", 1, T.bool(True))
+        for i in T.parallel(16):
+            e43[i] = T.if_then_else(e43_nan_count[i] > 0, T.float32("nan"), e43[i])
+        for i in T.parallel(16):
+            for j in T.parallel(1):
+                e44[i, 0] = e43[i + j]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e45[i, j] = e42[i, j] - e44[i, 0]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e46[i, j] = T.float32(0.125)
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e47[i, j] = e45[i, j] * e46[i, j]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e48[i, j] = (i * 16 + j + 87) % 256
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e49[i, j] = T.bool(True)
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e50[i, j] = T.if_then_else(e49[i, j] and (e48[i, j] >= 0 and e48[i, j] < 256), mem6[bid, 16 + e48[i, j]], T.float16(0.0))
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e51[i, j] = T.Cast("float16", e47[i, j])
+        T.copy(T.region(e51[0, 0], 1, 16, 16), T.region(e52_a_shared[0, 0], 2, 16, 16))
+        T.copy(T.region(e50[0, 0], 1, 16, 16), T.region(e52_b_shared[0, 0], 2, 16, 16))
+        T.copy(T.region(e41[0, 0], 1, 16, 16), T.region(e52[0, 0], 2, 16, 16))
+        T.gemm(T.region(e52_a_shared[0, 0], 1, 16, 16), T.region(e52_b_shared[0, 0], 1, 16, 16), T.region(e52[0, 0], 3, 16, 16), T.bool(False), T.bool(False), 16, 16, 16, 0, T.bool(False), 16, 16, 0, 0, 1, 0, 0, 0, 0)
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e53[i, j] = e52[(i * 16 + j) // 16, (i * 16 + j) % 16]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e54[i, j] = e53[(i * 16 + j) // 16, (i * 16 + j) % 16]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e55[i, j] = T.Cast("float16", e54[i, j])
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e58_wide[i, j] = T.Cast("float32", e55[i, j])
+        T.reduce(T.region(e58_wide[0, 0], 1, 16, 16), T.region(e58[0], 2, 16), "sum", 1, T.bool(True))
+        for i in T.parallel(16):
+            e59[i] = e58[i] + e43[i]
+        for i in T.parallel(16):
+            e60_wide[i] = e59[i]
+        T.reduce(T.region(e60_wide[0], 1, 16), T.region(e60[0], 2, 1), "sum", 0, T.bool(True))
+        for i in T.parallel(16):
+            for j in T.parallel(1):
+                e61[i, 0] = e59[i + j]
+        for i in T.parallel(16):
+            for j in T.parallel(1):
+                e62[i, 0] = T.Cast("float16", e61[i, 0])
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e63[i, j] = e55[i, j] + e62[i, 0]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e64[i, j] = e63[i, j]
+        e65[0] = e60[0]
+        e66[0] = steps
+        e67[0] = 0
+        e68[0] = 0
+        e69[0] = T.bool(True)
+        e70[0] = T.if_then_else(e69[0] and (e68[0] >= 0 and e68[0] < 1), mem7[bid, 16 + e68[0]], 0)
+        e71[0] = 0
+        e72[0] = e70[0] < e71[0]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e92[i, j] = e64[i, j]
+        e93[0] = e65[0]
+        e94[0] = e67[0]
+        for e92_iteration in T.serial(T.min(T.max(e66[0], 0), 4), annotations={"num_stages": 1}):
+            e73[0] = e92_iteration
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e74[i, j] = e92[i, j]
+            e75[0] = e93[0]
+            e76[0] = e94[0]
+            if e72[0]:
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e77[i, j] = e74[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e78[i, j] = T.float16(0.125)
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e79[i, j] = e77[i, j] + e78[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e83[i, j] = e79[i, j]
+            else:
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e80[i, j] = e74[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e81[i, j] = T.float16(0.125)
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e82[i, j] = e80[i, j] - e81[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e83[i, j] = e82[i, j]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e58_wide_1[i, j] = T.Cast("float32", e83[i, j])
+            T.reduce(T.region(e58_wide_1[0, 0], 1, 16, 16), T.region(e58_1[0], 2, 16), "sum", 1, T.bool(True))
+            for i in T.parallel(16):
+                e59_1[i] = e58_1[i] + e43[i]
+            for i in T.parallel(16):
+                e60_wide_1[i] = e59_1[i]
+            T.reduce(T.region(e60_wide_1[0], 1, 16), T.region(e60_1[0], 2, 1), "sum", 0, T.bool(True))
+            for i in T.parallel(16):
+                for j in T.parallel(1):
+                    e61_1[i, 0] = e59_1[i + j]
+            for i in T.parallel(16):
+                for j in T.parallel(1):
+                    e62_1[i, 0] = T.Cast("float16", e61_1[i, 0])
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e63_1[i, j] = e83[i, j] + e62_1[i, 0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e84[i, j] = e63_1[i, j]
+            e85[0] = e60_1[0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e86[i, j] = T.float16(0.125)
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e87[i, j] = e84[i, j] * e86[i, j]
+            e88[0] = e75[0] + e85[0]
+            e89[0] = 1
+            e90[0] = e73[0] + e89[0]
+            e91[0] = e76[0] + e90[0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e92[i, j] = e87[i, j]
+            e93[0] = e88[0]
+            e94[0] = e91[0]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e114[i, j] = e92[i, j]
+        e115[0] = e93[0]
+        e116[0] = e94[0]
+        e114_iteration[0] = 0
+        while e114_iteration[0] < T.min(T.max(e66[0], 0), 4):
+            e95[0] = e114_iteration[0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e96[i, j] = e114[i, j]
+            e97[0] = e115[0]
+            e98[0] = e116[0]
+            if e72[0]:
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e99[i, j] = e96[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e100[i, j] = T.float16(0.125)
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e101[i, j] = e99[i, j] + e100[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e105[i, j] = e101[i, j]
+            else:
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e102[i, j] = e96[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e103[i, j] = T.float16(0.125)
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e104[i, j] = e102[i, j] - e103[i, j]
+                for i in T.parallel(16):
+                    for j in T.parallel(16):
+                        e105[i, j] = e104[i, j]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e58_wide_2[i, j] = T.Cast("float32", e105[i, j])
+            T.reduce(T.region(e58_wide_2[0, 0], 1, 16, 16), T.region(e58_2[0], 2, 16), "sum", 1, T.bool(True))
+            for i in T.parallel(16):
+                e59_2[i] = e58_2[i] + e43[i]
+            for i in T.parallel(16):
+                e60_wide_2[i] = e59_2[i]
+            T.reduce(T.region(e60_wide_2[0], 1, 16), T.region(e60_2[0], 2, 1), "sum", 0, T.bool(True))
+            for i in T.parallel(16):
+                for j in T.parallel(1):
+                    e61_2[i, 0] = e59_2[i + j]
+            for i in T.parallel(16):
+                for j in T.parallel(1):
+                    e62_2[i, 0] = T.Cast("float16", e61_2[i, 0])
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e63_2[i, j] = e105[i, j] + e62_2[i, 0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e106[i, j] = e63_2[i, j]
+            e107[0] = e60_2[0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e108[i, j] = T.float16(0.125)
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e109[i, j] = e106[i, j] * e108[i, j]
+            e110[0] = e97[0] + e107[0]
+            e111[0] = 1
+            e112[0] = e95[0] + e111[0]
+            e113[0] = e98[0] + e112[0]
+            for i in T.parallel(16):
+                for j in T.parallel(16):
+                    e114[i, j] = e109[i, j]
+            e115[0] = e110[0]
+            e116[0] = e113[0]
+            e114_iteration[0] = e114_iteration[0] + 1
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e117[i, j] = e114[i, j] + e50[i, j]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e118[i, j] = (i * 16 + j + 33) % 256
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e119[i, j] = T.bool(True)
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e120[i, j] = T.if_then_else(e119[i, j] and (e118[i, j] >= 0 and e118[i, j] < 256), mem8[bid, 16 + e118[i, j]], T.float16(0.0))
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e121[i, j] = e117[i, j] * e120[i, j]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                e122[i, j] = e121[i, j] - e120[i, j]
+        for i in T.parallel(16):
+            for j in T.parallel(16):
+                out_e122[bid, 16 + (i * 16 + j)] = e122[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e18[bid, 16 + (i * 16 + j)] = e18[i, j]
+        for i in T.parallel(32):
+            for j in T.parallel(16):
+                out_e24[bid, 16 + (i * 16 + j)] = e24[i, j]
+        out_e115[bid, 16] = e115[0]
+        out_e116[bid, 16] = e116[0]

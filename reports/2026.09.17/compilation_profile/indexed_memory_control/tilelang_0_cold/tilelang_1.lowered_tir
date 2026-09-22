@@ -1,0 +1,106 @@
+# from tvm.script import ir as I
+# from tvm.script import tirx as T
+
+@I.ir_module
+class Module:
+    @T.prim_func
+    def impl_kernel(mem0: T.handle("float16", "global"), mem1: T.handle("float16", "global"), out_e12: T.handle("float16", "global"), out_e13: T.handle("int32", "global"), out_e17: T.handle("float16", "global"), out_e2: T.handle("int8", "global"), out_e3: T.handle("float16", "global"), out_e8: T.handle("float16", "global"), limit: T.int32):
+        T.func_attr({"calling_conv": 2, "target": T.target({"arch": "sm_89", "keys": ["cuda", "gpu"], "kind": "cuda", "max_num_threads": 1024, "tag": "", "thread_warp_size": 32}), "thread_extent": {"blockIdx.x": 3, "threadIdx.x": 128, "threadIdx.y": 1, "threadIdx.z": 1}, "tirx.is_global_func": T.bool(True), "tirx.kernel_launch_params": ["blockIdx.x", "threadIdx.x", "threadIdx.y", "threadIdx.z"], "tirx.noalias": True, "tl.non_restrict_params": [], "tl.readonly_param_indices": [0]})
+        out_e2_1 = T.decl_buffer((1632,), "int8", data=out_e2)
+        out_e13_1 = T.decl_buffer((1632,), "int32", data=out_e13)
+        out_e12_1 = T.decl_buffer((1632,), "float16", data=out_e12)
+        out_e8_1 = T.decl_buffer((1632,), "float16", data=out_e8)
+        out_e3_1 = T.decl_buffer((1632,), "float16", data=out_e3)
+        out_e17_1 = T.decl_buffer((1632,), "float16", data=out_e17)
+        mem1_1 = T.decl_buffer((3180,), "float16", data=mem1)
+        mem0_1 = T.decl_buffer((1632,), "float16", data=mem0)
+        bx = T.launch_thread("blockIdx.x", 3)
+        e1 = T.alloc_buffer((4,), "int32", scope="local")
+        e2 = T.alloc_buffer((4,), "int8", scope="local")
+        e3 = T.alloc_buffer((4,), "float16", scope="local")
+        e4 = T.alloc_buffer((4,), "float16", scope="local")
+        e5 = T.alloc_buffer((4,), "int32", scope="local")
+        e6 = T.alloc_buffer((1,), "int32", scope="local")
+        e7 = T.alloc_buffer((4,), "int8", scope="local")
+        e8 = T.alloc_buffer((4,), "float16", scope="local")
+        e9 = T.alloc_buffer((4,), "float16", scope="local")
+        e10 = T.alloc_buffer((4,), "float16", scope="local")
+        e11 = T.alloc_buffer((4,), "int8", scope="local")
+        e12 = T.alloc_buffer((4,), "float16", scope="local")
+        e13 = T.alloc_buffer((4,), "int32", scope="local")
+        e14 = T.alloc_buffer((4,), "int32", scope="local")
+        e15 = T.alloc_buffer((4,), "float16", scope="local")
+        e16 = T.alloc_buffer((4,), "float16", scope="local")
+        e17 = T.alloc_buffer((4,), "float16", scope="local")
+        tx = T.launch_thread("threadIdx.x", 128)
+        ty = T.launch_thread("threadIdx.y", 1)
+        tz = T.launch_thread("threadIdx.z", 1)
+        e1_1 = T.decl_buffer((4,), "int32", data=e1.data, scope="local")
+        e2_1 = T.decl_buffer((4,), "int8", data=e2.data, scope="local")
+        e3_1 = T.decl_buffer((4,), "float16", data=e3.data, scope="local")
+        e4_1 = T.decl_buffer((4,), "float16", data=e4.data, scope="local")
+        e5_1 = T.decl_buffer((4,), "int32", data=e5.data, scope="local")
+        e6_1 = T.decl_buffer((1,), "int32", data=e6.data, scope="local")
+        e7_1 = T.decl_buffer((4,), "int8", data=e7.data, scope="local")
+        e8_1 = T.decl_buffer((4,), "float16", data=e8.data, scope="local")
+        e9_1 = T.decl_buffer((4,), "float16", data=e9.data, scope="local")
+        e10_1 = T.decl_buffer((4,), "float16", data=e10.data, scope="local")
+        e11_1 = T.decl_buffer((4,), "int8", data=e11.data, scope="local")
+        e12_1 = T.decl_buffer((4,), "float16", data=e12.data, scope="local")
+        e13_1 = T.decl_buffer((4,), "int32", data=e13.data, scope="local")
+        e14_1 = T.decl_buffer((4,), "int32", data=e14.data, scope="local")
+        e15_1 = T.decl_buffer((4,), "float16", data=e15.data, scope="local")
+        e16_1 = T.decl_buffer((4,), "float16", data=e16.data, scope="local")
+        e17_1 = T.decl_buffer((4,), "float16", data=e17.data, scope="local")
+        for i in T.unroll(4):
+            e1_1[i] = (24 - i - tx * 4) % 512
+        for i in T.unroll(4):
+            e2_1[i] = T.int8(1)
+        for i in T.unroll(4):
+            e3_1[i] = T.if_then_else(T.Cast("bool", e2_1[i]) and 0 <= e1_1[i] and e1_1[i] < 512 and -16 <= e1_1[i] and e1_1[i] < 528, mem0_1[T.Cast("int64", bx) * T.int64(544) + T.Cast("int64", e1_1[T.Cast("int64", i)]) + T.int64(16)], T.float16(0.0))
+        for i in T.unroll(4):
+            e4_1[i] = e3_1[i] * e3_1[i]
+        for i in T.unroll(4):
+            e5_1[i] = (88 - i - tx * 4) % 512
+        e6_1[0] = limit
+        for i in T.unroll(4):
+            e7_1[i] = T.Cast("int8", e5_1[i] < e6_1[0])
+        for i in T.unroll(4):
+            if T.Cast("bool", e7_1[i]) and 0 <= e5_1[i] and e5_1[i] < 512:
+                if -8 <= e5_1[i]:
+                    if e5_1[i] < 522:
+                        mem1_1[T.Cast("int64", bx) * T.int64(1060) + T.Cast("int64", e5_1[T.Cast("int64", i)]) * T.int64(2) + T.int64(17)] = e4_1[i]
+        T.tvm_storage_sync("shared")
+        for i in T.unroll(4):
+            e8_1[i] = T.if_then_else(T.Cast("bool", e7_1[i]) and 0 <= e5_1[i] and e5_1[i] < 512 and -8 <= e5_1[i] and e5_1[i] < 522, mem1_1[T.Cast("int64", bx) * T.int64(1060) + T.Cast("int64", e5_1[T.Cast("int64", i)]) * T.int64(2) + T.int64(17)], T.float16(0.0))
+        for i in T.unroll(4):
+            e9_1[i] = T.float16(0.125)
+        for i in T.unroll(4):
+            e10_1[i] = e8_1[i] + e9_1[i]
+        T.tvm_storage_sync("shared")
+        for i in T.unroll(4):
+            if T.Cast("bool", e7_1[i]) and 0 <= e5_1[i] and e5_1[i] < 512:
+                if -18 <= e5_1[i]:
+                    if e5_1[i] < 1042:
+                        mem1_1[T.Cast("int64", bx) * T.int64(1060) + T.Cast("int64", e5_1[T.Cast("int64", i)]) + T.int64(18)] = e10_1[i]
+        T.tvm_storage_sync("shared")
+        for i in T.unroll(4):
+            e11_1[i] = T.int8(1)
+        for i in T.unroll(4):
+            e12_1[i] = T.if_then_else(T.Cast("bool", e11_1[i]) and 0 <= e5_1[i] and e5_1[i] < 512 and -8 <= e5_1[i] and e5_1[i] < 522, mem1_1[T.Cast("int64", bx) * T.int64(1060) + T.Cast("int64", e5_1[T.Cast("int64", i)]) * T.int64(2) + T.int64(17)], T.float16(0.0))
+        for i in T.unroll(4):
+            e13_1[i] = 1
+        for i in T.unroll(4):
+            e14_1[i] = T.bitwise_xor(e5_1[i], e13_1[i])
+        for i in T.unroll(4):
+            e15_1[i] = T.if_then_else(T.Cast("bool", e7_1[i]) and 0 <= e14_1[i] and e14_1[i] < 512 and -18 <= e14_1[i] and e14_1[i] < 1042, mem1_1[T.Cast("int64", bx) * T.int64(1060) + T.Cast("int64", e14_1[T.Cast("int64", i)]) + T.int64(18)], T.float16(0.0))
+        for i in T.unroll(4):
+            e16_1[i] = e12_1[i] + e15_1[i]
+        for i in T.unroll(4):
+            e17_1[i] = e16_1[i] * e9_1[i]
+        out_e17_1[bx * 544 + tx * 4 + 16:bx * 544 + tx * 4 + 16 + 4] = e17_1[0:4]
+        out_e3_1[bx * 544 + tx * 4 + 16:bx * 544 + tx * 4 + 16 + 4] = e3_1[0:4]
+        out_e8_1[bx * 544 + tx * 4 + 16:bx * 544 + tx * 4 + 16 + 4] = e8_1[0:4]
+        out_e12_1[bx * 544 + tx * 4 + 16:bx * 544 + tx * 4 + 16 + 4] = e12_1[0:4]
+        out_e13_1[bx * 544 + tx * 4 + 16:bx * 544 + tx * 4 + 16 + 4] = e13_1[0:4]
+        out_e2_1[bx * 544 + tx * 4 + 16:bx * 544 + tx * 4 + 16 + 4] = T.Cast("int8x4", T.Cast("boolx4", e2_1[0:4]))

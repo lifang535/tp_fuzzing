@@ -1,312 +1,173 @@
-# TileSmith — Structure-Aware Fuzzer for Tile Programs
+# TileSmith
 
-TileSmith is a fuzzing tool designed for tile-based GPU program compilers (TileLang, Triton),
-inspired by MLIRSmith's two-phase generation approach (structural template + parameter instantiation).
+TileSmith generates and mutates GPU tile programs for TileLang and Triton, then checks compilation, execution, PyTorch references and repeat/configuration invariants.
 
----
+The executable representations are **RegionProgram** and **ExtendedProgram**. Directed probes are whole-function Region programs. The historical TileProgram, TilePipeline and DynamicSequence implementations, operation registries, emitters and forwarding modules have been removed.
 
-## Directory Structure
+[中文](README.cn.md) · [Workflow](src/workflow/README.en.md)
 
-```
-tp_fuzzing/
-├── main.py                    # Entry point
-├── src/
-│   ├── config/                # Centralized hyperparameter configuration
-│   │   └── config.py
-│   ├── ir/                    # Intermediate Representation (IR)
-│   │   ├── ir.py              # Core data structures (TileKernel, ComputeKind, etc.)
-│   │   ├── pipeline.py        # Multi-step pipeline IR
-│   │   └── dynamic_seq.py     # Dynamic sequence IR (MLIRSmith TypedValuePool style)
-│   ├── constraints/           # Hardware constraint validation
-│   │   └── constraints.py
-│   ├── ops/                   # Operator registry (one class per ComputeKind)
-│   │   └── ops.py
-│   └── workflow/              # Fuzzing workflow
-│       ├── generator/         # Program generator
-│       ├── mutator/           # Mutation engine
-│       ├── emitter/           # Code emitter (TileLang / Triton)
-│       │   ├── tilelang/
-│       │   └── triton/
-│       ├── oracle/            # Test oracle (execution + bug detection)
-│       └── fuzzer/            # Main fuzzing loop
-```
+## Source layout
 
----
+| Location | Responsibility |
+|---|---|
+| `main.py` | CLI, backend loading, dump and campaign entry |
+| `src/config/config.py` | Generation, mutation, limits and tolerances |
+| `src/ir/ir.py` | TileKernel launch/probe parameters, dtype and scheduling enums |
+| `src/ir/region.py` | Operations, lexical regions, functions and RegionProgram |
+| `src/ir/region_ops.py`, `region_types.py` | Operation contracts, type inference and value pools |
+| `src/ir/extended.py` | Extended types, operations, multi-result regions and validation |
+| `src/ir/layout.py`, `serialization.py` | Physical layouts and current-format persistence |
+| `src/backends/common/` | Shared policies, probe generation and standalone script assembly |
+| `src/backends/tilelang/`, `triton/` | Target constraints, lowering and launch conventions |
+| `src/workflow/generator/`, `mutator/` | Fresh generation and mutation |
+| `src/workflow/emitter/` | Embedded reference interpreters and execution checks |
+| `src/workflow/oracle/` | Isolated processes, timeouts, diagnostics and compiler evidence |
+| `src/workflow/fuzzer/` | Campaign loop, deduplication, seeds, saving and resume |
+| `src/workflow/feedback.py`, `extended_feedback.py` | Structural and compilation feedback |
+| `src/workflow/coverage_audit.py` | Coverage evidence validation |
+| `tests/` | Unit tests, offline compilation and GPU smoke tests |
 
-## Quick Start
+TileKernel is a parameter object attached to a RegionProgram. Region operations and functions define its dataflow.
+
+## Usage
+
+Run from this directory. See [requirements.txt](requirements.txt) for dependency versions. Source generation and CPU unit tests do not require an available GPU; running kernels requires CUDA and the selected DSL.
 
 ```bash
-# Run with default settings (100 iterations, TileLang backend)
-python main.py
-
-# Specify iterations and random seed (reproducible)
-python main.py -n 500 --seed 42
-
-# Print generated code without executing
-python main.py --dump --seed 42
-
-# List all supported operator types
+python main.py --help
 python main.py --list-kernels
+python main.py --backend triton --seed 42 --dump
+python main.py --backend tilelang --seed 42 -n 100 -o results
+python main.py --backend triton --seed 42 -n 100 -o results
 
-# Use Triton backend
-python main.py --backend triton -n 200
+# Ordinary regions / probes / Extended only
+python main.py --extended-prob 0 --probe-prob 0 -n 100
+python main.py --extended-prob 0 --probe-prob 1 -n 100
+python main.py --extended-prob 1 -n 100
 
-# Specify output directory
-python main.py -o /tmp/fuzz_results -n 1000
+# Extended compilation without kernel execution
+python main.py --backend triton --compile-only -n 10
 
-# Use easy-shape mode (power-of-2 shapes only)
-# Effect: ~14% higher pass rate; useful for validating the fuzzer itself or building a clean seed corpus
-python main.py --easy-shape -n 200
-
-# Compare pass rates between modes
-python main.py --seed 42 -n 100 -o results/normal
-python main.py --seed 42 -n 100 --easy-shape -o results/easy
-
-# Resume a previous (possibly incomplete) run into the same result directory
-python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 -n 200 --seed 42 --easy-shape
+# Keep the original backend, seed, shape mode and generation settings
+python main.py --backend triton --seed 42 --resume results/<campaign-directory> -n 100
 ```
 
----
+`-n` counts newly executed tests, excluding deduplicated candidates. `--seed` controls generation/mutation; `--input-seed` controls tensor inputs. `--easy-shape` samples powers of two; sizes below a tile still exercise boundary handling.
 
-## Core Design
+## Selection and configuration
 
-### Three Program Types
+With an empty seed pool, candidates are generated fresh. Otherwise the default is **50% mutation / 50% fresh generation**, controlled by `Config.mutate_prob`.
 
-| Type | Probability | Description |
-|------|-------------|-------------|
-| `TilePipeline` | 40% | Template-based multi-step pipeline (GEMM + epilogue) |
-| `DynamicSequence` | 30% | Pool-driven dynamic sequence (MLIRSmith-style) |
-| `TileProgram` | 30% | Single-operator program |
+Fresh generation selects Extended first. Remaining candidates enter the Region generator, where the probe probability is conditional. New CLI campaigns default to `extended_prob=0.25` and `coverage_probe_prob=0.20`: expected fresh-candidate proportions are 25% Extended, 15% probes and 60% ordinary regions. Deduplication and failures affect executed/passing proportions.
 
-### Supported Operators (15 kinds)
+Library `Config()` defaults to `extended_prob=0`. CLI resume reads the saved Extended probability, falling back to 0 if absent.
 
-- Matrix multiplication: `gemm`
-- Memory ops: `copy`
-- Elementwise: `add`, `mul`, `max`, `sub`, `scale`, `exp`, `sqrt`, `where`
-- Transpose: `transpose`
-- Reduction: `reduce_sum`, `reduce_max`, `reduce_min`
-- Composite: `softmax`
+| Option | Default | Effect |
+|---|---:|---|
+| `--backend` | tilelang | Select registered backend |
+| `--extended-prob` | New CLI: 0.25 | Extended share of fresh candidates |
+| `--probe-prob` | 0.20 | Conditional probe share within Region generation |
+| `--gemm-prob` | 0.50 | GEMM entry versus load for ordinary regions |
+| `--typed-op-prob` | 0.35 | Type/shape/memory operations; 0 generates v3 |
+| `--function-min-count`, `--function-max-count` | 1, 3 | Auxiliary functions |
+| `--function-call-prob` | 0.30 | Call selection when callees are available |
+| `--dtype-mutate-prob` | 0.25 | Explicit storage dtype switch during mutation |
+| `--local-mutate-prob` | 0.35 | Local mutation after skipping dtype mutation |
+| `--region-input-seeds` | 2 | Input cases per ordinary region |
+| `--region-repeat-count` | 3 | Executions per input/configuration |
+| `--region-layout-prob` | 0.35 | Non-contiguous layout probability per used input |
+| `--no-region-schedule-pair` | Off | Disable paired thread configurations |
+| `--no-region-stage-sweep` | Off | Disable the alternate num_stages sweep for fresh regions |
+| `--no-region-loop-sweep` | Off | Disable the alternate loop_kind sweep for fresh regions |
+| `--no-region-layout-sweep` | Off | Disable the alternate layout pair sweep for fresh regions |
+| `--extended-config-depth` | 1 | Extended configuration sweep depth: 0 = single configuration; 1 = threads/stages pair; 2 = additionally a second pass configuration |
+| `--no-extended-configurations` | Off | Alias for `--extended-config-depth 0` |
+| `--extended-fast-math` | Off | Additionally compile with `tl.enable_fast_math` (changes numerics) |
+| `--no-extended-precision` | Off | Disable the accumulator-width sweep (fp16-accumulation copies + triton ieee→tf32) |
+| `--no-extended-identities` | Off | Disable the algebraic-identity sweep (distributivity copies) |
+| `--random-config-count` | 2 | Random pass-pipeline configurations sampled per extended program (deterministic per program + seed; 0 disables) |
+| `--extended-atomic-prob` | 0.25 | Global-memory atomic add/max/min surface share in Extended programs |
+| `--extended-fma-prob` | 0.30 | Scalar fused multiply-add chain probability in Extended programs |
+| `--extended-shape-op-prob` | 0.30 | Shape primitive probability in Extended programs (flip on both DSLs; interleave/join/split on triton) |
+| `--extended-int8-prob` | 0.30 | int8 x int8 matmul probability in Extended programs (int32 accumulator) |
+| `--region-int8-prob` | 0.15 | Native int8 GEMM-only region probability (pre-validated spec grid) |
+| `--no-region-pass-config` | Off | Disable the region pass-config invariance pair |
+| `--no-region-swizzle` | Off | Disable the tilelang `T.use_swizzle` region variant pair |
+| `--no-region-warp-policy` | Off | Disable the tilelang `GemmWarpPolicy` (FullRow/FullCol) region variant pair |
+| `--no-instance-grids` | Off | Disable the per-(op, backend) round-robin instance grids for the new op surfaces |
+| `--uncovered-boost` | 50.0 | Additive weight boost for never-attempted structural features (MLIRSmith-style diversity first; 0 restores legacy weighting) |
+| `--no-structural-feedback` | Off | Disable structural feedback guidance |
+| `--compile-only` | Off | Compile without execution; forces Extended probability to 1 |
 
-### Bug Classification
+See `--help` for other options and `src/config/config.py` for dimension pools, template limits, scratch budgets and tolerances.
 
-The tool automatically classifies discovered bugs into 10 categories:
+## Generation and checking
 
-| Category | Description |
-|----------|-------------|
-| `wrong_result` | Computed result differs from reference |
-| `dtype_mismatch` | Compiler's internal type inference conflicts with declaration |
-| `warp_partition` | Warp partitioning cannot satisfy block size |
-| `shared_memory_overflow` | Shared memory exceeds hardware limit |
-| `layout_inference` | TileLang layout inference finds no valid layout |
-| `dtype_unsupported_op` | Operator does not support the given type (e.g. `tl.sqrt` with fp16) |
-| `codegen_duplicate_arg` | Emitted kernel contains duplicate arguments |
-| `triton_compile_error` | Triton compilation error |
-| `segfault` | Compiler segmentation fault |
-| `other` | Uncategorized errors |
+Ordinary generation first builds operation trees and function signatures with `program_template()`. Instantiation binds operands from visible, compatible SSA values, supplies attributes and result names, and samples target-valid shapes and schedules. Helpers can call only earlier helpers. V3 uses full fp32 tiles; v4 adds fp16/fp32 values, tile/row/column/scalar shapes and tensor/buffer distinctions with scratch reads/writes.
 
-> **Notes:**
-> - `wrong_result` does not necessarily indicate a genuine compiler bug. In chained computations (multi-step pipelines or dynamic sequences), accumulated floating-point rounding errors can cause the output to diverge slightly from the reference, leading to false positives.
-> - Hardware constraint failures such as `shared_memory_overflow` may be partially caused by inaccurate hardware introspection at the constraint-checking stage — if the actual GPU's shared memory capacity cannot be read reliably, the generator may produce kernels that exceed the true hardware limit.
+Probes use a single `probe` node for copy, sum/max/min reduction, softmax, argmax or GEMM+argmax. They exercise physical strides, offsets, broadcasts, tails, exceptional values, repeated execution and cache reuse. Generation, mutation and persistence all use RegionProgram.
 
----
+Extended has its own IR and five generation families: arithmetic, indexed_memory, shape_matmul, control_calls and mixed. Each skeleton instantiates typed operands, operations and attributes. It supports internal matmul, indexed memory, multiple region/function results, intermediate observations and paired compiler configurations. It is independent of the removed DynamicSequence implementation.
 
-## Output Structure
+The MLIRSmith-style op-surface expansion adds new compiler code paths on top of both IRs. Extended programs gain global-memory atomics (commutative add/max/min over deliberately raced addresses), scalar FMA chains with data-dependent operands, triton shape primitives (flip/interleave/join/split) and int8 x int8 matmul with an int32 accumulator. Native regions gain transcendental elementwise ops (tanh/erf/log/log2/exp2/rsqrt/sin/cos/floor/ceil) and int8 GEMM-only programs whose spec comes from a pre-validated grid (block_K ∈ {32, 64}, int32 accumulator, exact integer reference). fp32 GEMMs are never combined with boundary step ops (ceil/floor/round/cast): TF32 tensor-core math flips rounding boundaries against the exact-fp32 reference and drowns the oracle in indistinguishable noise.
 
-```
-results/
-└── 2026.06.26-10.30_tilelang_hard-shape_seed=42/
-    ├── summary.json                              # Cumulative statistics (across all sessions)
-    ├── passed/
-    │   ├── passed_single_gemm_M128,N256,K64,bM64,bN128,bK32,t128,pipelined,s2,float16.py
-    │   ├── passed_pipeline_gemm+scale+add_M512,N512,K128,bM64,bN64,bK32,t128,serial,s1,float16.py
-    │   └── passed_dynamic_gemm+exp+copy_f2g_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16.py
-    └── failed/
-        └── {root_cause}/
-            ├── failed_single_gemm_M128,N256,K64,bM64,bN128,bK32,t128,pipelined,s2,float16.py
-            ├── failed_pipeline_gemm+where_M512,N512,K128,bM64,bN64,bK32,t128,serial,s1,float16.py
-            └── failed_dynamic_gemm+sqrt+mul_M256,N128,K64,bM32,bN64,bK16,t128,pipelined,s2,float16.py
-```
+New-op attributes are sampled from bounded instance grids (`src/workflow/generator/grids.py`): per (op, backend) round-robin cursors make every corner cell appear exactly once per sweep (MLIRSmith exhaustive-instance philosophy applied to the new surfaces; legacy ops keep random sampling). Grid cursors persist in the campaign RNG state; `--no-instance-grids` restores pure random sampling.
 
-Filename convention: `{passed/failed}_{type}_{ops}_{params}`
+## Diversity mechanisms and oracle dimensions
 
-- Params format: `M{m},N{n},K{k},bM{block_M},bN{block_N},bK{block_K},t{threads},{loop_kind},s{num_stages},{dtype}`
-- Single op: `{passed/failed}_single_{op}_{params}`
-- Template pipeline: `{passed/failed}_pipeline_{op1}+{op2}+..._{params}`
-- Dynamic sequence: `{passed/failed}_dynamic_{op1}+{op2}+..._{params}`
+Following MLIRSmith's "one program × many configuration reuses, uncovered-feature-first, fine-grained localization", every program runs several paired checks beyond its base pipeline. The reference interpreter is schedule-independent (`_region_reference` is a pure IR interpreter), so schedule sweeps share one reference; sweeps that change numerics (accumulator width, algebraic identities) instead compute expectations per transformed program copy.
 
-Only test cases with identical program structure AND all input parameters are considered duplicates; different parameters produce distinct files.
+| Mechanism | Default | Checked content | Failure label (root_cause) |
+|---|---|---|---|
+| Uncovered-feature-first | On (`--uncovered-boost 50`) | Never-attempted structural features get a one-shot weight boost | — |
+| Region schedule sweep | On (disabled by `--no-region-stage-sweep` / `--no-region-loop-sweep`) | Legal num_stages and loop_kind variants beyond the thread pair share the same reference | `stage_mismatch` / `loop_kind_mismatch` |
+| Region layout sweep | On (disabled by `--no-region-layout-sweep`) | Layout programs run a second alternate layout pair; each pair compiles its own kernel set (layout constants are baked into kernel sources) | `layout_mismatch` |
+| Region pass-config pair | On (disabled by `--no-region-pass-config`) | The region kernel additionally compiles through `@tilelang.jit(pass_configs=...)` with a deterministic sampled subset of the numerically-neutral region pool (knobs.py); triton launches `enable_fp_fusion=True`. The int8 region pool excludes `tirx.disable_vectorize` (de-vectorized int8 cp_async copies are rejected by tilelang codegen) | `pass_config_mismatch` |
+| Region swizzle pair | On (disabled by `--no-region-swizzle`) | The tilelang gemm variant additionally annotates the kernel with `T.use_swizzle(panel_size=10)`; triton has no such knob and gets no pair | `swizzle_mismatch` |
+| Region warp-policy pair | On (disabled by `--no-region-warp-policy`) | The tilelang gemm additionally compiles `GemmWarpPolicy.FullRow`/`FullCol` variants (all warps along M/N; per-tile math untouched, one shared reference), filtered per-policy by warp-partition feasibility; tilelang only | `warp_policy_mismatch` |
+| Extended pass-configuration sweep | Depth 1 (`--extended-config-depth`) | Thread/stages pair (depth 1) + a second pass configuration `tl.disable_loop_unswitching` / `enable_fp_fusion` (depth 2) | `configuration_mismatch` (cross-variant consistency) |
+| Random pass-pipeline sampling | 2 configs/program (`--random-config-count`, 0 disables) | Each extended program additionally compiles deterministic-random configurations: a random subset of 14 verified semantic-preserving tilelang `pass_configs` switches (plus optional numeric knobs, random threads/stages), or random `num_warps`/`num_stages`/`maxnreg` on triton; plain variants are baseline-checked | `configuration_mismatch` (cross-variant consistency) |
+| Accumulator-width sweep | On (disabled by `--no-extended-precision`) | An fp16-accumulation copy of each base configuration (tilelang `T.gemm` fp16 fragment, triton `tl.dot` fp16 accumulator); the interpreter models MMA rounding per k=16; triton additionally gets an ieee→tf32 input-precision variant | `precision_mismatch` |
+| Algebraic-identity sweep | On (disabled by `--no-extended-identities`) | In matmul-less programs, `mul(x, add/sub(y, z))` is rewritten into distributive form; expectations are computed on the transformed program | `algebraic_identity` |
 
-`summary.json` format:
+tilelang's `opt_level` cannot penetrate `tilelang.compile` (all s_tir passes declare `opt_level=0`), so the RC2 pass-pipeline difference uses the verified `pass_configs` keys; `tl.enable_fast_math` changes numerics and stays off by default. The random-sampling pool (`src/backends/common/knobs.py`) only contains keys with verified consumers in the installed tilelang 0.1.11 (race-prone, safety-legalization-removal, Hopper-only and debug keys are excluded), and sampling is a pure function of (program signature, seed) so evidence reads and timeout scaling re-derive the same variant list.
 
-```json
-{
-  "backend": "tilelang",
-  "total_tested": 2011,
-  "bugs_total": 940,
-  "bugs_unique": 4,
-  "root_causes": {
-    "wrong_result": 859,
-    "shared_memory_overflow": 2,
-    "warp_partition": 5,
-    "dtype_mismatch": 74
-  }
-}
-```
+Per-report localization is stored in summary.json's new `root_cause_locations` key (`root_cause → location → count`): locations come from the invariance label itself, the last `TILESMITH_STAGE` marker before a crash, a TVM pass name, or the reporting source file. The `root_causes` key keeps its `{str: int}` shape and `failed/` directory naming is unchanged.
 
-- `bugs_total`: sum of all root_cause trigger counts (`sum(root_causes.values())`)
-- `bugs_unique`: number of distinct root cause categories (`len(root_causes)`)
-- `root_causes`: trigger count per category, including duplicate bugs not saved to disk
+Generated scripts embed inputs, references and checks. Ordinary regions check numerical results, repeated executions, paired schedules (threads, num_stages, loop_kind), layout pairs, input integrity and output guards; typed regions also guard scratch. Extended records compiler evidence and checks observations, pass configurations, randomly sampled pipelines, accumulator width, algebraic identities and scratch contents.
 
-## Resume
+Feedback counts IR operations, dependencies, nesting, types, layouts and schedules, distinguishing attempts, successful executions and compilation. These are structural features, not compiler branch coverage. A failure category or numerical mismatch still requires triage before being called a compiler bug.
 
-`--resume` continues a previous run into the same result directory:
+## Results and compatibility
 
-```bash
-python main.py --resume 2026.06.29-16.41_tilelang_easy-shape_seed=42 \
-               -n 1000 --seed 42 --easy-shape
-```
+Campaigns store `passed/`, `compiled/`, `failed/<root_cause>/`, Extended `artifacts/`, and summary, feedback, seed, dimension and RNG state files. Interrupted cases may also have `pending_program.pkl`. Passing and failing records include standalone Python reproducers. Region filenames use call structure plus a full-IR hash; Extended uses family plus hash. Compilation-only results are distinct from successfully executed results. summary.json additionally records `root_cause_locations` (`root_cause → location → count`) for fine-grained triage.
 
-- `--backend`, `--easy-shape`, and `--seed` must match the directory name — mismatch raises an error
-- Rebuilds the tested-config set from `passed/` and `failed/` files to skip already-tested programs
-- Restores exact root_cause trigger counts from `summary.json` (including dup bugs not written to files)
-- If `summary.json` is absent (run was interrupted before saving), falls back to file counts
-- All statistics are written back to `summary.json` cumulatively at the end of each session
+Region v1–v4 and Extended JSON records remain readable. Unused `legacy: null` and spec `alpha` fields in saved native records are normalized away. Nonempty legacy wrappers and historical single_op/pipeline/dynamic records are rejected; start a new campaign for those formats. Existing result/report directories and standalone reproducers are untouched.
 
----
+The cleanup also removes redundant parameter sampling whose results were overwritten. Consequently the same seed need not produce the same future random stream across this change; saved native IR remains replayable. `pipeline_rtol_fp16/fp32` is renamed to `region_rtol_fp16/fp32` without changing tolerances. GEMM's `LoopKind.PIPELINED`, `num_stages` and `pipeline_stages_choices` remain active hardware scheduling options.
 
-## Configuration
-
-All hyperparameters are centralized in the `Config` dataclass in `src/config/config.py`.
-Common options:
-
-```python
-Config(
-    seed=42,              # Program generation seed (None = non-deterministic)
-    input_seed=0,         # Tensor seed embedded in each standalone reproducer
-    backends=["tilelang"],# Target backend
-    output_dir="results", # Output directory
-    compile_timeout=60,   # Compilation timeout (seconds)
-    execute_timeout=60,   # Execution timeout (seconds)
-)
-```
-
----
-
-## Workflow
-
-### Step 1 — Program Generation (`generator/`)
-
-`ProgramGenerator.generate()` selects one of three strategies by probability:
-
-**Strategy A — Single op (30%)**  
-Randomly selects one of 15 `ComputeKind` values (weighted), validates hardware constraints, and emits a `TileKernel`.
-
-**Strategy B — Template pipeline (40%)**  
-Generates a `TilePipeline` from a predefined structural template:
-- GEMM epilogue: `GEMM → [0–2 epilogue ops] → [optional terminal]`
-- Elementwise chain: `COPY → [1–2 elementwise ops]`
-
-**Strategy C — Dynamic sequence (30%, MLIRSmith-style)**  
-`DynamicSequenceGenerator` maintains a `TileValuePool` (analogous to MLIRSmith's `TypedValuePool`) and makes incremental decisions:
-
-```
-Initialize TileValuePool (with input buffers A/B)
-Loop 3–8 steps:
-    1. Scan all OpGens, find ops available given current pool state
-    2. Randomly select one by weight (uncovered ops get +50 diversity boost)
-    3. Emit a KernelStep, update pool and torch_ref
-Always starts with GEMM
-```
-
-The standalone dynamic reference interprets named-buffer dataflow, including tile padding, tile-local reductions, and intermediate dtype conversions. Legacy `torch_ref` strings are retained as metadata; they no longer define the final comparison.
-
-### Step 2 — Mutation (`mutator/`)
-
-60% of iterations mutate a passing program from `seed_pool`:
-
-- **Parameter mutation**: shapes to 2^n / 2^n±1 / prime / extreme values; tile sizes to valid values; dtype switch; threads switch
-- **Structural mutation**: toggle `loop_kind` (pipelined ↔ serial); adjust `num_stages`; replace `compute_kind`
-- **Boundary mutation**: `M = block_M * n + r` (r ≠ 0) to trigger non-divisible boundary handling
-- **Pipeline-specific**: add / remove / replace epilogue steps
-
-After mutation, `_enforce_constraints()` repairs any invalid parameter combinations.
-
-### Step 3 — Code Emission (`emitter/`)
-
-Translates abstract IR into executable Python code strings. The same IR can target different backends:
-
-| IR Type | TileLang | Triton |
-|---------|----------|--------|
-| `TileKernel` (single op) | `tilelang/emitter.py` | `triton/emitter.py` |
-| `TilePipeline` (template) | `tilelang/pipeline_emitter.py` | `triton/pipeline_emitter.py` |
-| `DynamicSequence` (dynamic) | `tilelang/dynamic_emitter.py` | `triton/dynamic_emitter.py` |
-
-Each emitter produces a complete Python file with a kernel function and a test function (tensor creation, kernel execution, reference comparison).
-
-### Step 4 — Test Execution (`oracle/`)
-
-Runs generated code in an isolated subprocess to contain crashes:
-
-```python
-subprocess.run([python3, tmp_file], timeout=compile_timeout + execute_timeout)
-```
-
-### Step 5 — Result Saving (`fuzzer/`)
-
-Passing programs are saved to `passed/` and optionally added to `seed_pool`. Failing programs are saved under `failed/{root_cause}/` with `.py` (reproducible code) and `.json` (metadata including full error output).
-
----
-
-## Deduplication and Pool Rotation
-
-**Deduplication**: programs with identical `(compute_kind, M, N, K, block, dtype, loop, stages)` signatures are tested only once.
-
-**dim_pool rotation**: every `pool_rotation_interval` iterations (default 100), the dim_pool is re-randomized to prevent M/N/K values from being exhausted — measured to reduce duplicate rate from 63% to 4%.
-
----
-
-## Correspondence with MLIRSmith
-
-| MLIRSmith Component | TileSmith Equivalent |
-|---------------------|----------------------|
-| `TypedValuePool` | `TileValuePool` (`ir/dynamic_seq.py`) |
-| `RegionGen.apply()` | `DynamicSequenceGenerator.generate()` |
-| `OpGenerator` × 200+ | `OpGenBase` subclasses × 13 (`ir/dynamic_seq.py`) |
-| `DiversityCriteria` | Diversity boost (uncovered op weight +50) |
-| `config.h` / `OpConf` | `config/config.py` |
-| Template JSON + instantiation | `TilePipeline` + `PipelineGenerator` |
-| Crash detection only | Crash + correctness (differential testing) |
-
-
-## Correctness and regression checks
-
-`--input-seed` controls PyTorch tensor inputs independently of `--seed`. New summaries record this setting and require it to match on resume. Old result directories remain readable; their existing reproducers are unchanged.
-
-Numeric comparisons validate NaN/Inf locations and infinity signs before measuring finite errors, rounding the reference to output storage precision. Copy and transpose also check signed zeros. Dynamic deduplication includes operation attributes and buffer identities. Resume preserves cumulative summary counts; `bugs_unique` counts failure categories, not confirmed distinct compiler bugs.
+## Validation
 
 ```bash
 python -B -m unittest discover -s tests -v
+python -B tests/offline_typed_smoke.py
 python -B tests/gpu_smoke.py
-# Optional: exercise shared cache behavior across cases.
-python -B tests/gpu_smoke.py --shared-cache
+python -B tests/extended_smoke.py --seeds 1
+python -B tests/region_int8_smoke.py           # int8 GEMM oracle runs on both backends
+python -B tests/region_int8_smoke.py --compile-only
 ```
 
-The GPU smoke runner uses a separate TileLang cache per case by default and writes reproducers/logs to its printed temporary directory, not the fuzzing results directory. TileLang dtype mismatches observed with a shared cache require separate investigation; isolated-cache tests validate emitted programs and reference semantics.
+Unit tests exercise interpreters, types/scopes, layouts, mutation, feedback, persistence, backend dispatch and injected faults. `tests/fixtures/current_programs.json` contains 24 pre-cleanup current-format programs and function-AST digests, preserving emitted behavior through the cleanup.
 
-## Paper-directed probes
+Offline smoke compiles Triton PTX/cubin and performs TileLang lowering/CUDA source generation. This does not execute kernels; the three GPU smoke commands require CUDA.
 
-Fresh generation selects a directed probe with probability 20%; the remaining cases retain the existing pipeline/dynamic/single distribution. Passing probes also enter the mutation pool. Use `--probe-prob 1` for probes only, or `--probe-prob 0` to disable fresh probes (existing probe seeds can still mutate).
+To compare compilation stages of the same saved IR (requires CUDA):
 
 ```bash
-python main.py --backend triton --probe-prob 1 --seed 42 -n 100
-python main.py --backend tilelang --probe-prob 1 --seed 42 -n 100
-python -B tests/gpu_smoke.py --filter probe
+python -B tests/profile_compilation.py --program <program.json> \
+  --output reports/<new-experiment-directory> --repeats 3 --warm
 ```
 
-Probes cover copy, row sum/max/min, softmax, argmax, and fused matmul→argmax. Index outputs are int32 with first-index tie breaking; small integer GEMM inputs avoid unstable near ties. Transposed Triton probes explicitly emit `tl.dot(x, tl.trans(y))` before argmax. Boundary dimensions include singleton, 31/32/33, 63/64/65, and 127/128/129 with operation-specific neutral padding.
+Backends run sequentially with private DSL caches for each cold trial; `--warm` reuses the cache in a new process. The profiler records TileLang passes/NVCC, Triton compiler stages, imports, references and execution checks. `--single-variant` measures one compilation configuration/observation variant. Hooks are confined to experiment workers; normal campaigns are unchanged. Use `exclusive_seconds` when summing nested stages.
 
-Inputs use contiguous, transposed, strided, and offset layouts. TileLang uses flat physical buffers and explicit indexing, which tests address lowering rather than arbitrary-stride frontend descriptors. NaN/Inf/signed-zero/subnormal patterns currently exercise bit-exact copies only.
-
-Each probe defaults to 128/256-thread variants, each executed three times on identical inputs. Checks cover reference results, repeat determinism, schedule agreement, 16-element output guards on either side, and input-storage integrity. Guards do not replace a memory sanitizer. Probe settings persist in IR, dedup signatures, and resumable results. Old results remain loadable; generator changes do not preserve the old version's subsequent random sequence.
-
-This expands trigger coverage without claiming reproduction of every historical bug. Warp specialization, Hopper producer-warpgroup register deallocation, AMD scheduling, compiler-pass pairs, repeated-compilation IR/cache stability, performance regressions, multidimensional launches, and additional dtypes remain incompletely covered.
+Measured results and bottleneck analysis are retained in the [compilation experiment report](reports/2026.09.17/compilation_profile/REPORT.md) (Chinese).

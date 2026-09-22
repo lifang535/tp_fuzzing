@@ -1,0 +1,414 @@
+#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940
+#define _tl_orig_alignas alignas
+#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)
+#include <cuda.h>
+#undef alignas
+#define alignas _tl_orig_alignas
+#endif
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/scan.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void impl_kernel(const half_t* __restrict__ mem0, const float* __restrict__ mem1, const int* __restrict__ mem2, signed char* __restrict__ out_e22, int* __restrict__ out_e24, half_t* __restrict__ out_e3, float* __restrict__ out_e68, int* __restrict__ out_e69, float* __restrict__ out_e71, float* __restrict__ out_e72, int steps);
+extern "C" __global__ void __launch_bounds__(128, 1) impl_kernel(const half_t* __restrict__ mem0, const float* __restrict__ mem1, const int* __restrict__ mem2, signed char* __restrict__ out_e22, int* __restrict__ out_e24, half_t* __restrict__ out_e3, float* __restrict__ out_e68, int* __restrict__ out_e69, float* __restrict__ out_e71, float* __restrict__ out_e72, int steps) {
+  extern __shared__ __align__(1024) uchar buf_dyn_shmem[];
+  void* workspace = ((void*)((char*)buf_dyn_shmem + 0));
+  void* workspace_1 = ((void*)((char*)buf_dyn_shmem + 0));
+  void* workspace_2 = ((void*)((char*)buf_dyn_shmem + 0));
+  int e1[4];
+  signed char e2[4];
+  half_t e3[4];
+  half_t e4[4];
+  half_t e5[4];
+  int e14[1];
+  signed char e15[1];
+  float e16[1];
+  float e8_wide[4];
+  float e8[1];
+  float e9[1];
+  float e10_wide[1];
+  float e10[1];
+  float e11[1];
+  half_t e12[1];
+  half_t e13[4];
+  half_t e17[4];
+  float e18[1];
+  int e19[1];
+  int e20[1];
+  int e21[1];
+  signed char e22[1];
+  int e23[1];
+  int e24[1];
+  signed char e25[1];
+  half_t e45[4];
+  float e46[1];
+  int e47[1];
+  int e26[1];
+  half_t e27[4];
+  float e28[1];
+  int e29[1];
+  half_t e30[4];
+  half_t e31[4];
+  half_t e32[4];
+  half_t e36[4];
+  half_t e33[4];
+  half_t e34[4];
+  half_t e35[4];
+  float e8_wide_1[4];
+  float e8_1[1];
+  float e9_1[1];
+  float e10_wide_1[1];
+  float e10_1[1];
+  float e11_1[1];
+  half_t e12_1[1];
+  half_t e13_1[4];
+  half_t e37[4];
+  float e38[1];
+  half_t e39[4];
+  half_t e40[4];
+  float e41[1];
+  int e42[1];
+  int e43[1];
+  int e44[1];
+  half_t e67[4];
+  float e68[1];
+  int e69[1];
+  int e67_iteration = 0;
+  int e48[1];
+  half_t e49[4];
+  float e50[1];
+  int e51[1];
+  half_t e52[4];
+  half_t e53[4];
+  half_t e54[4];
+  half_t e58[4];
+  half_t e55[4];
+  half_t e56[4];
+  half_t e57[4];
+  float e8_wide_2[4];
+  float e8_2[1];
+  float e9_2[1];
+  float e10_wide_2[1];
+  float e10_2[1];
+  float e11_2[1];
+  half_t e12_2[1];
+  half_t e13_2[4];
+  half_t e59[4];
+  float e60[1];
+  half_t e61[4];
+  half_t e62[4];
+  float e63[1];
+  int e64[1];
+  int e65[1];
+  int e66[1];
+  half_t e70[4];
+  float e71[4];
+  float e72_wide[4];
+  float e72[1];
+  #pragma unroll
+  for (int i = 0; i < 4; ++i) {
+    e1[i] = (((24 - i) - (((int)threadIdx.x) * 4)) & 511);
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 4; ++i_1) {
+    e2[i_1] = (signed char)1;
+  }
+  #pragma unroll
+  for (int i_2 = 0; i_2 < 4; ++i_2) {
+    half_t condval;
+    if (((((((bool)e2[i_2]) && (0 <= e1[i_2])) && (e1[i_2] < 512)) && (-16 <= e1[i_2])) && (e1[i_2] < 528))) {
+      condval = mem0[(((((int64_t)((int)blockIdx.x)) * (int64_t)544) + ((int64_t)e1[((int64_t)i_2)])) + (int64_t)16)];
+    } else {
+      condval = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e3[i_2] = condval;
+  }
+  #pragma unroll
+  for (int i_3 = 0; i_3 < 4; ++i_3) {
+    e4[i_3] = (e3[i_3] * e3[i_3]);
+  }
+  #pragma unroll
+  for (int i_4 = 0; i_4 < 4; ++i_4) {
+    e5[i_4] = e4[i_4];
+  }
+  e14[0] = (((((int)threadIdx.x) >> 2) + 27) & 31);
+  e15[0] = (signed char)1;
+  float condval_1;
+  if (((((((bool)e15[0]) && (0 <= e14[0])) && (e14[0] < 32)) && (-16 <= e14[0])) && (e14[0] < 48))) {
+    condval_1 = mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)64) + ((int64_t)e14[(int64_t)0])) + (int64_t)16)];
+  } else {
+    condval_1 = 0x0p+0f/*0.000000e+00*/;
+  }
+  e16[0] = condval_1;
+  float4 __1;
+  uint2 v_ = *(uint2*)(e5 + 0);
+  ((float2*)(&__1))[0] = __half22float2(((half2*)(&v_))[0]);
+  ((float2*)(&__1))[1] = __half22float2(((half2*)(&v_))[1]);
+  *(float4*)(e8_wide + 0) = __1;
+  e8[0] = 0x0p+0f/*0.000000e+00*/;
+  #pragma unroll
+  for (int rv = 0; rv < 4; ++rv) {
+    e8[0] = (e8[0] + e8_wide[rv]);
+  }
+  e8[0] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(e8[0]);
+  e9[0] = (e8[0] + e16[0]);
+  e10_wide[0] = e9[0];
+  e10[0] = 0x0p+0f/*0.000000e+00*/;
+  e10[0] = (e10[0] + e10_wide[0]);
+  e10[0] = tl::AllReduce<tl::SumOp, 128, 4, 0>::run(e10[0], (&(((float*)workspace_2)[0])));
+  e11[0] = e9[0];
+  e12[0] = ((half_t)e11[0]);
+  #pragma unroll
+  for (int i_5 = 0; i_5 < 4; ++i_5) {
+    e13[i_5] = (e5[i_5] + e12[0]);
+  }
+  #pragma unroll
+  for (int i_6 = 0; i_6 < 4; ++i_6) {
+    e17[i_6] = e13[i_6];
+  }
+  e18[0] = e10[0];
+  e19[0] = steps;
+  e20[0] = 0;
+  e21[0] = 0;
+  e22[0] = (signed char)1;
+  int condval_2;
+  if (((((((bool)e22[0]) && (0 <= e21[0])) && (e21[0] < 1)) && (-16 <= e21[0])) && (e21[0] < 17))) {
+    condval_2 = mem2[(((((int64_t)((int)blockIdx.x)) * (int64_t)33) + ((int64_t)e21[(int64_t)0])) + (int64_t)16)];
+  } else {
+    condval_2 = 0;
+  }
+  e23[0] = condval_2;
+  e24[0] = 0;
+  e25[0] = ((signed char)(e23[0] < e24[0]));
+  #pragma unroll
+  for (int i_7 = 0; i_7 < 4; ++i_7) {
+    e45[i_7] = e17[i_7];
+  }
+  e46[0] = e18[0];
+  e47[0] = e20[0];
+  __syncthreads();
+  for (int e45_iteration = 0; e45_iteration < min(max(e19[0], 0), 4); ++e45_iteration) {
+    e26[0] = e45_iteration;
+    #pragma unroll
+    for (int i_8 = 0; i_8 < 4; ++i_8) {
+      e27[i_8] = e45[i_8];
+    }
+    e28[0] = e46[0];
+    e29[0] = e47[0];
+    if ((bool)e25[0]) {
+      #pragma unroll
+      for (int i_9 = 0; i_9 < 4; ++i_9) {
+        e30[i_9] = e27[i_9];
+      }
+      #pragma unroll
+      for (int i_10 = 0; i_10 < 4; ++i_10) {
+        e31[i_10] = half_t(0x1p-3f/*1.250000e-01*/);
+      }
+      #pragma unroll
+      for (int i_11 = 0; i_11 < 4; ++i_11) {
+        e32[i_11] = (e30[i_11] + e31[i_11]);
+      }
+      #pragma unroll
+      for (int i_12 = 0; i_12 < 4; ++i_12) {
+        e36[i_12] = e32[i_12];
+      }
+    } else {
+      #pragma unroll
+      for (int i_13 = 0; i_13 < 4; ++i_13) {
+        e33[i_13] = e27[i_13];
+      }
+      #pragma unroll
+      for (int i_14 = 0; i_14 < 4; ++i_14) {
+        e34[i_14] = half_t(0x1p-3f/*1.250000e-01*/);
+      }
+      #pragma unroll
+      for (int i_15 = 0; i_15 < 4; ++i_15) {
+        e35[i_15] = (e33[i_15] - e34[i_15]);
+      }
+      #pragma unroll
+      for (int i_16 = 0; i_16 < 4; ++i_16) {
+        e36[i_16] = e35[i_16];
+      }
+    }
+    float4 __2;
+    uint2 v__1 = *(uint2*)(e36 + 0);
+    ((float2*)(&__2))[0] = __half22float2(((half2*)(&v__1))[0]);
+    ((float2*)(&__2))[1] = __half22float2(((half2*)(&v__1))[1]);
+    *(float4*)(e8_wide_1 + 0) = __2;
+    e8_1[0] = 0x0p+0f/*0.000000e+00*/;
+    #pragma unroll
+    for (int rv_1 = 0; rv_1 < 4; ++rv_1) {
+      e8_1[0] = (e8_1[0] + e8_wide_1[rv_1]);
+    }
+    e8_1[0] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(e8_1[0]);
+    e9_1[0] = (e8_1[0] + e16[0]);
+    e10_wide_1[0] = e9_1[0];
+    e10_1[0] = 0x0p+0f/*0.000000e+00*/;
+    e10_1[0] = (e10_1[0] + e10_wide_1[0]);
+    e10_1[0] = tl::AllReduce<tl::SumOp, 128, 4, 0>::run(e10_1[0], (&(((float*)workspace)[0])));
+    e11_1[0] = e9_1[0];
+    e12_1[0] = ((half_t)e11_1[0]);
+    #pragma unroll
+    for (int i_17 = 0; i_17 < 4; ++i_17) {
+      e13_1[i_17] = (e36[i_17] + e12_1[0]);
+    }
+    #pragma unroll
+    for (int i_18 = 0; i_18 < 4; ++i_18) {
+      e37[i_18] = e13_1[i_18];
+    }
+    e38[0] = e10_1[0];
+    #pragma unroll
+    for (int i_19 = 0; i_19 < 4; ++i_19) {
+      e39[i_19] = half_t(0x1p-3f/*1.250000e-01*/);
+    }
+    #pragma unroll
+    for (int i_20 = 0; i_20 < 4; ++i_20) {
+      e40[i_20] = (e37[i_20] * e39[i_20]);
+    }
+    e41[0] = (e28[0] + e38[0]);
+    e42[0] = 1;
+    e43[0] = (e26[0] + e42[0]);
+    e44[0] = (e29[0] + e43[0]);
+    #pragma unroll
+    for (int i_21 = 0; i_21 < 4; ++i_21) {
+      e45[i_21] = e40[i_21];
+    }
+    e46[0] = e41[0];
+    e47[0] = e44[0];
+  }
+  #pragma unroll
+  for (int i_22 = 0; i_22 < 4; ++i_22) {
+    e67[i_22] = e45[i_22];
+  }
+  e68[0] = e46[0];
+  e69[0] = e47[0];
+  e67_iteration = 0;
+  __syncthreads();
+  while (1) {
+    if (!((((e67_iteration < e19[0]) || (e67_iteration < 0)) && (e67_iteration < 4)))) { break; }
+    e48[0] = e67_iteration;
+    #pragma unroll
+    for (int i_23 = 0; i_23 < 4; ++i_23) {
+      e49[i_23] = e67[i_23];
+    }
+    e50[0] = e68[0];
+    e51[0] = e69[0];
+    if ((bool)e25[0]) {
+      #pragma unroll
+      for (int i_24 = 0; i_24 < 4; ++i_24) {
+        e52[i_24] = e49[i_24];
+      }
+      #pragma unroll
+      for (int i_25 = 0; i_25 < 4; ++i_25) {
+        e53[i_25] = half_t(0x1p-3f/*1.250000e-01*/);
+      }
+      #pragma unroll
+      for (int i_26 = 0; i_26 < 4; ++i_26) {
+        e54[i_26] = (e52[i_26] + e53[i_26]);
+      }
+      #pragma unroll
+      for (int i_27 = 0; i_27 < 4; ++i_27) {
+        e58[i_27] = e54[i_27];
+      }
+    } else {
+      #pragma unroll
+      for (int i_28 = 0; i_28 < 4; ++i_28) {
+        e55[i_28] = e49[i_28];
+      }
+      #pragma unroll
+      for (int i_29 = 0; i_29 < 4; ++i_29) {
+        e56[i_29] = half_t(0x1p-3f/*1.250000e-01*/);
+      }
+      #pragma unroll
+      for (int i_30 = 0; i_30 < 4; ++i_30) {
+        e57[i_30] = (e55[i_30] - e56[i_30]);
+      }
+      #pragma unroll
+      for (int i_31 = 0; i_31 < 4; ++i_31) {
+        e58[i_31] = e57[i_31];
+      }
+    }
+    float4 __3;
+    uint2 v__2 = *(uint2*)(e58 + 0);
+    ((float2*)(&__3))[0] = __half22float2(((half2*)(&v__2))[0]);
+    ((float2*)(&__3))[1] = __half22float2(((half2*)(&v__2))[1]);
+    *(float4*)(e8_wide_2 + 0) = __3;
+    e8_2[0] = 0x0p+0f/*0.000000e+00*/;
+    #pragma unroll
+    for (int rv_2 = 0; rv_2 < 4; ++rv_2) {
+      e8_2[0] = (e8_2[0] + e8_wide_2[rv_2]);
+    }
+    e8_2[0] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(e8_2[0]);
+    e9_2[0] = (e8_2[0] + e16[0]);
+    e10_wide_2[0] = e9_2[0];
+    e10_2[0] = 0x0p+0f/*0.000000e+00*/;
+    e10_2[0] = (e10_2[0] + e10_wide_2[0]);
+    e10_2[0] = tl::AllReduce<tl::SumOp, 128, 4, 0>::run(e10_2[0], (&(((float*)workspace_1)[0])));
+    e11_2[0] = e9_2[0];
+    e12_2[0] = ((half_t)e11_2[0]);
+    #pragma unroll
+    for (int i_32 = 0; i_32 < 4; ++i_32) {
+      e13_2[i_32] = (e58[i_32] + e12_2[0]);
+    }
+    #pragma unroll
+    for (int i_33 = 0; i_33 < 4; ++i_33) {
+      e59[i_33] = e13_2[i_33];
+    }
+    e60[0] = e10_2[0];
+    #pragma unroll
+    for (int i_34 = 0; i_34 < 4; ++i_34) {
+      e61[i_34] = half_t(0x1p-3f/*1.250000e-01*/);
+    }
+    #pragma unroll
+    for (int i_35 = 0; i_35 < 4; ++i_35) {
+      e62[i_35] = (e59[i_35] * e61[i_35]);
+    }
+    e63[0] = (e50[0] + e60[0]);
+    e64[0] = 1;
+    e65[0] = (e48[0] + e64[0]);
+    e66[0] = (e51[0] + e65[0]);
+    #pragma unroll
+    for (int i_36 = 0; i_36 < 4; ++i_36) {
+      e67[i_36] = e62[i_36];
+    }
+    e68[0] = e63[0];
+    e69[0] = e66[0];
+    e67_iteration = (e67_iteration + 1);
+  }
+  #pragma unroll
+  for (int i_37 = 0; i_37 < 4; ++i_37) {
+    e70[i_37] = (e67[i_37] * e45[i_37]);
+  }
+  float4 __4;
+  uint2 v__3 = *(uint2*)(e70 + 0);
+  ((float2*)(&__4))[0] = __half22float2(((half2*)(&v__3))[0]);
+  ((float2*)(&__4))[1] = __half22float2(((half2*)(&v__3))[1]);
+  *(float4*)(e71 + 0) = __4;
+  #pragma unroll
+  for (int i_38 = 0; i_38 < 4; ++i_38) {
+    e72_wide[i_38] = e71[i_38];
+  }
+  e72[0] = 0x0p+0f/*0.000000e+00*/;
+  #pragma unroll
+  for (int rv_3 = 0; rv_3 < 4; ++rv_3) {
+    e72[0] = (e72[0] + e72_wide[rv_3]);
+  }
+  e72[0] = tl::AllReduce<tl::SumOp, 4, 1, 0>::run(e72[0]);
+  *(float4*)(out_e71 + (((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 4)) + 16)) = *(float4*)(e71 + 0);
+  out_e68[((((int)blockIdx.x) * 33) + 16)] = e68[0];
+  out_e69[((((int)blockIdx.x) * 33) + 16)] = e69[0];
+  if ((((int)threadIdx.x) % 4) == 0) {
+    out_e72[(((((int)blockIdx.x) * 64) + (((int)threadIdx.x) >> 2)) + 16)] = e72[0];
+  }
+  *(uint2*)(out_e3 + (((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 4)) + 16)) = *(uint2*)(e3 + 0);
+  out_e22[((((int)blockIdx.x) * 33) + 16)] = ((signed char)((bool)e22[0]));
+  out_e24[((((int)blockIdx.x) * 33) + 16)] = e24[0];
+}
+

@@ -1,0 +1,481 @@
+{
+  "type": "extended",
+  "version": 1,
+  "body": {
+    "arguments": [],
+    "operations": [
+      {
+        "op": "index",
+        "results": [
+          {
+            "name": "e1",
+            "type": {
+              "dtype": "int32",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "shift": 25,
+          "reverse": true
+        },
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e2",
+            "type": {
+              "dtype": "bool",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": true
+        },
+        "regions": []
+      },
+      {
+        "op": "load",
+        "results": [
+          {
+            "name": "e3",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e1",
+          "e2"
+        ],
+        "attrs": {
+          "buffer": "mem0"
+        },
+        "regions": []
+      },
+      {
+        "op": "mul",
+        "results": [
+          {
+            "name": "e4",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e3",
+          "e3"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "index",
+        "results": [
+          {
+            "name": "e5",
+            "type": {
+              "dtype": "int32",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "shift": 89,
+          "reverse": true
+        },
+        "regions": []
+      },
+      {
+        "op": "parameter",
+        "results": [
+          {
+            "name": "e6",
+            "type": {
+              "dtype": "int32",
+              "shape": []
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "name": "limit"
+        },
+        "regions": []
+      },
+      {
+        "op": "lt",
+        "results": [
+          {
+            "name": "e7",
+            "type": {
+              "dtype": "bool",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e5",
+          "e6"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "store",
+        "results": [],
+        "operands": [
+          "e5",
+          "e7",
+          "e4"
+        ],
+        "attrs": {
+          "buffer": "mem2"
+        },
+        "regions": []
+      },
+      {
+        "op": "barrier",
+        "results": [],
+        "operands": [],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "load",
+        "results": [
+          {
+            "name": "e8",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e5",
+          "e7"
+        ],
+        "attrs": {
+          "buffer": "mem2"
+        },
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e9",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": 0.125
+        },
+        "regions": []
+      },
+      {
+        "op": "add",
+        "results": [
+          {
+            "name": "e10",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e8",
+          "e9"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "barrier",
+        "results": [],
+        "operands": [],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "store",
+        "results": [],
+        "operands": [
+          "e5",
+          "e7",
+          "e10"
+        ],
+        "attrs": {
+          "buffer": "mem3"
+        },
+        "regions": []
+      },
+      {
+        "op": "barrier",
+        "results": [],
+        "operands": [],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e11",
+            "type": {
+              "dtype": "bool",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": true
+        },
+        "regions": []
+      },
+      {
+        "op": "load",
+        "results": [
+          {
+            "name": "e12",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e5",
+          "e11"
+        ],
+        "attrs": {
+          "buffer": "mem2"
+        },
+        "regions": []
+      },
+      {
+        "op": "constant",
+        "results": [
+          {
+            "name": "e13",
+            "type": {
+              "dtype": "int32",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [],
+        "attrs": {
+          "value": 1
+        },
+        "regions": []
+      },
+      {
+        "op": "bitxor",
+        "results": [
+          {
+            "name": "e14",
+            "type": {
+              "dtype": "int32",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e5",
+          "e13"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "load",
+        "results": [
+          {
+            "name": "e15",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e14",
+          "e7"
+        ],
+        "attrs": {
+          "buffer": "mem3"
+        },
+        "regions": []
+      },
+      {
+        "op": "add",
+        "results": [
+          {
+            "name": "e16",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e12",
+          "e15"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "op": "mul",
+        "results": [
+          {
+            "name": "e17",
+            "type": {
+              "dtype": "float16",
+              "shape": [
+                32,
+                16
+              ]
+            }
+          }
+        ],
+        "operands": [
+          "e16",
+          "e9"
+        ],
+        "attrs": {},
+        "regions": []
+      }
+    ],
+    "returns": [
+      "e17"
+    ]
+  },
+  "buffers": [
+    {
+      "name": "mem0",
+      "dtype": "float16",
+      "size": 512,
+      "role": "input",
+      "base": null,
+      "offset": 0,
+      "stride": 1
+    },
+    {
+      "name": "mem1",
+      "dtype": "float16",
+      "size": 1028,
+      "role": "scratch",
+      "base": null,
+      "offset": 0,
+      "stride": 1
+    },
+    {
+      "name": "mem2",
+      "dtype": "float16",
+      "size": 512,
+      "role": "scratch",
+      "base": "mem1",
+      "offset": 1,
+      "stride": 2
+    },
+    {
+      "name": "mem3",
+      "dtype": "float16",
+      "size": 512,
+      "role": "scratch",
+      "base": "mem1",
+      "offset": 2,
+      "stride": 1
+    }
+  ],
+  "functions": [],
+  "observations": [
+    "e3",
+    "e8",
+    "e12",
+    "e13",
+    "e2"
+  ],
+  "blocks": 3,
+  "input_pattern": "boundary",
+  "runtime_cases": [
+    [
+      0,
+      1
+    ],
+    [
+      1,
+      511
+    ],
+    [
+      3,
+      512
+    ]
+  ],
+  "configuration_pair": true,
+  "observation_pair": true,
+  "family": "indexed_memory"
+}

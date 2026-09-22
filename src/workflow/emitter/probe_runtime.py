@@ -9,6 +9,10 @@ def _probe_input(rows, cols, dtype, layout, pattern, device='cuda'):
         strides, offset = (1, rows), 0
     elif layout == 'strided':
         strides, offset = (2 * cols + 3, 2), 0
+    elif layout == 'broadcast_rows':
+        strides, offset = (0, 1), 0
+    elif layout == 'broadcast_cols':
+        strides, offset = (1, 0), 0
     elif layout == 'offset':
         strides, offset = (cols + 3, 1), 7
     else:
@@ -35,7 +39,13 @@ def _probe_input(rows, cols, dtype, layout, pattern, device='cuda'):
         values = values.repeat((rows * cols + len(numbers) - 1) // len(numbers))[:rows * cols].reshape(rows, cols)
     else:
         raise ValueError(f'Unknown pattern: {pattern}')
-    view.copy_(values)
+    # Initialize only unique storage locations for overlapping broadcast views.
+    if layout == 'broadcast_rows':
+        view[0].copy_(values[0])
+    elif layout == 'broadcast_cols':
+        view[:, 0].copy_(values[:, 0])
+    else:
+        view.copy_(values)
     return storage, view, strides, offset
 
 
@@ -48,8 +58,9 @@ def _probe_exact(actual, expected, label):
         raise RuntimeError(f'WRONG RESULT: {label}: bits differ')
 
 
-def _run_probe(launches, inputs, reference, kind, repeats, threshold):
+def _run_probe(launches, inputs, reference, kind, repeats, threshold, instantiate=False):
     import torch
+    import sys
     if repeats < 2:
         raise ValueError('Directed probes require at least two executions')
     integer = kind in ('argmax', 'gemm_argmax')
@@ -62,6 +73,14 @@ def _run_probe(launches, inputs, reference, kind, repeats, threshold):
     snapshots = [item[0].clone() for item in inputs]
     baseline = None
     for variant, launch in enumerate(launches):
+        # Instantiate lazily: A must execute before requesting B and then A again.
+        # This exercises frontend/JIT cache lookup, not just existing callable reuse.
+        if instantiate:
+            # stderr-only stage marker so timeout/crash location inference
+            # names the probe variant (see _failure_location).
+            print(f'TILESMITH_STAGE=probe_instantiate_{variant}', file=sys.stderr, flush=True)
+            launch = launch()
+        print(f'TILESMITH_STAGE=probe_variant_{variant}', file=sys.stderr, flush=True)
         for repeat in range(repeats):
             output.fill_(23)
             output[guard:-guard].fill_(sentinel)

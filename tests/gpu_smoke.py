@@ -13,33 +13,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.config import Config
-from src.ir import TileKernel, TileProgram, ComputeKind, DataType, TilePipeline, PipelineStep
-from src.ir.dynamic_seq import (TileBuffer, TileValuePool, DynamicSequence, GemmOpGen,
-    ScaleOpGen, AccumulateReduceOpGen, DoublePipelineOpGen, IfEpilogueOpGen,
-    ElemwiseAddOpGen, CopyG2SOpGen, CopyS2FOpGen, ElemwiseMulOpGen,
-    CopyF2GOpGen, SoftmaxOpGen)
+from src.ir import TileKernel, ComputeKind, DataType
+from src.backends.common.probes import probe_program
 from src.workflow.oracle import Oracle
-
-
-def dynamic(ops, dtype, n=70):
-    params = dict(M=33, N=n, K=32, block_M=32, block_N=32, block_K=32,
-                  threads=128, loop_kind='pipelined', num_stages=2,
-                  dtype=dtype, acc_dtype='float32')
-    pool = TileValuePool(global_in=[TileBuffer('A', (33,32), dtype, 'global', 'A.float()'),
-                                          TileBuffer('B', (32,n), dtype, 'global', 'B.float()')])
-    counters = {}
-    steps = [GemmOpGen().apply(pool, params, counters)]
-    for gen in ops:
-        steps.append(gen.apply(pool, params, counters))
-    if not steps[-1].op_kind == 'softmax':
-        steps.append(CopyF2GOpGen().apply(pool, params, counters))
-    return DynamicSequence(steps, pool, M=33, N=n, K=32, block_M=32, block_N=32, block_K=32,
-                           threads=128, loop_kind='pipelined', num_stages=2, dtype=dtype)
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--filter', default='', help='Run labels matching any comma-separated substring')
+    parser.add_argument('--unaligned-region-strides', action='store_true',
+                        help='Keep odd fp16 GEMM strides to diagnose cp.async lowering failures')
     parser.add_argument('--shared-cache', action='store_true', help='Exercise the user cache across cases')
     args = parser.parse_args()
     random.seed(10)
@@ -51,7 +34,51 @@ def main():
         oracle = Oracle(Config(input_seed=7), backend)
         for dtype in ('float32', 'float16'):
             cases = {}
+            from test_typed_regions import typed_program
+            cases['region_typed_memory_load'] = typed_program(dtype, 'load')
+            cases['region_typed_memory_gemm'] = typed_program(dtype, 'gemm')
+            from test_regions import nested_program, loop_outer_program, migrated_ops_program
+            cases["region_nested_load"] = nested_program(dtype, "load")
+            cases["region_nested_gemm"] = nested_program(dtype, "gemm")
+            cases["region_outer_load"] = loop_outer_program(dtype, "load")
+            cases["region_outer_gemm"] = loop_outer_program(dtype, "gemm")
+            cases["region_migrated_elementwise"] = migrated_ops_program(dtype)
+            cases["region_migrated_reductions"] = migrated_ops_program(dtype, True)
+            from test_functions import function_program
+            cases['region_functions_load'] = function_program(dtype)
+            cases['region_functions_gemm'] = function_program(dtype, 'gemm')
+            cases['region_functions_reductions'] = function_program(dtype, reductions=True)
+            from test_generation_diversity import arithmetic_program
+            cases['region_div_minimum_functions'] = arithmetic_program(dtype)
+            from test_region_coverage import coverage_program
+            cases['region_coverage_load'] = coverage_program(dtype, 'load')
+            cases['region_coverage_gemm'] = coverage_program(dtype, 'gemm')
+            layout_cases = (
+                ('offset_load', 'load', 'offset', 'contiguous'),
+                ('broadcast_gemm', 'gemm', 'broadcast_rows', 'broadcast_cols'),
+            ) if dtype == 'float16' else (
+                ('transposed_load', 'load', 'transposed', 'contiguous'),
+                ('strided_gemm', 'gemm', 'strided', 'contiguous'),
+            )
+            for label, initial, layout_a, layout_b in layout_cases:
+                program = coverage_program(dtype, initial)
+                program.input_scale = 0.125
+                program.execution.input_pattern = 'integer'
+                program.execution.input_seed_count = 1
+                program.execution.repeat_count = 2
+                program.execution.input_layout_a = layout_a
+                program.execution.input_layout_b = layout_b
+                program.execution.layout_sweep = True  # run the alternate layout pair too
+                cases['region_layout_' + label] = program
+            from src.ir.region import RegionProgram, Region, Operation
+            spec = TileKernel('kernel_0', compute_kind=ComputeKind.COPY, M=33, N=33, K=32,
+                              block_M=32, block_N=64, block_K=32, threads=128,
+                              dtype=DataType(dtype), coverage_probe=True,
+                              input_layout='strided', input_pattern='special', cache_cycle=True)
+            cases['region_probe'] = RegionProgram(spec, Region([], [Operation('probe', 'v1')], 'v1'))
             for kind, pattern, layout, n in (
+                (ComputeKind.COPY, 'indexed', 'broadcast_rows', 33),
+                (ComputeKind.REDUCE_SUM, 'integer', 'broadcast_cols', 31),
                 (ComputeKind.COPY, 'special', 'offset', 33),
                 (ComputeKind.COPY, 'subnormal', 'transposed', 31),
                 (ComputeKind.COPY, 'indexed', 'strided', 65),
@@ -64,32 +91,18 @@ def main():
                 (ComputeKind.REDUCE_MIN, 'integer', 'transposed', 31),
                 (ComputeKind.SOFTMAX, 'negative', 'offset', 33),
             ):
-                cases[f'probe_{kind.value}_{pattern}_{layout}'] = TileProgram([TileKernel(
+                cases[f'probe_{kind.value}_{pattern}_{layout}'] = probe_program(TileKernel(
                     'kernel_0', compute_kind=kind, M=33, N=n, K=65,
                     block_M=32, block_N=max(32, 1 << (n - 1).bit_length()), block_K=32,
                     dtype=DataType(dtype), threads=128, coverage_probe=True,
-                    input_pattern=pattern, input_layout=layout)])
-            for kind in (ComputeKind.COPY, ComputeKind.GEMM, ComputeKind.SOFTMAX):
-                cases['single_'+kind.value] = TileProgram([TileKernel('kernel_0', compute_kind=kind,
-                        M=33, N=64 if kind == ComputeKind.SOFTMAX else 70, K=32,
-                        block_M=64, block_N=64, block_K=32, dtype=DataType(dtype), threads=256)])
-            from src.workflow.generator.probes import repair_probe
-            cases['probe_gemm_argmax_wide'] = TileProgram([repair_probe(TileKernel(
+                    input_pattern=pattern, input_layout=layout, cache_cycle=True))
+            cases['probe_gemm_argmax_wide'] = probe_program(TileKernel(
                 'kernel_0', compute_kind=ComputeKind.GEMM_ARGMAX, M=1, N=129, K=129,
                 dtype=DataType(dtype), input_pattern='integer', input_layout='strided',
-                num_stages=3))])
-            cases['local_reduce'] = dynamic([AccumulateReduceOpGen()], dtype)
-            cases['double'] = dynamic([ScaleOpGen(), DoublePipelineOpGen()], dtype)
-            cases['copy_mul'] = dynamic([ElemwiseAddOpGen(), CopyG2SOpGen(), CopyS2FOpGen(), ElemwiseMulOpGen()], dtype)
-            cases['branch'] = dynamic([IfEpilogueOpGen()], dtype)
-            cases['dynamic_softmax'] = dynamic([SoftmaxOpGen()], dtype, n=32)
-            cases['pipeline'] = TilePipeline([PipelineStep(ComputeKind.GEMM), PipelineStep(ComputeKind.SCALE, alpha=0.5)],
-                        M=33,N=70,K=32,block_M=64,block_N=64,block_K=32,dtype=DataType(dtype),threads=256)
-            cases['pipeline_softmax'] = TilePipeline([PipelineStep(ComputeKind.GEMM), PipelineStep(ComputeKind.SOFTMAX)],
-                        M=33,N=64,K=32,block_M=64,block_N=64,block_K=32,dtype=DataType(dtype),threads=256)
-            cases['chain'] = TilePipeline([PipelineStep(ComputeKind.COPY), PipelineStep(ComputeKind.SCALE, alpha=5.0),
-                                          PipelineStep(ComputeKind.UNARY_EXP), PipelineStep(ComputeKind.SCALE, alpha=0.001)],
-                        M=33,N=70,K=32,block_M=32,block_N=32,block_K=32,dtype=DataType(dtype),threads=128)
+                num_stages=3))
+            if args.unaligned_region_strides:
+                for name in ('region_nested_gemm', 'region_outer_gemm'):
+                    cases[name].spec.N, cases[name].spec.K = 35, 33
             for name, program in cases.items():
                 label = f'{backend}_{dtype}_{name}'
                 if not any(part in label for part in args.filter.split(',')):

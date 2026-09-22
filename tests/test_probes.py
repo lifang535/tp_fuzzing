@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import torch
 from src.config import Config
-from src.ir import TileProgram, TileKernel, ComputeKind, DataType
-from src.workflow.generator.probes import generate_probe, mutate_probe, repair_probe, KINDS, patterns
+from src.ir import TileKernel, ComputeKind, DataType
+from src.backends.common.probes import generate_probe, mutate_probe, repair_probe, probe_program, KINDS, patterns
 from src.workflow.emitter.probe_runtime import _probe_input, _probe_exact, _run_probe
 from src.workflow.emitter import get_emitter
 from src.workflow.fuzzer.fuzzer import TileSmith
@@ -42,7 +42,7 @@ class ProbeTests(unittest.TestCase):
         seen = set()
         for _ in range(100):
             program = mutate_probe(generate_probe(config))
-            k = program.kernels[0]
+            k = program.spec
             seen.add(k.compute_kind)
             self.assertLessEqual(k.N, k.block_N)
             self.assertEqual(k.block_N & (k.block_N - 1), 0)
@@ -52,7 +52,8 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(seen, set(KINDS))
 
     def test_wide_gemm_repairs_resource_usage(self):
-        from src.constraints import tilelang_check_shared_memory, triton_check_shared_memory
+        from src.backends.tilelang.params import check_shared_memory as tilelang_check_shared_memory
+        from src.backends.triton.params import check_shared_memory as triton_check_shared_memory
         for dtype in DataType:
             k = repair_probe(TileKernel('wide', compute_kind=ComputeKind.GEMM_ARGMAX,
                                        N=129, dtype=dtype, num_stages=3))
@@ -66,13 +67,40 @@ class ProbeTests(unittest.TestCase):
         restored = fuzzer._dict_to_program(meta)
         self.assertEqual(fuzzer._make_sig(program), fuzzer._make_sig(restored))
         self.assertEqual(fuzzer._make_sig(program), fuzzer._make_sig_from_dict(meta))
-        self.assertEqual(program.kernels[0].params_dict, restored.kernels[0].params_dict)
+        self.assertEqual(program.spec.params_dict, restored.spec.params_dict)
         for attr, value in [('input_layout', 'different'), ('input_pattern', 'different'),
-                            ('repeat_count', 8), ('schedule_pair', False)]:
+                            ('repeat_count', 8), ('schedule_pair', False), ('cache_cycle', False)]:
             changed = copy.deepcopy(program)
-            setattr(changed.kernels[0], attr, value)
+            setattr(changed.spec, attr, value)
             self.assertNotEqual(fuzzer._make_sig(program), fuzzer._make_sig(changed))
             self.assertNotEqual(fuzzer._kind_label(program), fuzzer._kind_label(changed))
+
+    def test_broadcast_storage_is_initialized_without_overlapping_writes(self):
+        from src.backends.common.probe_emitter import _layout
+        for layout in ('broadcast_rows', 'broadcast_cols'):
+            storage, view, strides, offset = _probe_input(3, 5, torch.float32, layout, 'indexed', 'cpu')
+            self.assertEqual((*strides, offset, storage.numel()), _layout(3, 5, layout))
+            if layout == 'broadcast_rows':
+                self.assertTrue(torch.equal(view[0], view[2]))
+            else:
+                self.assertTrue(torch.equal(view[:, 0], view[:, 4]))
+
+    @patch('torch.cuda.synchronize')
+    def test_cache_cycle_instantiates_in_execution_order(self, sync):
+        a = _probe_input(2, 3, torch.float32, 'offset', 'integer', 'cpu')
+        events = []
+        def factory(name):
+            def build():
+                events.append('compile-' + name)
+                def run(out):
+                    events.append('run-' + name)
+                    out[16:-16].copy_(a[1].reshape(-1))
+                return run
+            return build
+        _run_probe([factory('A'), factory('B'), factory('A')], [a], a[1], 'copy', 2, 0,
+                   instantiate=True)
+        self.assertEqual(events, ['compile-A', 'run-A', 'run-A', 'compile-B', 'run-B',
+                                  'run-B', 'compile-A', 'run-A', 'run-A'])
 
     @patch('torch.cuda.synchronize')
     def test_oracles_detect_injected_faults(self, sync):

@@ -1,0 +1,168 @@
+#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940
+#define _tl_orig_alignas alignas
+#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)
+#include <cuda.h>
+#undef alignas
+#define alignas _tl_orig_alignas
+#endif
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/scan.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void impl_kernel(const half_t* __restrict__ mem0, const half_t* __restrict__ mem1, signed char* __restrict__ out_e12, float* __restrict__ out_e21, float* __restrict__ out_e22, int* __restrict__ out_e9);
+extern "C" __global__ void __launch_bounds__(256, 1) impl_kernel(const half_t* __restrict__ mem0, const half_t* __restrict__ mem1, signed char* __restrict__ out_e12, float* __restrict__ out_e21, float* __restrict__ out_e22, int* __restrict__ out_e9) {
+  int e1[2];
+  signed char e2[2];
+  half_t e3[2];
+  half_t e4[2];
+  half_t e5[2];
+  half_t e6[2];
+  half_t e7[2];
+  int e8[2];
+  int e9[2];
+  int e10[2];
+  signed char e11[2];
+  signed char e12[2];
+  half_t e13[2];
+  half_t e14[2];
+  half_t e15[2];
+  int e16[2];
+  signed char e17[2];
+  half_t e18[2];
+  half_t e19[2];
+  half_t e20[2];
+  float e21[2];
+  float e22_wide[2];
+  float e22[1];
+  #pragma unroll
+  for (int i = 0; i < 2; ++i) {
+    e1[i] = (((24 - i) - (((int)threadIdx.x) * 2)) & 511);
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 2; ++i_1) {
+    e2[i_1] = (signed char)1;
+  }
+  #pragma unroll
+  for (int i_2 = 0; i_2 < 2; ++i_2) {
+    half_t condval;
+    if (((((((bool)e2[i_2]) && (0 <= e1[i_2])) && (e1[i_2] < 512)) && (-16 <= e1[i_2])) && (e1[i_2] < 528))) {
+      condval = mem0[(((((int64_t)((int)blockIdx.x)) * (int64_t)544) + ((int64_t)e1[((int64_t)i_2)])) + (int64_t)16)];
+    } else {
+      condval = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e3[i_2] = condval;
+  }
+  #pragma unroll
+  for (int i_3 = 0; i_3 < 2; ++i_3) {
+    e4[i_3] = (e3[i_3] * e3[i_3]);
+  }
+  #pragma unroll
+  for (int i_4 = 0; i_4 < 2; ++i_4) {
+    e5[i_4] = e4[i_4];
+  }
+  #pragma unroll
+  for (int i_5 = 0; i_5 < 2; ++i_5) {
+    e6[i_5] = half_t(0x1p-1f/*5.000000e-01*/);
+  }
+  #pragma unroll
+  for (int i_6 = 0; i_6 < 2; ++i_6) {
+    e7[i_6] = (e5[i_6] * e6[i_6]);
+  }
+  #pragma unroll
+  for (int i_7 = 0; i_7 < 2; ++i_7) {
+    e8[i_7] = 1;
+  }
+  #pragma unroll
+  for (int i_8 = 0; i_8 < 2; ++i_8) {
+    e9[i_8] = (e1[i_8] & e8[i_8]);
+  }
+  #pragma unroll
+  for (int i_9 = 0; i_9 < 2; ++i_9) {
+    e10[i_9] = 3;
+  }
+  #pragma unroll
+  for (int i_10 = 0; i_10 < 2; ++i_10) {
+    e11[i_10] = ((signed char)(e9[i_10] < e10[i_10]));
+  }
+  #pragma unroll
+  for (int i_11 = 0; i_11 < 2; ++i_11) {
+    e12[i_11] = ((signed char)(((bool)e11[i_11]) && ((bool)e2[i_11])));
+  }
+  #pragma unroll
+  for (int i_12 = 0; i_12 < 2; ++i_12) {
+    e13[i_12] = half_t(-0x1p-3f/*-1.250000e-01*/);
+  }
+  #pragma unroll
+  for (int i_13 = 0; i_13 < 2; ++i_13) {
+    half_t condval_1;
+    if (((bool)e12[i_13])) {
+      condval_1 = e7[i_13];
+    } else {
+      condval_1 = e13[i_13];
+    }
+    e14[i_13] = condval_1;
+  }
+  #pragma unroll
+  for (int i_14 = 0; i_14 < 2; ++i_14) {
+    e15[i_14] = (e14[i_14] + e7[i_14]);
+  }
+  #pragma unroll
+  for (int i_15 = 0; i_15 < 2; ++i_15) {
+    e16[i_15] = (((458 - i_15) - (((int)threadIdx.x) * 2)) & 511);
+  }
+  #pragma unroll
+  for (int i_16 = 0; i_16 < 2; ++i_16) {
+    e17[i_16] = (signed char)1;
+  }
+  #pragma unroll
+  for (int i_17 = 0; i_17 < 2; ++i_17) {
+    half_t condval_2;
+    if (((((((bool)e17[i_17]) && (0 <= e16[i_17])) && (e16[i_17] < 512)) && (-16 <= e16[i_17])) && (e16[i_17] < 528))) {
+      condval_2 = mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)544) + ((int64_t)e16[((int64_t)i_17)])) + (int64_t)16)];
+    } else {
+      condval_2 = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e18[i_17] = condval_2;
+  }
+  #pragma unroll
+  for (int i_18 = 0; i_18 < 2; ++i_18) {
+    e19[i_18] = (e15[i_18] + e18[i_18]);
+  }
+  #pragma unroll
+  for (int i_19 = 0; i_19 < 2; ++i_19) {
+    e20[i_19] = (e19[i_19] - e14[i_19]);
+  }
+  for (int i_20 = 0; i_20 < 2; ++i_20) {
+    e21[i_20] = ((float)e20[i_20]);
+  }
+  #pragma unroll
+  for (int i_21 = 0; i_21 < 2; ++i_21) {
+    e22_wide[i_21] = e21[i_21];
+  }
+  e22[0] = 0x0p+0f/*0.000000e+00*/;
+  #pragma unroll
+  for (int rv = 0; rv < 2; ++rv) {
+    e22[0] = (e22[0] + e22_wide[rv]);
+  }
+  e22[0] = tl::AllReduce<tl::SumOp, 8, 1, 0>::run(e22[0]);
+  for (int i_22 = 0; i_22 < 2; ++i_22) {
+    out_e21[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_22) + 16)] = e21[i_22];
+  }
+  for (int i_23 = 0; i_23 < 2; ++i_23) {
+    out_e9[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_23) + 16)] = e9[i_23];
+  }
+  for (int i_24 = 0; i_24 < 2; ++i_24) {
+    out_e12[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_24) + 16)] = ((signed char)((bool)e12[i_24]));
+  }
+  if ((((int)threadIdx.x) % 8) == 0) {
+    out_e22[(((((int)blockIdx.x) * 64) + (((int)threadIdx.x) >> 3)) + 16)] = e22[0];
+  }
+}
+

@@ -1,0 +1,111 @@
+{
+  "backend": "triton",
+  "success": true,
+  "torch": "2.4.0+cu124",
+  "backend_version": "3.0.0",
+  "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "capability": [
+    8,
+    9
+  ],
+  "stages": {
+    "import.torch": {
+      "calls": 1,
+      "seconds": 1.1621337229998971,
+      "exclusive_seconds": 1.1621337229998971
+    },
+    "import.backend": {
+      "calls": 1,
+      "seconds": 0.0807599139998274,
+      "exclusive_seconds": 0.0807599139998274
+    },
+    "runtime.cuda_context": {
+      "calls": 1,
+      "seconds": 0.12833324299936066,
+      "exclusive_seconds": 0.12833324299936066
+    },
+    "instrumentation.setup": {
+      "calls": 1,
+      "seconds": 9.922200024448102e-05,
+      "exclusive_seconds": 9.922200024448102e-05
+    },
+    "module.load": {
+      "calls": 1,
+      "seconds": 0.012847887999669183,
+      "exclusive_seconds": 0.012847887999669183
+    },
+    "runtime.inputs": {
+      "calls": 4,
+      "seconds": 0.024786148999737634,
+      "exclusive_seconds": 0.024786148999737634
+    },
+    "runtime.reference": {
+      "calls": 2,
+      "seconds": 0.16132522200041421,
+      "exclusive_seconds": 0.16132522200041421
+    },
+    "prepare_variant": {
+      "calls": 4,
+      "seconds": 0.00018458100021234713,
+      "exclusive_seconds": 0.00018458100021234713
+    },
+    "triton.frontend": {
+      "calls": 2,
+      "seconds": 0.02853169800073374,
+      "exclusive_seconds": 0.02853169800073374
+    },
+    "triton.ttir": {
+      "calls": 2,
+      "seconds": 0.008823631000268506,
+      "exclusive_seconds": 0.008823631000268506
+    },
+    "triton.ttgir": {
+      "calls": 2,
+      "seconds": 0.02527287199973216,
+      "exclusive_seconds": 0.02527287199973216
+    },
+    "triton.llir": {
+      "calls": 2,
+      "seconds": 0.15193527399969753,
+      "exclusive_seconds": 0.15193527399969753
+    },
+    "triton.ptx": {
+      "calls": 2,
+      "seconds": 0.027880210999683186,
+      "exclusive_seconds": 0.027880210999683186
+    },
+    "triton.cubin": {
+      "calls": 2,
+      "seconds": 0.07339225499981694,
+      "exclusive_seconds": 0.07339225499981694
+    },
+    "triton.compile_total": {
+      "calls": 2,
+      "seconds": 0.6616325819995836,
+      "exclusive_seconds": 0.34579664099965157
+    },
+    "runtime.kernel": {
+      "calls": 12,
+      "seconds": 1.6569083090016647,
+      "exclusive_seconds": 0.9952757270020811
+    },
+    "runtime.compare": {
+      "calls": 46,
+      "seconds": 0.141832546999467,
+      "exclusive_seconds": 0.141832546999467
+    },
+    "harness.total": {
+      "calls": 1,
+      "seconds": 2.048636911000358,
+      "exclusive_seconds": 0.06360010299886198
+    },
+    "worker": {
+      "calls": 1,
+      "seconds": 3.502310421999937,
+      "exclusive_seconds": 0.06949952100057999
+    }
+  },
+  "span_accounting_valid": true
+}

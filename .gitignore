@@ -32,3 +32,7 @@ reports/*/results_*/
 # OS
 .DS_Store
 Thumbs.db
+
+# Debug tensor dumps and scratch archive
+*.pt
+scratch_lp/_archive/

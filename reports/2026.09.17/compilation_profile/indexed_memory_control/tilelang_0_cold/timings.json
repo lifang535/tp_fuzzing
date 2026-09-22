@@ -1,0 +1,421 @@
+{
+  "backend": "tilelang",
+  "success": true,
+  "torch": "2.4.0+cu124",
+  "backend_version": "0.1.11",
+  "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "capability": [
+    8,
+    9
+  ],
+  "stages": {
+    "import.torch": {
+      "calls": 1,
+      "seconds": 1.5629384860003483,
+      "exclusive_seconds": 1.5629384860003483
+    },
+    "import.backend": {
+      "calls": 1,
+      "seconds": 1.0378458580007646,
+      "exclusive_seconds": 1.0378458580007646
+    },
+    "runtime.cuda_context": {
+      "calls": 1,
+      "seconds": 0.209057914999903,
+      "exclusive_seconds": 0.209057914999903
+    },
+    "instrumentation.setup": {
+      "calls": 1,
+      "seconds": 0.00041087399949901737,
+      "exclusive_seconds": 0.00041087399949901737
+    },
+    "module.load": {
+      "calls": 1,
+      "seconds": 0.26324420099990675,
+      "exclusive_seconds": 0.26324420099990675
+    },
+    "artifacts.progress": {
+      "calls": 34,
+      "seconds": 0.011307900002066162,
+      "exclusive_seconds": 0.011307900002066162
+    },
+    "tilelang.frontend": {
+      "calls": 4,
+      "seconds": 0.32896319900009985,
+      "exclusive_seconds": 0.32896319900009985
+    },
+    "artifacts.write": {
+      "calls": 8,
+      "seconds": 0.010628141002598568,
+      "exclusive_seconds": 0.010628141002598568
+    },
+    "tilelang.pass.pass_fn": {
+      "calls": 20,
+      "seconds": 0.01247455899920169,
+      "exclusive_seconds": 0.01247455899920169
+    },
+    "tilelang.pass.tirx.BindTarget": {
+      "calls": 8,
+      "seconds": 0.0011055920012950082,
+      "exclusive_seconds": 0.0011055920012950082
+    },
+    "tilelang.pass.tl.LegalizeNegativeIndex": {
+      "calls": 4,
+      "seconds": 0.050549771000987676,
+      "exclusive_seconds": 0.050549771000987676
+    },
+    "tilelang.pass.tl.VerifyParallelLoop": {
+      "calls": 4,
+      "seconds": 0.15074194400040142,
+      "exclusive_seconds": 0.15074194400040142
+    },
+    "tilelang.pass.tl.InjectAssumes": {
+      "calls": 4,
+      "seconds": 0.0002818789989760262,
+      "exclusive_seconds": 0.0002818789989760262
+    },
+    "tilelang.pass.tl.Simplify": {
+      "calls": 20,
+      "seconds": 0.34696411400091165,
+      "exclusive_seconds": 0.34696411400091165
+    },
+    "tilelang.pass.tl.LayoutReducer": {
+      "calls": 4,
+      "seconds": 0.015500902999519894,
+      "exclusive_seconds": 0.015500902999519894
+    },
+    "tilelang.pass.tl.LowerBlackwell2SM": {
+      "calls": 4,
+      "seconds": 5.9743999372585677e-05,
+      "exclusive_seconds": 5.9743999372585677e-05
+    },
+    "tilelang.pass.tl.IfStmtBinding": {
+      "calls": 4,
+      "seconds": 0.0003670469995995518,
+      "exclusive_seconds": 0.0003670469995995518
+    },
+    "tilelang.pass.tl.PipelinePlanning": {
+      "calls": 4,
+      "seconds": 0.00013539300107368035,
+      "exclusive_seconds": 0.00013539300107368035
+    },
+    "tilelang.pass.tl.InjectSoftwarePipeline": {
+      "calls": 4,
+      "seconds": 0.0004463700006454019,
+      "exclusive_seconds": 0.0004463700006454019
+    },
+    "tilelang.pass.tl.LayoutInference": {
+      "calls": 4,
+      "seconds": 6.865575185001035,
+      "exclusive_seconds": 6.865575185001035
+    },
+    "tilelang.pass.tl.LowerTileOp": {
+      "calls": 4,
+      "seconds": 0.4497123870005453,
+      "exclusive_seconds": 0.4497123870005453
+    },
+    "tilelang.pass.tl.LowerL2Persistent": {
+      "calls": 4,
+      "seconds": 0.00024500899962731637,
+      "exclusive_seconds": 0.00024500899962731637
+    },
+    "tilelang.pass.tl.LegalizeVectorizedLoop": {
+      "calls": 4,
+      "seconds": 0.03460560999974405,
+      "exclusive_seconds": 0.03460560999974405
+    },
+    "tilelang.pass.tl.LegalizeSafeMemoryAccess": {
+      "calls": 4,
+      "seconds": 0.022777701999984856,
+      "exclusive_seconds": 0.022777701999984856
+    },
+    "tilelang.pass.tl.LowerAccessPtr": {
+      "calls": 4,
+      "seconds": 0.00014679400010209065,
+      "exclusive_seconds": 0.00014679400010209065
+    },
+    "tilelang.pass.tl.HoistNonRestrictParams": {
+      "calls": 4,
+      "seconds": 6.182000106491614e-05,
+      "exclusive_seconds": 6.182000106491614e-05
+    },
+    "tilelang.pass.tl.LowerSharedTmem": {
+      "calls": 4,
+      "seconds": 0.00017434599976695608,
+      "exclusive_seconds": 0.00017434599976695608
+    },
+    "tilelang.pass.tl.PlanAndUpdateBufferAllocationLocation": {
+      "calls": 4,
+      "seconds": 0.0008175220000339323,
+      "exclusive_seconds": 0.0008175220000339323
+    },
+    "tilelang.pass.tl.LowerSharedBarrier": {
+      "calls": 4,
+      "seconds": 0.00010400299925095169,
+      "exclusive_seconds": 0.00010400299925095169
+    },
+    "tilelang.pass.tl.HoistGlobalBufferAllocations": {
+      "calls": 4,
+      "seconds": 4.7573000301781576e-05,
+      "exclusive_seconds": 4.7573000301781576e-05
+    },
+    "tilelang.pass.tl.LowerOpaqueBlock": {
+      "calls": 4,
+      "seconds": 0.0004039350005768938,
+      "exclusive_seconds": 0.0004039350005768938
+    },
+    "tilelang.pass.tirx.NarrowDataType": {
+      "calls": 4,
+      "seconds": 0.004455108000001928,
+      "exclusive_seconds": 0.004455108000001928
+    },
+    "tilelang.pass.tl.FlattenBuffer": {
+      "calls": 4,
+      "seconds": 0.015009018999080581,
+      "exclusive_seconds": 0.015009018999080581
+    },
+    "tilelang.pass.tl.ConfigIndexBitwidth": {
+      "calls": 4,
+      "seconds": 0.016375551000237465,
+      "exclusive_seconds": 0.016375551000237465
+    },
+    "tilelang.pass.tirx.Simplify": {
+      "calls": 16,
+      "seconds": 0.2098429989991928,
+      "exclusive_seconds": 0.2098429989991928
+    },
+    "tilelang.pass.tl.VectorizeLoop": {
+      "calls": 4,
+      "seconds": 0.0002742910000961274,
+      "exclusive_seconds": 0.0002742910000961274
+    },
+    "tilelang.pass.tir.StorageRewrite": {
+      "calls": 4,
+      "seconds": 0.001234616999681748,
+      "exclusive_seconds": 0.001234616999681748
+    },
+    "tilelang.pass.tl.LoopUnswitching": {
+      "calls": 4,
+      "seconds": 0.00019767400044656824,
+      "exclusive_seconds": 0.00019767400044656824
+    },
+    "tilelang.pass.tl.UnrollLoop": {
+      "calls": 4,
+      "seconds": 0.000260648998846591,
+      "exclusive_seconds": 0.000260648998846591
+    },
+    "tilelang.pass.s_tir.RenormalizeSplitPattern": {
+      "calls": 4,
+      "seconds": 0.028640966000239132,
+      "exclusive_seconds": 0.028640966000239132
+    },
+    "tilelang.pass.tirx.RemoveNoOp": {
+      "calls": 8,
+      "seconds": 0.083390849999887,
+      "exclusive_seconds": 0.083390849999887
+    },
+    "tilelang.pass.s_tir.InsertHoistIfThenElse": {
+      "calls": 4,
+      "seconds": 0.01623380100045324,
+      "exclusive_seconds": 0.01623380100045324
+    },
+    "tilelang.pass.s_tir.HoistIfThenElse": {
+      "calls": 4,
+      "seconds": 0.10730420100026095,
+      "exclusive_seconds": 0.0007910020003691898
+    },
+    "tilelang.pass.tirx.VerifyMemory": {
+      "calls": 4,
+      "seconds": 0.00014961299984861398,
+      "exclusive_seconds": 0.00014961299984861398
+    },
+    "tilelang.pass.tirx.AnnotateEntryFunc": {
+      "calls": 4,
+      "seconds": 3.74530009139562e-05,
+      "exclusive_seconds": 3.74530009139562e-05
+    },
+    "tilelang.pass.s_tir.InferFragment": {
+      "calls": 4,
+      "seconds": 0.0003021590009666397,
+      "exclusive_seconds": 0.0003021590009666397
+    },
+    "tilelang.pass.tl.LowerThreadAllreduce": {
+      "calls": 4,
+      "seconds": 0.00030301899914775277,
+      "exclusive_seconds": 0.00030301899914775277
+    },
+    "tilelang.pass.tl.LowerLDGSTG": {
+      "calls": 4,
+      "seconds": 2.355699962208746e-05,
+      "exclusive_seconds": 2.355699962208746e-05
+    },
+    "tilelang.pass.tl.LowerHopperIntrin": {
+      "calls": 4,
+      "seconds": 0.00014560300132870907,
+      "exclusive_seconds": 0.00014560300132870907
+    },
+    "tilelang.pass.tl.AnnotateDeviceRegions": {
+      "calls": 4,
+      "seconds": 2.3303000489249825e-05,
+      "exclusive_seconds": 2.3303000489249825e-05
+    },
+    "tilelang.pass.tirx.ConvertSSA": {
+      "calls": 4,
+      "seconds": 0.0002618590006022714,
+      "exclusive_seconds": 0.0002618590006022714
+    },
+    "tilelang.pass.tl.SplitHostDevice": {
+      "calls": 4,
+      "seconds": 0.001531676000013249,
+      "exclusive_seconds": 0.0012698169994109776
+    },
+    "tilelang.pass.tl.MarkCudaSyncCalls": {
+      "calls": 4,
+      "seconds": 0.00016232899906754028,
+      "exclusive_seconds": 0.00016232899906754028
+    },
+    "tilelang.pass.tl.AnnotateReadOnlyParams": {
+      "calls": 4,
+      "seconds": 9.869400037132436e-05,
+      "exclusive_seconds": 9.869400037132436e-05
+    },
+    "tilelang.pass.tl.MergeSharedMemoryAllocations": {
+      "calls": 4,
+      "seconds": 7.332099903578637e-05,
+      "exclusive_seconds": 7.332099903578637e-05
+    },
+    "tilelang.pass.tl.InjectFenceProxy": {
+      "calls": 4,
+      "seconds": 1.8866999198507983e-05,
+      "exclusive_seconds": 1.8866999198507983e-05
+    },
+    "tilelang.pass.tl.ThreadSync": {
+      "calls": 8,
+      "seconds": 0.0321338019994073,
+      "exclusive_seconds": 0.0321338019994073
+    },
+    "tilelang.pass.tl.InjectTcgen05Fence": {
+      "calls": 4,
+      "seconds": 4.226000055496115e-05,
+      "exclusive_seconds": 4.226000055496115e-05
+    },
+    "tilelang.pass.tl.MergeIfStmt": {
+      "calls": 4,
+      "seconds": 0.00020456299989746185,
+      "exclusive_seconds": 0.00020456299989746185
+    },
+    "tilelang.pass.tl.MakePackedAPI": {
+      "calls": 4,
+      "seconds": 0.007212624998828687,
+      "exclusive_seconds": 0.007212624998828687
+    },
+    "tilelang.pass.tl.LowerDeviceKernelLaunch": {
+      "calls": 4,
+      "seconds": 0.000836247998449835,
+      "exclusive_seconds": 0.000836247998449835
+    },
+    "tilelang.pass.tl.PersistThreadblock": {
+      "calls": 4,
+      "seconds": 0.0002659900001162896,
+      "exclusive_seconds": 0.0002659900001162896
+    },
+    "tilelang.pass.tirx.Filter": {
+      "calls": 8,
+      "seconds": 0.000578933001634141,
+      "exclusive_seconds": 0.000578933001634141
+    },
+    "tilelang.lower_to_host_device_ir": {
+      "calls": 4,
+      "seconds": 8.336859418999666,
+      "exclusive_seconds": 0.019684184998368437
+    },
+    "tilelang.pass.tl.LowerIntrin": {
+      "calls": 8,
+      "seconds": 0.056983948000379314,
+      "exclusive_seconds": 0.056983948000379314
+    },
+    "tilelang.nvcc": {
+      "calls": 4,
+      "seconds": 13.411419953000404,
+      "exclusive_seconds": 13.411419953000404
+    },
+    "tilelang.device_codegen": {
+      "calls": 4,
+      "seconds": 13.493369277000056,
+      "exclusive_seconds": 0.007701683000050252
+    },
+    "tilelang.pass.tirx.FP8StorageLegalize": {
+      "calls": 4,
+      "seconds": 0.0004424340004334226,
+      "exclusive_seconds": 0.0004424340004334226
+    },
+    "tilelang.pass.tirx.BF16StorageLegalize": {
+      "calls": 4,
+      "seconds": 0.00013381200005824212,
+      "exclusive_seconds": 0.00013381200005824212
+    },
+    "tilelang.pass.tirx.LowerTVMBuiltin": {
+      "calls": 4,
+      "seconds": 0.0011213870002393378,
+      "exclusive_seconds": 0.0011213870002393378
+    },
+    "tilelang.pass.tirx.LowerCustomDatatypes": {
+      "calls": 4,
+      "seconds": 0.00021623200063913828,
+      "exclusive_seconds": 0.00021623200063913828
+    },
+    "tilelang.host_codegen": {
+      "calls": 4,
+      "seconds": 0.04648042599819746,
+      "exclusive_seconds": 0.004855743995904049
+    },
+    "tilelang.adapter": {
+      "calls": 4,
+      "seconds": 0.0010696700010157656,
+      "exclusive_seconds": 0.0010696700010157656
+    },
+    "tilelang.compile_total": {
+      "calls": 4,
+      "seconds": 21.881129148999207,
+      "exclusive_seconds": 0.003350357000272197
+    },
+    "prepare_all": {
+      "calls": 1,
+      "seconds": 26.10582571699979,
+      "exclusive_seconds": 3.882163312996454
+    },
+    "runtime.inputs": {
+      "calls": 2,
+      "seconds": 0.0030947739996918244,
+      "exclusive_seconds": 0.0030947739996918244
+    },
+    "runtime.reference": {
+      "calls": 6,
+      "seconds": 0.009208592999129905,
+      "exclusive_seconds": 0.009208592999129905
+    },
+    "runtime.kernel": {
+      "calls": 72,
+      "seconds": 1.2752501379945897,
+      "exclusive_seconds": 1.2752501379945897
+    },
+    "runtime.compare": {
+      "calls": 540,
+      "seconds": 0.6512296879964197,
+      "exclusive_seconds": 0.6512296879964197
+    },
+    "harness.total": {
+      "calls": 1,
+      "seconds": 28.331298930999765,
+      "exclusive_seconds": 0.27832403600950784
+    },
+    "worker": {
+      "calls": 1,
+      "seconds": 31.43262263900033,
+      "exclusive_seconds": 0.027826374000142096
+    }
+  },
+  "span_accounting_valid": true
+}

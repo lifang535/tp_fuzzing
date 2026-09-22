@@ -1,0 +1,642 @@
+[
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.002876970000215806,
+    "signature": 0.0004121900001337053,
+    "mutate": 0.00032170600024983287,
+    "feedback": 0.00014478200046141865
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.004551887999696191,
+    "signature": 0.0006350879993988201,
+    "mutate": 0.0032904919999054982,
+    "feedback": 0.001095453999369056
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.002068599000267568,
+    "signature": 0.0003786939996643923,
+    "mutate": 0.0010036249996119295,
+    "feedback": 0.0008147439993990702
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 4.627999987860676e-05,
+    "signature": 5.240100017545046e-05,
+    "mutate": 0.00016733899974497035,
+    "feedback": 4.669299960369244e-05
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0032104080000863178,
+    "signature": 0.0005198110002311296,
+    "mutate": 0.0008136220003507333,
+    "feedback": 0.0011144849995616823
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.0037331200001062825,
+    "signature": 0.003238779999264807,
+    "mutate": 0.0019286990000182413,
+    "feedback": 0.007434162999743421
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.0008934730003602454,
+    "signature": 0.000875851000273542,
+    "mutate": 0.0006377780000548228,
+    "feedback": 0.00201337000089552
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0025203880004482926,
+    "signature": 0.0004046399999424466,
+    "mutate": 0.0034360689996901783,
+    "feedback": 0.0012686079999184585
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.012336606000644679,
+    "signature": 0.0005670330001521506,
+    "mutate": 0.0037462840000443975,
+    "feedback": 0.0012049480001223856
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0023540330003015697,
+    "signature": 0.0003945259995816741,
+    "mutate": 0.000716315999852668,
+    "feedback": 0.0009057480001501972
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.003637877000073786,
+    "signature": 0.00046931500037317164,
+    "mutate": 0.001267729000574036,
+    "feedback": 0.0011034179997295723
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0032811730006869766,
+    "signature": 0.0004740390004371875,
+    "mutate": 0.0019343650001246715,
+    "feedback": 0.001277175999348401
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0028802090000681346,
+    "signature": 0.000567860000046494,
+    "mutate": 0.0017081850000977283,
+    "feedback": 0.0012662780000027851
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.002999000999807322,
+    "signature": 0.0005135410001457785,
+    "mutate": 0.0016065619993241853,
+    "feedback": 0.0015044149995446787
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.001364790000479843,
+    "signature": 0.002357590999963577,
+    "mutate": 0.003100257000369311,
+    "feedback": 0.004153529999712191
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0041198729995812755,
+    "signature": 0.0005552880002142047,
+    "mutate": 0.001919560000715137,
+    "feedback": 0.0012649020000026212
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.003933277999749407,
+    "signature": 0.0004459849997147103,
+    "mutate": 0.0013289309999890975,
+    "feedback": 0.001198212999952375
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0033800129995142925,
+    "signature": 0.0004879439993601409,
+    "mutate": 0.0019592850003391504,
+    "feedback": 0.0011056529992856667
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 9.236999994755024e-05,
+    "signature": 6.819199916208163e-05,
+    "mutate": 0.0002366010003242991,
+    "feedback": 6.445399958465714e-05
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0036592739998013712,
+    "signature": 0.00046287599980132654,
+    "mutate": 0.00139437999951042,
+    "feedback": 0.0011432809997131699
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.004047497999636107,
+    "signature": 0.0004464510002435418,
+    "mutate": 0.0018678679998629377,
+    "feedback": 0.0011126849994980148
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.0010981539999193046,
+    "signature": 0.0018003010000029462,
+    "mutate": 0.002433917000416841,
+    "feedback": 0.0034672049996515852
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.003099536999798147,
+    "signature": 0.0005191959999137907,
+    "mutate": 0.0015572400006931275,
+    "feedback": 0.0011791719998655026
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0036192409997966024,
+    "signature": 0.0004590109992932412,
+    "mutate": 0.0012250390000190237,
+    "feedback": 0.0011390660001779906
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.003338127999995777,
+    "signature": 0.0004857519998040516,
+    "mutate": 0.0017735810006342945,
+    "feedback": 0.0011534690002008574
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.002511491999939608,
+    "signature": 0.0004565540002658963,
+    "mutate": 0.0036914890006300993,
+    "feedback": 0.0010113980006281054
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0031033490004119813,
+    "signature": 0.00043673900017893175,
+    "mutate": 0.004370612999991863,
+    "feedback": 0.0011428039997554151
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.00273330799973337,
+    "signature": 0.0005234970003584749,
+    "mutate": 0.0038051250003263704,
+    "feedback": 0.0011614220002229558
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0030585940003220458,
+    "signature": 0.00045214799956738716,
+    "mutate": 0.0006740919998264872,
+    "feedback": 0.0011155970005347626
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.00279799500003719,
+    "signature": 0.00043804200049635256,
+    "mutate": 0.003558113000508456,
+    "feedback": 0.0010372169999754988
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.003557400999852689,
+    "signature": 0.0005017749999751686,
+    "mutate": 0.0016536240000277758,
+    "feedback": 0.0010703859998102416
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.001250297000296996,
+    "signature": 0.002019153000219376,
+    "mutate": 0.001212710999425326,
+    "feedback": 0.0037901180003245827
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.0006217969994395389,
+    "signature": 0.0009084909997909563,
+    "mutate": 0.00045120600043446757,
+    "feedback": 0.002053888999398623
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 9.245399996871129e-05,
+    "signature": 6.581999969057506e-05,
+    "mutate": 0.0002009109994105529,
+    "feedback": 5.587499981629662e-05
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0031858390002525994,
+    "signature": 0.0008934630004659994,
+    "mutate": 0.003295258999969519,
+    "feedback": 0.0009638260007704957
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.003220966000299086,
+    "signature": 0.0004727670002466766,
+    "mutate": 0.0007913389999885112,
+    "feedback": 0.0010726210002758307
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 0.0033335429998260224,
+    "signature": 0.0004728419999082689,
+    "mutate": 0.00157068899989099,
+    "feedback": 0.0011806219999925816
+  },
+  {
+    "backend": "tilelang",
+    "extended": false,
+    "generate": 7.222600015666103e-05,
+    "signature": 5.842800055688713e-05,
+    "mutate": 0.00024021199988055741,
+    "feedback": 6.265299998631235e-05
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.0006439199996748357,
+    "signature": 0.0007550350001110928,
+    "mutate": 0.0008387309999307035,
+    "feedback": 0.0016957839998212876
+  },
+  {
+    "backend": "tilelang",
+    "extended": true,
+    "generate": 0.000506889999996929,
+    "signature": 0.0006293689993981388,
+    "mutate": 0.0009808450004129554,
+    "feedback": 0.001679474999946251
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.00011584900039451895,
+    "signature": 7.487400034733582e-05,
+    "mutate": 0.00020232000042597065,
+    "feedback": 6.251600007090019e-05
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0025756269997145864,
+    "signature": 0.000527668999893649,
+    "mutate": 0.0018704519998209435,
+    "feedback": 0.0010661180003808113
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.001811993000046641,
+    "signature": 0.0003229769999961718,
+    "mutate": 0.000700960999893141,
+    "feedback": 0.0007953530002851039
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 6.0461000430223066e-05,
+    "signature": 7.476900009351084e-05,
+    "mutate": 0.0001770940007190802,
+    "feedback": 5.09510000483715e-05
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.003292249999503838,
+    "signature": 0.0004150400000071386,
+    "mutate": 0.0007728059999863035,
+    "feedback": 0.0010320500005036592
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.001904955000100017,
+    "signature": 0.0030838560005577165,
+    "mutate": 0.002041286999883596,
+    "feedback": 0.006696812999507529
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.0007360670006164582,
+    "signature": 0.0010052449997601798,
+    "mutate": 0.0007049840005493024,
+    "feedback": 0.0019882810001945472
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0021749699999418226,
+    "signature": 0.000646874999802094,
+    "mutate": 0.000879960000020219,
+    "feedback": 0.0008625699992990121
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0038586590007980703,
+    "signature": 0.0005608800001937198,
+    "mutate": 0.000783587000114494,
+    "feedback": 0.001180092999675253
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 6.147800013422966e-05,
+    "signature": 5.412700011220295e-05,
+    "mutate": 0.0002488860000084969,
+    "feedback": 8.1101999967359e-05
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0029231529997559846,
+    "signature": 0.0005823470000905218,
+    "mutate": 0.0008053080000536283,
+    "feedback": 0.0013378479998209514
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.001161389999651874,
+    "signature": 0.001932046000547416,
+    "mutate": 0.001059616000020469,
+    "feedback": 0.003551557999344368
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0036631390003094566,
+    "signature": 0.0005454510001072777,
+    "mutate": 0.0030466049993265187,
+    "feedback": 0.001230185000167694
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.00086125699999684,
+    "signature": 0.0016293290000248817,
+    "mutate": 0.0014037419996384415,
+    "feedback": 0.0019358170002305997
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0033723149999786983,
+    "signature": 0.0005037559994889307,
+    "mutate": 0.0033428840006308747,
+    "feedback": 0.0012277280002308544
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.00298385599944595,
+    "signature": 0.0005211130001043784,
+    "mutate": 0.0016878410006029299,
+    "feedback": 0.0011400190005588229
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.000585904999752529,
+    "signature": 0.0009628300003896584,
+    "mutate": 0.0010719319998315768,
+    "feedback": 0.001554686999952537
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 8.103799973468995e-05,
+    "signature": 6.873199981782818e-05,
+    "mutate": 0.00020998699983465485,
+    "feedback": 5.2940999921702314e-05
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0026836499991986784,
+    "signature": 0.0005375179998736712,
+    "mutate": 0.0013413220003712922,
+    "feedback": 0.0012268919999769423
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.005074814999716182,
+    "signature": 0.0006769410001652432,
+    "mutate": 0.002676787000382319,
+    "feedback": 0.0017087260002881521
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.003864473000248836,
+    "signature": 0.0009988259998863214,
+    "mutate": 0.005734099000619608,
+    "feedback": 0.0014628150001954054
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.003743033000318974,
+    "signature": 0.0008440900001005502,
+    "mutate": 0.0022387550006897072,
+    "feedback": 0.0015998760000002221
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.004976227000042854,
+    "signature": 0.0008060380005190382,
+    "mutate": 0.0023464080004487187,
+    "feedback": 0.0014524160005748854
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0025486009999440284,
+    "signature": 0.0002453380002407357,
+    "mutate": 0.0008442700000159675,
+    "feedback": 0.0007151310001063393
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 7.054300021991367e-05,
+    "signature": 6.487700011348352e-05,
+    "mutate": 0.000220704000639671,
+    "feedback": 5.993099966872251e-05
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.003391631000340567,
+    "signature": 0.0004340489995229291,
+    "mutate": 0.0036443520002649166,
+    "feedback": 0.0011237629996685428
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0031311390002883854,
+    "signature": 0.0004723450001620222,
+    "mutate": 0.002691985000637942,
+    "feedback": 0.0011130339998999261
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0026754629998322343,
+    "signature": 0.0005876010000065435,
+    "mutate": 0.0007323710005948669,
+    "feedback": 0.0011124089996883413
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0031653030000597937,
+    "signature": 0.0005199270008233725,
+    "mutate": 0.0009762899999259389,
+    "feedback": 0.0014815600006841123
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.003199616000529204,
+    "signature": 0.000544370000170602,
+    "mutate": 0.0017726820005918853,
+    "feedback": 0.001305695999690215
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0026249250004184432,
+    "signature": 0.000341043999469548,
+    "mutate": 0.0011582659999476164,
+    "feedback": 0.0008037080006033648
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.0006736790001014015,
+    "signature": 0.001031116999911319,
+    "mutate": 0.001320923999628576,
+    "feedback": 0.0024246389994004858
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0048843100003068685,
+    "signature": 0.00043267299952276517,
+    "mutate": 0.0010827250007423572,
+    "feedback": 0.001076847000149428
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.001892321000013908,
+    "signature": 0.0003881600005115615,
+    "mutate": 0.0034225019999212236,
+    "feedback": 0.0007382910007436294
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.0021716760002163937,
+    "signature": 0.003801460999966366,
+    "mutate": 0.00460029699934239,
+    "feedback": 0.007157316999837349
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0026968349993694574,
+    "signature": 0.0005577769998126314,
+    "mutate": 0.0017983529996854486,
+    "feedback": 0.001350917000308982
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.0007904389995019301,
+    "signature": 0.001422995000211813,
+    "mutate": 0.001451271999940218,
+    "feedback": 0.0023295689998121816
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.0029375979993346846,
+    "signature": 0.0004530910000539734,
+    "mutate": 0.002367290999245597,
+    "feedback": 0.001185694999549014
+  },
+  {
+    "backend": "triton",
+    "extended": false,
+    "generate": 0.00011382699995010626,
+    "signature": 0.00012878999950771686,
+    "mutate": 0.0002778610005407245,
+    "feedback": 6.186900009197416e-05
+  },
+  {
+    "backend": "triton",
+    "extended": true,
+    "generate": 0.0012796009996236535,
+    "signature": 0.001729397999952198,
+    "mutate": 0.0023190100000647362,
+    "feedback": 0.0030603949999203905
+  }
+]

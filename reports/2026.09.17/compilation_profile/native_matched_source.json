@@ -1,0 +1,5 @@
+{
+  "source": "results/2026.09.17-20.03_tilelang_hard-shape_seed=42/passed/passed_calls_main(f1)__f0()__f1(f0+f0)_3728b87b87574ed9.json",
+  "estimated_logical_elements": 14954939,
+  "reason": "Original Triton-only schedule failed TileLang warp partition. This unmodified source had passed TileLang and has block_K >= 16."
+}

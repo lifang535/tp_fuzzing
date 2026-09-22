@@ -1,0 +1,10 @@
+{
+  "tilelang_gemm": "results/2026.07.08-15.44_tilelang_easy-shape_seed=42/failed/wrong_result/failed_single_gemm_M4,N64,K4,bM16,bN64,bK8,t128,serial,s1,float16.json",
+  "tilelang_dynamic_gemm_softmax": "results/2026.07.08-15.44_tilelang_easy-shape_seed=42/failed/wrong_result/failed_dynamic_gemm+softmax_M1,N32,K2,bM16,bN32,bK8,t128,serial,s4,float32.json",
+  "tilelang_dynamic_gemm_accumulate_reduce_copy_f2g": "results/2026.07.08-15.44_tilelang_easy-shape_seed=42/failed/wrong_result/failed_dynamic_gemm+accumulate_reduce+copy_f2g_M32,N2,K2,bM32,bN32,bK8,t128,serial,s1,float32.json",
+  "triton_softmax": "results/2026.07.08-15.02_triton_easy-shape_seed=42/failed/wrong_result/failed_single_softmax_M8,N16,K8,bM16,bN16,bK16,t128,serial,s1,float32.json",
+  "triton_dynamic_gemm_softmax": "results/2026.07.08-15.02_triton_easy-shape_seed=42/failed/wrong_result/failed_dynamic_gemm+softmax_M16,N16,K1,bM16,bN16,bK16,t128,serial,s1,float16.json",
+  "triton_dynamic_gemm_accumulate_reduce_copy_f2g": "results/2026.07.08-15.02_triton_hard-shape_seed=42/failed/wrong_result/failed_dynamic_gemm+accumulate_reduce+copy_f2g_M64,N9013,K1042,bM64,bN128,bK16,t128,pipelined,s1,float32.json",
+  "cpasync_odd": "results/2026.07.08-15.44_tilelang_hard-shape_seed=42/failed/ptx_async_boundary/failed_single_gemm_M1,N191,K17,bM16,bN32,bK16,t128,pipelined,s2,float16.json",
+  "warp_small": "results/2026.07.08-15.44_tilelang_easy-shape_seed=42/failed/warp_partition/failed_pipeline_gemm+sqrt+where+softmax_M4,N16,K4,bM16,bN16,bK8,t128,pipelined,s1,float32.json"
+}

@@ -1,0 +1,94 @@
+[
+  {
+    "variant": "tilelang_0",
+    "options": {
+      "threads": 32,
+      "stages": 1,
+      "pass_configs": {}
+    },
+    "stages": {
+      "tir": {
+        "sha256": "e4456f639a4a643e42bed201c3a6abde29baf944152af3fe73e0620babe39245",
+        "bytes": 29726
+      },
+      "cuda": {
+        "sha256": "fda878685531300c78a1c92a29d65e7a600d88cd6fbd0bd6ab89b27d71fa27a7",
+        "bytes": 29511
+      }
+    },
+    "features": [
+      "[\"compiler\",\"cuda\",\"mma.h\"]"
+    ],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_1",
+    "options": {
+      "threads": 32,
+      "stages": 1,
+      "pass_configs": {}
+    },
+    "stages": {
+      "tir": {
+        "sha256": "831778022ea915c1ae9241acc11405b264dcdba88cd387545b5689155c483496",
+        "bytes": 30982
+      },
+      "cuda": {
+        "sha256": "4f815bb05dbae461c7699c0411277fcfc71cce501cb92e2de94d7dbe91d4beaa",
+        "bytes": 31584
+      }
+    },
+    "features": [
+      "[\"compiler\",\"cuda\",\"mma.h\"]"
+    ],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_2",
+    "options": {
+      "threads": 32,
+      "stages": 2,
+      "pass_configs": {
+        "tirx.disable_vectorize": true
+      }
+    },
+    "stages": {
+      "tir": {
+        "sha256": "21b32bfee37394a30c91cd9bfb302004c0c1847d8d1ed3033f1c20c9ad8b669c",
+        "bytes": 29726
+      },
+      "cuda": {
+        "sha256": "08c8e3e0a255a300c6fb0bc1b6aea386575f3fa05a9026e9645576ae0694d43d",
+        "bytes": 28631
+      }
+    },
+    "features": [
+      "[\"compiler\",\"cuda\",\"mma.h\"]"
+    ],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_3",
+    "options": {
+      "threads": 32,
+      "stages": 2,
+      "pass_configs": {
+        "tirx.disable_vectorize": true
+      }
+    },
+    "stages": {
+      "tir": {
+        "sha256": "654750368ea9cf281a5db2add09d1db0a939297e76a05dd2f93ac082a3b54762",
+        "bytes": 30982
+      },
+      "cuda": {
+        "sha256": "43057c14335473ae9115f6929c095f0957885d8a667f81cac291a9ef459477ac",
+        "bytes": 31085
+      }
+    },
+    "features": [
+      "[\"compiler\",\"cuda\",\"mma.h\"]"
+    ],
+    "complete": true
+  }
+]

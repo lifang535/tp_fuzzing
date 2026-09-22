@@ -1,0 +1,91 @@
+{
+  "backend": "triton",
+  "success": true,
+  "torch": "2.4.0+cu124",
+  "backend_version": "3.0.0",
+  "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "capability": [
+    8,
+    9
+  ],
+  "stages": {
+    "import.torch": {
+      "calls": 1,
+      "seconds": 1.0203013310001552,
+      "exclusive_seconds": 1.0203013310001552
+    },
+    "import.backend": {
+      "calls": 1,
+      "seconds": 0.06670437600041623,
+      "exclusive_seconds": 0.06670437600041623
+    },
+    "runtime.cuda_context": {
+      "calls": 1,
+      "seconds": 0.11285352499999135,
+      "exclusive_seconds": 0.11285352499999135
+    },
+    "instrumentation.setup": {
+      "calls": 1,
+      "seconds": 0.00010456699965288863,
+      "exclusive_seconds": 0.00010456699965288863
+    },
+    "module.load": {
+      "calls": 1,
+      "seconds": 0.06162519900044572,
+      "exclusive_seconds": 0.06162519900044572
+    },
+    "artifacts.progress": {
+      "calls": 30,
+      "seconds": 0.007900110997979937,
+      "exclusive_seconds": 0.007900110997979937
+    },
+    "triton.compile_total": {
+      "calls": 4,
+      "seconds": 0.30599103100030334,
+      "exclusive_seconds": 0.30599103100030334
+    },
+    "artifacts.write": {
+      "calls": 4,
+      "seconds": 0.049230269000872795,
+      "exclusive_seconds": 0.049230269000872795
+    },
+    "prepare_all": {
+      "calls": 1,
+      "seconds": 0.3564130579998164,
+      "exclusive_seconds": 0.0005332419987098547
+    },
+    "runtime.inputs": {
+      "calls": 2,
+      "seconds": 0.0022730560003765277,
+      "exclusive_seconds": 0.0022730560003765277
+    },
+    "runtime.reference": {
+      "calls": 6,
+      "seconds": 0.02955085399935342,
+      "exclusive_seconds": 0.02955085399935342
+    },
+    "runtime.kernel": {
+      "calls": 72,
+      "seconds": 0.015579684996737342,
+      "exclusive_seconds": 0.015579684996737342
+    },
+    "runtime.compare": {
+      "calls": 1290,
+      "seconds": 1.0144008770021173,
+      "exclusive_seconds": 1.0144008770021173
+    },
+    "harness.total": {
+      "calls": 1,
+      "seconds": 2.0369223089992374,
+      "exclusive_seconds": 0.6114631840027869
+    },
+    "worker": {
+      "calls": 1,
+      "seconds": 3.372974328000055,
+      "exclusive_seconds": 0.074463021000156
+    }
+  },
+  "span_accounting_valid": true
+}

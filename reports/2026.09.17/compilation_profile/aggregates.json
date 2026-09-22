@@ -1,0 +1,522 @@
+[
+  {
+    "case": "arithmetic_control",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 36.28484702999958,
+      "emit": 0.004063308999320725,
+      "startup_imports": 2.5819076199995834,
+      "layout_inference": 11.805416487000002,
+      "nvcc": 13.74486476400034,
+      "other_compilation": 3.5398333949960943,
+      "reference": 0.008435933999862755,
+      "execution_checks": 4.583284598001228,
+      "artifact_io": 0.02110423200247169
+    },
+    "median_seconds": 36.28484702999958,
+    "min_seconds": 36.28484702999958,
+    "max_seconds": 36.28484702999958
+  },
+  {
+    "case": "arithmetic_control",
+    "backend": "tilelang",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 4.1941455060004955,
+      "emit": 0.0027051399993069936,
+      "startup_imports": 2.821782759000598,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.353359738999643,
+      "reference": 0.005691583997759153,
+      "execution_checks": 0.9971500090041445,
+      "artifact_io": 0.016161414998350665
+    },
+    "median_seconds": 4.1941455060004955,
+    "min_seconds": 4.1941455060004955,
+    "max_seconds": 4.1941455060004955
+  },
+  {
+    "case": "arithmetic_control",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 4.106979058999968,
+      "emit": 1.5778221390000908,
+      "startup_imports": 1.6418641449999996,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.7159956490004333,
+      "reference": 0.005137416997968103,
+      "execution_checks": 1.71327631600343,
+      "artifact_io": 0.030705531998137303
+    },
+    "median_seconds": 4.106979058999968,
+    "min_seconds": 4.106979058999968,
+    "max_seconds": 4.106979058999968
+  },
+  {
+    "case": "arithmetic_control",
+    "backend": "triton",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 2.737260592999519,
+      "emit": 0.0023874630005593644,
+      "startup_imports": 1.465922755000065,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.2740224409981238,
+      "reference": 0.004777231998559728,
+      "execution_checks": 0.9657347500005926,
+      "artifact_io": 0.026803415002177644
+    },
+    "median_seconds": 2.737260592999519,
+    "min_seconds": 2.737260592999519,
+    "max_seconds": 2.737260592999519
+  },
+  {
+    "case": "control_calls_control",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 169.97116854700016,
+      "emit": 0.005367020000448974,
+      "startup_imports": 7.744880478000596,
+      "layout_inference": 125.15853600499759,
+      "nvcc": 25.22374153200053,
+      "other_compilation": 7.845003445003385,
+      "reference": 0.03270738600167533,
+      "execution_checks": 3.9274770289994194,
+      "artifact_io": 0.03882267199696798
+    },
+    "median_seconds": 169.97116854700016,
+    "min_seconds": 169.97116854700016,
+    "max_seconds": 169.97116854700016
+  },
+  {
+    "case": "control_calls_control",
+    "backend": "tilelang",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 6.705591846999596,
+      "emit": 0.07916849499997625,
+      "startup_imports": 4.124965137999425,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 1.1904967399987072,
+      "reference": 0.013937294001152623,
+      "execution_checks": 1.3541164449989083,
+      "artifact_io": 0.02207623000140302
+    },
+    "median_seconds": 6.705591846999596,
+    "min_seconds": 6.705591846999596,
+    "max_seconds": 6.705591846999596
+  },
+  {
+    "case": "control_calls_control",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 4.361711653000384,
+      "emit": 1.0770637530004024,
+      "startup_imports": 1.7220280490000732,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.8156323199991675,
+      "reference": 0.010249632999148162,
+      "execution_checks": 1.7853070359969934,
+      "artifact_io": 0.028494615005001833
+    },
+    "median_seconds": 4.361711653000384,
+    "min_seconds": 4.361711653000384,
+    "max_seconds": 4.361711653000384
+  },
+  {
+    "case": "control_calls_control",
+    "backend": "triton",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 4.2389148639995256,
+      "emit": 0.003652909999800613,
+      "startup_imports": 1.6887346479998087,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.39021820700145327,
+      "reference": 0.010537555001064902,
+      "execution_checks": 2.1097461359941008,
+      "artifact_io": 0.03967831800309796
+    },
+    "median_seconds": 4.2389148639995256,
+    "min_seconds": 4.2389148639995256,
+    "max_seconds": 4.2389148639995256
+  },
+  {
+    "case": "indexed_memory_control",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 32.028106253999795,
+      "emit": 0.013264237999464967,
+      "startup_imports": 3.69680732300003,
+      "layout_inference": 6.865575185001035,
+      "nvcc": 13.411419953000404,
+      "other_compilation": 5.815260522994322,
+      "reference": 0.009208592999129905,
+      "execution_checks": 2.207898636000209,
+      "artifact_io": 0.02193604100466473
+    },
+    "median_seconds": 32.028106253999795,
+    "min_seconds": 32.028106253999795,
+    "max_seconds": 32.028106253999795
+  },
+  {
+    "case": "indexed_memory_control",
+    "backend": "tilelang",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 3.9398463140005333,
+      "emit": 0.002565169999797945,
+      "startup_imports": 2.7008419180010605,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.2998416449991055,
+      "reference": 0.010231383001155336,
+      "execution_checks": 0.9096261220001907,
+      "artifact_io": 0.01930524599902128
+    },
+    "median_seconds": 3.9398463140005333,
+    "min_seconds": 3.9398463140005333,
+    "max_seconds": 3.9398463140005333
+  },
+  {
+    "case": "indexed_memory_control",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 4.349437330000001,
+      "emit": 1.1971863749995464,
+      "startup_imports": 1.8365915210006278,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.6831207109999013,
+      "reference": 0.013085741000395501,
+      "execution_checks": 1.7938093170014326,
+      "artifact_io": 0.022830039997643325
+    },
+    "median_seconds": 4.349437330000001,
+    "min_seconds": 4.349437330000001,
+    "max_seconds": 4.349437330000001
+  },
+  {
+    "case": "indexed_memory_control",
+    "backend": "triton",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 3.9713411250004356,
+      "emit": 0.002511083999706898,
+      "startup_imports": 2.3308215380002366,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.43117463599810435,
+      "reference": 0.013433479001832893,
+      "execution_checks": 1.1542586750019836,
+      "artifact_io": 0.04165279699827806
+    },
+    "median_seconds": 3.9713411250004356,
+    "min_seconds": 3.9713411250004356,
+    "max_seconds": 3.9713411250004356
+  },
+  {
+    "case": "mixed",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 3,
+    "mean": {
+      "total": 152.0065428096665,
+      "emit": 0.011087154000051669,
+      "startup_imports": 4.422243894666583,
+      "layout_inference": 108.97006942000007,
+      "nvcc": 14.886666211332946,
+      "other_compilation": 14.115753244335187,
+      "reference": 0.05552176899982442,
+      "execution_checks": 9.511617897999107,
+      "artifact_io": 0.0446703723328028
+    },
+    "median_seconds": 150.12292266299937,
+    "min_seconds": 140.93111213300017,
+    "max_seconds": 164.96559363300003
+  },
+  {
+    "case": "mixed",
+    "backend": "tilelang",
+    "cache": "warm",
+    "n": 3,
+    "mean": {
+      "total": 14.883361094999904,
+      "emit": 0.02207095033342436,
+      "startup_imports": 4.7028183566665875,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 1.724577473332829,
+      "reference": 0.04188011766564159,
+      "execution_checks": 8.388295168335693,
+      "artifact_io": 0.02578997899915218
+    },
+    "median_seconds": 7.8143323659996895,
+    "min_seconds": 7.009761817999788,
+    "max_seconds": 29.825989101000232
+  },
+  {
+    "case": "mixed",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 3,
+    "mean": {
+      "total": 6.046433834666459,
+      "emit": 0.3858692653335917,
+      "startup_imports": 1.7989822139998068,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 1.4516427530003664,
+      "reference": 0.0339380186666555,
+      "execution_checks": 2.704161103332808,
+      "artifact_io": 0.05770974566682222
+    },
+    "median_seconds": 5.963023061999593,
+    "min_seconds": 5.941302072999861,
+    "max_seconds": 6.234976368999924
+  },
+  {
+    "case": "mixed",
+    "backend": "triton",
+    "cache": "warm",
+    "n": 3,
+    "mean": {
+      "total": 4.162043425333347,
+      "emit": 0.00619312699988465,
+      "startup_imports": 1.7396763850004693,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.30024539966567926,
+      "reference": 0.0366370106667091,
+      "execution_checks": 2.029973140001554,
+      "artifact_io": 0.05551148999893485
+    },
+    "median_seconds": 4.015978938999979,
+    "min_seconds": 3.7635296119997292,
+    "max_seconds": 4.706621725000332
+  },
+  {
+    "case": "mixed_single",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 37.83028153699979,
+      "emit": 0.007030417999885685,
+      "startup_imports": 3.0076019360003556,
+      "layout_inference": 26.99538106,
+      "nvcc": 3.5905402710004637,
+      "other_compilation": 3.4175034599993523,
+      "reference": 0.03194945899940649,
+      "execution_checks": 0.777074254998297,
+      "artifact_io": 0.01023109600191674
+    },
+    "median_seconds": 37.83028153699979,
+    "min_seconds": 37.83028153699979,
+    "max_seconds": 37.83028153699979
+  },
+  {
+    "case": "mixed_single",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 3.5346468590005315,
+      "emit": 1.2042706940001153,
+      "startup_imports": 1.871219944000586,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.5757820999988326,
+      "reference": 0.03681639800015546,
+      "execution_checks": 1.0365028140013237,
+      "artifact_io": 0.014325602999633702
+    },
+    "median_seconds": 3.5346468590005315,
+    "min_seconds": 3.5346468590005315,
+    "max_seconds": 3.5346468590005315
+  },
+  {
+    "case": "native_matched",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 41.460448155999984,
+      "emit": 0.008279583000330604,
+      "startup_imports": 4.390675923999879,
+      "layout_inference": 21.751191299999846,
+      "nvcc": 7.723148892000609,
+      "other_compilation": 3.579703299999892,
+      "reference": 2.315506175000337,
+      "execution_checks": 1.7002225649994216,
+      "artifact_io": 0
+    },
+    "median_seconds": 41.460448155999984,
+    "min_seconds": 41.460448155999984,
+    "max_seconds": 41.460448155999984
+  },
+  {
+    "case": "native_matched",
+    "backend": "tilelang",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 4.7412278020001395,
+      "emit": 0.00991871399946831,
+      "startup_imports": 3.052670770000077,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.16290460900017933,
+      "reference": 0.33390517699990596,
+      "execution_checks": 1.1917472459999772,
+      "artifact_io": 0
+    },
+    "median_seconds": 4.7412278020001395,
+    "min_seconds": 4.7412278020001395,
+    "max_seconds": 4.7412278020001395
+  },
+  {
+    "case": "native_matched",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 4.314791650999723,
+      "emit": 1.3361193239998101,
+      "startup_imports": 1.9971676359991761,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.8476962079985242,
+      "reference": 0.36051310500079126,
+      "execution_checks": 1.1094147020012315,
+      "artifact_io": 0
+    },
+    "median_seconds": 4.314791650999723,
+    "min_seconds": 4.314791650999723,
+    "max_seconds": 4.314791650999723
+  },
+  {
+    "case": "native_matched",
+    "backend": "triton",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 3.315300123999805,
+      "emit": 0.0073825119998218725,
+      "startup_imports": 2.0739589670001806,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.4235300640002606,
+      "reference": 0.20720981499925983,
+      "execution_checks": 0.6106012780001038,
+      "artifact_io": 0
+    },
+    "median_seconds": 3.315300123999805,
+    "min_seconds": 3.315300123999805,
+    "max_seconds": 3.315300123999805
+  },
+  {
+    "case": "shape_matmul_control",
+    "backend": "tilelang",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 27.50894797700039,
+      "emit": 0.003993991999777791,
+      "startup_imports": 2.864892823000446,
+      "layout_inference": 5.44231545599996,
+      "nvcc": 12.895216759001414,
+      "other_compilation": 4.237124013999164,
+      "reference": 0.01212699200186762,
+      "execution_checks": 2.039320404001046,
+      "artifact_io": 0.017951528996491106
+    },
+    "median_seconds": 27.50894797700039,
+    "min_seconds": 27.50894797700039,
+    "max_seconds": 27.50894797700039
+  },
+  {
+    "case": "shape_matmul_control",
+    "backend": "tilelang",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 3.8829539360003764,
+      "emit": 0.0015969000005497946,
+      "startup_imports": 2.7556368370005657,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.3859653019990219,
+      "reference": 0.01153964500008442,
+      "execution_checks": 0.7090519230014252,
+      "artifact_io": 0.020760228999279207
+    },
+    "median_seconds": 3.8829539360003764,
+    "min_seconds": 3.8829539360003764,
+    "max_seconds": 3.8829539360003764
+  },
+  {
+    "case": "shape_matmul_control",
+    "backend": "triton",
+    "cache": "cold",
+    "n": 1,
+    "mean": {
+      "total": 3.8720293599999422,
+      "emit": 1.0867076349995841,
+      "startup_imports": 1.652244576999692,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.7311834120009735,
+      "reference": 0.037379790001068613,
+      "execution_checks": 1.423956893997456,
+      "artifact_io": 0.02726468700075202
+    },
+    "median_seconds": 3.8720293599999422,
+    "min_seconds": 3.8720293599999422,
+    "max_seconds": 3.8720293599999422
+  },
+  {
+    "case": "shape_matmul_control",
+    "backend": "triton",
+    "cache": "warm",
+    "n": 1,
+    "mean": {
+      "total": 2.728034869000112,
+      "emit": 0.0012818839995816234,
+      "startup_imports": 1.668904017999921,
+      "layout_inference": 0,
+      "nvcc": 0,
+      "other_compilation": 0.280483455000649,
+      "reference": 0.039660107000599965,
+      "execution_checks": 0.709564896998927,
+      "artifact_io": 0.029422392000014952
+    },
+    "median_seconds": 2.728034869000112,
+    "min_seconds": 2.728034869000112,
+    "max_seconds": 2.728034869000112
+  }
+]

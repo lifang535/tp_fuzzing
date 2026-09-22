@@ -7,25 +7,26 @@ import json
 import pickle
 import random
 import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
 from src.config import Config, DEFAULT_CONFIG
-from src.workflow.generator import ProgramGenerator
-from src.workflow.mutator import Mutator
 from src.workflow.oracle import Oracle, BugReport, BugType
-from src.ir import TileProgram
-from src.ir import TilePipeline
-from src.ir import DynamicSequence
 
 
 class FuzzingStats:
     def __init__(self):
         self.total_generated = 0
         self.total_tested = 0
+        self.programs_compiled = 0
+        self.programs_passed = 0
         self.bugs_found: List[BugReport] = []
         self.unique_bugs: List[BugReport] = []
+        # MLIRSmith-style wasted-effort counter: chaotic programs whose
+        # reference is numerically unstable are oracle noise, not bugs.
+        self.oracle_unstable = 0
         self.start_time = time.time()
 
     def summary(self, historical_bugs_total: int = 0, historical_bugs_unique: int = 0,
@@ -52,13 +53,23 @@ class TileSmith:
         if config.seed is not None:
             random.seed(config.seed)
 
-        self.generator = ProgramGenerator(config, backend=self.backend)
-        self.mutator = Mutator(config, backend=self.backend)
+        from src.backends import get_backend
+        backend_impl = get_backend(self.backend)
+        self.generator = backend_impl.make_generator(config)
+        self.mutator = backend_impl.make_mutator(config)
+        self.mutator.type_gen = self.generator.type_gen
         self.oracle = Oracle(config, backend=self.backend)
+        from src.workflow.feedback import StructuralFeedback
+        self.feedback = StructuralFeedback()
+        if config.structural_feedback:
+            self.generator.region_gen.feedback = self.feedback
+            self.mutator.feedback = self.feedback
         self.stats = FuzzingStats()
         self.seed_pool: List = []
         self.tested_configs: set = set()
         self.known_root_causes: dict = {}
+        # root_cause -> location -> count (location-aware bug kinds)
+        self.root_cause_locations: dict = {}
         self._historical_bugs_total = 0
         self._historical_bugs_unique = 0
 
@@ -76,6 +87,7 @@ class TileSmith:
             self._restore_rng_state()
             self._restore_dim_pool()
             self._restore_seed_pool()
+            self.feedback.restore(self.output_dir / "structural_feedback.json")
         else:
             # New run: create fresh directory
             timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M")
@@ -84,15 +96,15 @@ class TileSmith:
             run_dir_name = f"{timestamp}_{self.backend}_{shape_str}_{seed_str}"
             self.output_dir = Path(config.output_dir) / run_dir_name
             self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.oracle.artifact_root = self.output_dir / 'artifacts'
 
     def _load_history(self):
         """Load previous results from resume directory to avoid re-testing."""
         passed_count = 0
         failed_count = 0
 
-        passed_dir = self.output_dir / "passed"
-        if passed_dir.exists():
-            for json_file in passed_dir.rglob("*.json"):
+        for passed_dir in (self.output_dir / 'passed', self.output_dir / 'compiled'):
+            for json_file in passed_dir.glob("*.json"):
                 try:
                     with open(json_file) as f:
                         d = json.load(f)
@@ -117,6 +129,7 @@ class TileSmith:
                         self.tested_configs.add(sig)
                         failed_count += 1
                         dir_count += 1
+                        self.root_cause_locations.setdefault(root_cause, Counter())[d.get('location', '')] += 1
                     except (json.JSONDecodeError, KeyError):
                         pass
                 if dir_count > 0:
@@ -134,9 +147,18 @@ class TileSmith:
                 summary = {}
             if "input_seed" in summary and summary["input_seed"] != self.config.input_seed:
                 raise ValueError(f"Resume input seed mismatch: use --input-seed {summary['input_seed']}")
+            if summary.get('compile_only', False) != self.config.compile_only:
+                raise ValueError('Cannot mix compile-only and execution results in one campaign')
+            self.stats.programs_compiled = summary.get('programs_compiled', 0)
+            self.stats.programs_passed = summary.get('programs_passed', passed_count if not self.config.compile_only else 0)
             total_count = max(total_count, summary.get("total_tested", 0))
             for cause, count in summary.get("root_causes", {}).items():
                 self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
+            for cause, counts in summary.get("root_cause_locations", {}).items():
+                if isinstance(counts, dict) and counts:
+                    current = self.root_cause_locations.get(cause, Counter())
+                    if sum(counts.values()) > sum(current.values()):
+                        self.root_cause_locations[cause] = Counter(counts)
 
         self.stats.total_tested = total_count
         self.stats.total_generated = self.stats.total_tested
@@ -162,19 +184,24 @@ class TileSmith:
             state = (s["version"], tuple(s["internalstate"]), s["gauss_next"])
             random.setstate(state)
             self._resume_generation_attempts = s.get("generation_attempts", 0)
-            pending_path = self.output_dir / "pending_program.pkl"
-            if pending_path.exists():
-                try:
-                    with open(pending_path, "rb") as pf:
-                        pending_i, pending_program = pickle.load(pf)
-                    self._resume_pending_i = pending_i
-                    self._resume_pending_program = pending_program
-                    print(f"[resume] Restored pending program [{pending_i}] (interrupted test will be re-run)")
-                except Exception as pe:
-                    print(f"[resume] Failed to restore pending program: {pe}")
+            if self.generator.grids is not None:
+                self.generator.grids.load(s.get("grid_cursors", {}))
             print(f"[resume] Restored random state from rng_state.json (generation_attempts={self._resume_generation_attempts})")
         except Exception as e:
             print(f"[resume] Failed to restore random state: {e}")
+
+        pending_path = self.output_dir / "pending_program.pkl"
+        if pending_path.exists():
+            try:
+                with open(pending_path, "rb") as pf:
+                    pending_i, program = pickle.load(pf)
+                # Normalize previous native specs and validate the executable IR.
+                program = self._dict_to_program(self._program_to_dict(program))
+            except Exception as error:
+                raise ValueError(f'Cannot resume pending program {pending_path}: {error}') from error
+            self._resume_pending_i = pending_i
+            self._resume_pending_program = program
+            print(f"[resume] Restored pending program [{pending_i}] (interrupted test will be re-run)")
 
     def _save_dim_pool(self):
         with open(self.output_dir / "dim_pool.json", "w") as f:
@@ -207,141 +234,19 @@ class TileSmith:
         try:
             with open(pool_path) as f:
                 entries = json.load(f)
-            for d in entries:
-                program = self._dict_to_program(d)
-                if program is not None:
-                    self.seed_pool.append(program)
+            self.seed_pool = [self._dict_to_program(d) for d in entries]
             print(f"[resume] Restored seed_pool with {len(self.seed_pool)} entries")
-        except Exception as e:
-            print(f"[resume] Failed to restore seed_pool: {e}")
+        except Exception as error:
+            raise ValueError(f'Cannot resume seed pool {pool_path}: {error}') from error
 
     def _program_to_dict(self, program) -> dict:
-        """Serialize a program to a JSON-compatible dict (same format as passed files)."""
-        if isinstance(program, DynamicSequence):
-            return {
-                "type": "dynamic",
-                "sequence": [s.op_kind for s in program.steps],
-                "params": program.params_dict,
-                "dtype": program.dtype,
-            }
-        if isinstance(program, TilePipeline):
-            return {
-                "type": "pipeline",
-                "pipeline": [s.kind.value for s in program.steps],
-                "params": program.params_dict,
-                "dtype": program.dtype.value if hasattr(program.dtype, "value") else program.dtype,
-            }
-        # TileProgram (single_op)
-        kernel = program.kernels[0]
-        return {
-            "type": "single_op",
-            "compute_kind": kernel.compute_kind.value,
-            "params": kernel.params_dict,
-            "dtype": kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype,
-        }
+        from src.ir.serialization import program_to_dict
+        return program_to_dict(program)
 
     @staticmethod
     def _dict_to_program(d: dict):
-        """Deserialize a dict back to a program object."""
-        from src.ir import TileKernel, ComputeKind, LoopKind, DataType, TileProgram
-        from src.ir import TilePipeline, PipelineStep
-        from src.ir import DynamicSequence, KernelStep, TileValuePool
-
-        params = d.get("params", {})
-        type_ = d.get("type", "")
-
-        if type_ == "pipeline":
-            ops = params.get("pipeline", [])
-            alphas = params.get("pipeline_alphas", [1.0] * len(ops))
-            steps = [PipelineStep(kind=ComputeKind(op), alpha=a) for op, a in zip(ops, alphas)]
-            lk = params.get("loop_kind", "pipelined")
-            dtype_str = d.get("dtype", "float16")
-            return TilePipeline(
-                steps=steps,
-                M=params["M"], N=params["N"], K=params["K"],
-                block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
-                threads=params["threads"], num_stages=params["num_stages"],
-                loop_kind=LoopKind(lk) if isinstance(lk, str) else lk,
-                dtype=DataType(dtype_str) if isinstance(dtype_str, str) else dtype_str,
-            )
-
-        if type_ == "single_op":
-            ck = d.get("compute_kind", params.get("compute_kind", "gemm"))
-            lk = params.get("loop_kind", "pipelined")
-            dtype_str = d.get("dtype", "float16")
-            kernel = TileKernel(
-                name="kernel_0",
-                compute_kind=ComputeKind(ck),
-                M=params["M"], N=params["N"], K=params["K"],
-                block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
-                threads=params["threads"], num_stages=params["num_stages"],
-                loop_kind=LoopKind(lk) if isinstance(lk, str) else lk,
-                dtype=DataType(dtype_str) if isinstance(dtype_str, str) else dtype_str,
-                alpha=params.get("alpha", 1.0),
-                coverage_probe=params.get("coverage_probe", False),
-                input_layout=params.get("input_layout", "contiguous"),
-                input_pattern=params.get("input_pattern", "normal"),
-                repeat_count=params.get("repeat_count", 3),
-                schedule_pair=params.get("schedule_pair", True),
-            )
-            return TileProgram(kernels=[kernel])
-
-        if type_ == "dynamic":
-            # Rebuild a minimal DynamicSequence with just the scalar fields.
-            # The pool and step buffers are not needed by the mutator (it only
-            # reads op_kind and scalar params before regenerating the sequence).
-            ops = params.get("sequence", [])
-            alphas = params.get("sequence_alphas", [1.0] * len(ops))
-            steps = [
-                KernelStep(op_kind=op, inputs=[], outputs=[],
-                           attrs={"alpha": a} if op == "scale" else {},
-                           torch_ref_update="")
-                for op, a in zip(ops, alphas)
-            ]
-            specs = params.get("sequence_steps")
-            pool = TileValuePool()
-            if specs is not None:
-                from src.ir import TileBuffer
-                buffers = {}
-                reduced = {out[0] for kind, ins, outs, attrs in specs
-                           if kind in ("reduce_sum", "reduce_max", "reduce_min") for out in outs}
-                def buffer(desc):
-                    name, scope, dtype = desc
-                    key = (scope, name)
-                    if key not in buffers:
-                        if scope == "global":
-                            shape = ((params["M"], params["K"]) if name == "A" else
-                                     (params["K"], params["N"]) if name == "B" else
-                                     (params["M"], params["N"]))
-                            destination = pool.global_in
-                        else:
-                            shape = ((params["block_M"],) if name in reduced else
-                                     (params["block_M"], params["block_N"]))
-                            destination = pool.shared if scope == "shared" else pool.fragment
-                        buffers[key] = TileBuffer(name, shape, dtype, scope, "")
-                        destination.append(buffers[key])
-                    return buffers[key]
-                steps = [KernelStep(kind, [buffer(b) for b in ins], [buffer(b) for b in outs], attrs, "")
-                         for kind, ins, outs, attrs in specs]
-                # The terminal/writeback buffer defines the result, including
-                # historical sequences that wrote an earlier fragment.
-                if steps:
-                    final = steps[-1].inputs[0] if steps[-1].op_kind == "copy_f2g" else steps[-1].outputs[0]
-                    if final in pool.fragment:
-                        pool.fragment.remove(final)
-                        pool.fragment.append(final)
-            lk = params.get("loop_kind", "pipelined")
-            return DynamicSequence(
-                steps=steps,
-                pool=pool,
-                M=params["M"], N=params["N"], K=params["K"],
-                block_M=params["block_M"], block_N=params["block_N"], block_K=params["block_K"],
-                threads=params["threads"], num_stages=params["num_stages"],
-                loop_kind=lk if isinstance(lk, str) else lk.value,
-                dtype=d.get("dtype", "float16"),
-            )
-
-        return None
+        from src.ir.serialization import program_from_dict
+        return program_from_dict(d)
 
     @staticmethod
     def _validate_resume_config(dir_name: str, config):
@@ -354,7 +259,7 @@ class TileSmith:
         # Expected parts: [date-time, backend, shape-mode, seed=N]
         # But date-time itself contains no underscore (uses dots and dash)
         # So: parts[0]=date-time, parts[1]=backend, parts[2]=shape-mode, parts[3]=seed=N
-        # However backend could be "tilelang" or "triton" (no underscore)
+        # Backend registry names cannot contain underscores.
 
         errors = []
 
@@ -363,7 +268,7 @@ class TileSmith:
         if current_backend not in dir_name:
             errors.append(
                 f"Backend mismatch: directory is for "
-                f"'{'triton' if 'triton' in dir_name else 'tilelang'}' "
+                f"'{parts[1] if len(parts) > 1 else 'unknown'}' "
                 f"but current config uses '{current_backend}'"
             )
 
@@ -454,24 +359,45 @@ class TileSmith:
                 self.stats.total_tested += 1
                 new_tested += 1
 
+                novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only)
+                compiler_novelty = self.feedback.observe_compilation(
+                    program, self.oracle.last_compilation, self.oracle.compilation_complete)
+                if self.oracle.compilation_complete:
+                    self.stats.programs_compiled += 1
+                if bug is None and not self.config.compile_only:
+                    self.stats.programs_passed += 1
                 if bug:
+                    if bug.root_cause == 'oracle_unstable':
+                        # The numeric check was skipped: no implementation could
+                        # pass it, so this is wasted fuzzing effort (MLIRSmith
+                        # counts invalid programs the same way), not a bug.
+                        # A few reproducers are saved for auditing, and the
+                        # failed-program feedback demotion still applies.
+                        self.stats.oracle_unstable += 1
+                        if self.stats.oracle_unstable <= self.config.max_same_root_cause:
+                            self._save_bug(bug, i, program)
+                        if verbose:
+                            print(f"[{i}] [ORACLE UNSTABLE] {self._kind_label(program)}")
+                        continue
                     self.stats.bugs_found.append(bug)
                     is_new = self.known_root_causes.get(bug.root_cause, 0) < self.config.max_same_root_cause
                     if is_new:
                         self.stats.unique_bugs.append(bug)
                         self._save_bug(bug, i, program)
                     self.known_root_causes[bug.root_cause] = self.known_root_causes.get(bug.root_cause, 0) + 1
+                    self.root_cause_locations.setdefault(bug.root_cause, Counter())[bug.location] += 1
                     if verbose:
                         marker = "NEW" if is_new else "dup"
                         print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}")
                 else:
                     self._save_passed(program, i)
-                    if random.random() < self.config.seed_add_prob:
+                    if (self.config.structural_feedback and (novelty or compiler_novelty)) or random.random() < self.config.seed_add_prob:
                         self.seed_pool.append(program)
                         if len(self.seed_pool) > self.config.seed_pool_max:
                             self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
                     if verbose:
-                        print(f"[{i}] [PASSED] {self._kind_label(program)}")
+                        status = 'COMPILED' if self.config.compile_only else 'PASSED'
+                        print(f"[{i}] [{status}] {self._kind_label(program)}")
 
                 if verbose and new_tested % 100 == 0:
                     total_bugs = self._historical_bugs_total + len(self.stats.bugs_found)
@@ -485,11 +411,53 @@ class TileSmith:
             summary = {
                 "backend": self.backend,
                 "input_seed": self.config.input_seed,
+                "compile_only": self.config.compile_only,
+                "save_artifacts": self.config.save_artifacts,
+                "programs_compiled": self.stats.programs_compiled,
+                "programs_passed": self.stats.programs_passed,
                 "coverage_probe_prob": self.config.coverage_probe_prob,
+                "dtype_mutate_prob": self.config.dtype_mutate_prob,
+                "generation_config": {
+                    "extended_prob": self.config.extended_prob,
+                    "extended_configuration_pair": self.config.extended_configuration_pair,
+                    "extended_config_depth": self.config.extended_config_depth,
+                    "extended_fast_math_pair": self.config.extended_fast_math_pair,
+                    "extended_precision_pair": self.config.extended_precision_pair,
+                    "extended_identity_pair": self.config.extended_identity_pair,
+                    "extended_observation_pair": self.config.extended_observation_pair,
+                    "random_config_count": self.config.random_config_count,
+                    "instance_grid": self.config.instance_grid,
+                    "extended_atomic_prob": self.config.extended_atomic_prob,
+                    "extended_fma_prob": self.config.extended_fma_prob,
+                    "extended_shape_op_prob": self.config.extended_shape_op_prob,
+                    "extended_int8_prob": self.config.extended_int8_prob,
+                    "region_int8_prob": self.config.region_int8_prob,
+                    "region_pass_config": self.config.region_pass_config,
+                    "region_swizzle_pair": self.config.region_swizzle_pair,
+                    "region_gemm_prob": self.config.region_gemm_prob,
+                    "region_typed_prob": self.config.region_typed_prob,
+                    "region_scratch_max_bytes": self.config.region_scratch_max_bytes,
+                    "local_mutate_prob": self.config.local_mutate_prob,
+                    "latest_value_prob": self.config.latest_value_prob,
+                    "function_min_count": self.config.function_min_count,
+                    "function_max_count": self.config.function_max_count,
+                    "function_call_prob": self.config.function_call_prob,
+                    "region_input_seed_count": self.config.region_input_seed_count,
+                    "region_repeat_count": self.config.region_repeat_count,
+                    "region_schedule_pair": self.config.region_schedule_pair,
+                    "region_layout_prob": self.config.region_layout_prob,
+                    "uncovered_boost": self.config.uncovered_boost,
+                },
+                "structural_features_attempted": len(self.feedback.attempted),
+                "structural_features_passed": len(self.feedback.passed),
+                "structural_features_compiled": len(self.feedback.compiled),
+                "compiler_ir_features": len(self.feedback.compiler),
                 "total_tested": self.stats.total_tested,
+                "oracle_unstable": self.stats.oracle_unstable,
                 "bugs_total": bugs_total,
                 "bugs_unique": bugs_unique,
                 "root_causes": self.known_root_causes,
+                "root_cause_locations": {cause: dict(counts) for cause, counts in self.root_cause_locations.items()},
             }
             with open(self.output_dir / "summary.json", "w") as f:
                 json.dump(summary, f, indent=2)
@@ -501,6 +469,7 @@ class TileSmith:
                     "internalstate": list(rng_state[1]),
                     "gauss_next": rng_state[2],
                     "generation_attempts": i,
+                    "grid_cursors": self.generator.grids.save() if self.generator.grids is not None else {},
                 }, f)
             pending_path = self.output_dir / "pending_program.pkl"
             # _inflight_program is non-None only when interrupt happened inside oracle.test()
@@ -510,6 +479,7 @@ class TileSmith:
             elif pending_path.exists():
                 pending_path.unlink()
 
+            self.feedback.save(self.output_dir / "structural_feedback.json")
             self._save_dim_pool()
             self._save_seed_pool()
 
@@ -522,91 +492,17 @@ class TileSmith:
 
         return self.stats
 
-    def _make_sig(self, program):
-        """Create a hashable dedup signature for TileProgram, TilePipeline, or DynamicSequence.
-        All enum fields are converted to their string .value so the sig matches _make_sig_from_dict."""
-        if isinstance(program, DynamicSequence):
-            steps_sig = json.dumps(program.step_specs, sort_keys=True, separators=(",", ":"))
-            return (steps_sig, program.M, program.N, program.K,
-                    program.block_M, program.block_N, program.block_K,
-                    program.threads, program.loop_kind, program.num_stages, program.dtype)
-        if isinstance(program, TilePipeline):
-            steps_sig = tuple(
-                (s.kind.value if hasattr(s.kind, "value") else s.kind, s.alpha)
-                for s in program.steps
-            )
-            return (steps_sig, program.M, program.N, program.K,
-                    program.block_M, program.block_N, program.block_K,
-                    program.threads,
-                    program.loop_kind.value if hasattr(program.loop_kind, "value") else program.loop_kind,
-                    program.num_stages,
-                    program.dtype.value if hasattr(program.dtype, "value") else program.dtype)
-        kernel = program.kernels[0]
-        return (
-            kernel.compute_kind.value if hasattr(kernel.compute_kind, "value") else kernel.compute_kind,
-            kernel.M, kernel.N, kernel.K,
-            kernel.block_M, kernel.block_N, kernel.block_K,
-            kernel.threads,
-            kernel.loop_kind.value if hasattr(kernel.loop_kind, "value") else kernel.loop_kind,
-            kernel.num_stages,
-            kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype,
-            kernel.alpha,
-            *((kernel.input_layout, kernel.input_pattern, kernel.repeat_count, kernel.schedule_pair)
-              if kernel.coverage_probe else ()),
-        )
+    @staticmethod
+    def _make_sig(program):
+        """Canonical executable IR identity, shared with persisted records."""
+        from src.ir.serialization import program_to_dict
+        data = program_to_dict(program)
+        return (data['type'], json.dumps(data, sort_keys=True, separators=(',', ':')))
 
     @staticmethod
-    def _make_sig_from_dict(d: dict):
-        """Reconstruct the same dedup sig from a saved JSON dict.
-        Handles both passed-file format (has 'type' key) and
-        BugReport.to_dict() format (has 'compute_kind' key, no 'type')."""
-        params = d.get("params", {})
-        M = params.get("M", 0)
-        N = params.get("N", 0)
-        K = params.get("K", 0)
-        bM = params.get("block_M", 0)
-        bN = params.get("block_N", 0)
-        bK = params.get("block_K", 0)
-        threads = params.get("threads", 0)
-        num_stages = params.get("num_stages", 1)
-        loop_kind = params.get("loop_kind", "pipelined")
-        dtype = d.get("dtype", params.get("dtype", "float16"))
-
-        # Determine type from 'type' key (passed files) or 'compute_kind' prefix (bug files)
-        type_ = d.get("type", "")
-        if not type_:
-            compute_kind_str = d.get("compute_kind", "")
-            if compute_kind_str.startswith("dynamic:"):
-                type_ = "dynamic"
-            elif compute_kind_str.startswith("pipeline:"):
-                type_ = "pipeline"
-            else:
-                type_ = "single_op"
-
-        if type_ == "dynamic":
-            specs = params.get("sequence_steps")
-            if specs is None:
-                # Old reports omit branch/dataflow details. Do not let their coarse
-                # signatures suppress new programs whose semantics we now retain.
-                steps_sig = ("legacy_dynamic", tuple(params.get("sequence", [])),
-                             tuple(params.get("sequence_alphas", [])))
-            else:
-                steps_sig = json.dumps(specs, sort_keys=True, separators=(",", ":"))
-            return (steps_sig, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype)
-
-        if type_ == "pipeline":
-            ops = params.get("pipeline", [])
-            alphas = params.get("pipeline_alphas", [1.0] * len(ops))
-            steps_sig = tuple(zip(ops, alphas))
-            return (steps_sig, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype)
-
-        # single_op
-        compute_kind = d.get("compute_kind", params.get("compute_kind", ""))
-        alpha = params.get("alpha", 1.0)
-        return (compute_kind, M, N, K, bM, bN, bK, threads, loop_kind, num_stages, dtype, alpha) + (
-            (params.get("input_layout", "contiguous"), params.get("input_pattern", "normal"),
-             params.get("repeat_count", 3), params.get("schedule_pair", True))
-            if params.get("coverage_probe", False) else ())
+    def _make_sig_from_dict(data):
+        from src.ir.serialization import program_from_dict
+        return TileSmith._make_sig(program_from_dict(data))
 
     def _generate_test_case(self):
         if not self.seed_pool:
@@ -617,57 +513,29 @@ class TileSmith:
             k=1,
         )[0]
         if strategy == "mutate":
-            seed = random.choice(self.seed_pool)
+            seed = (random.choices(self.seed_pool, weights=[self.feedback.seed_weight(p) for p in self.seed_pool], k=1)[0]
+                    if self.config.structural_feedback else random.choice(self.seed_pool))
             return self.mutator.mutate(seed)
         return self.generator.generate()
 
     def _kind_label(self, program) -> str:
-        """Return a human-readable label for use in filenames.
-        Format:
-          dynamic_{ops}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
-          pipeline_{ops}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
-          single_{op}_M{m},N{n},K{k},bM{bm},bN{bn},bK{bk},t{threads},{loop_kind},s{stages},{dtype}
+        """Summarize static function calls in filenames, with a full IR hash.
+
+        Shapes, operations and control-flow nesting remain in the saved IR.
         """
-        def _step_label_dynamic(s) -> str:
-            if s.op_kind == "scale":
-                return f"scale_a{s.attrs.get('alpha', 1.0)}"
-            return s.op_kind
-
-        def _step_label_pipeline(s) -> str:
-            kind = s.kind.value if hasattr(s.kind, "value") else s.kind
-            if kind == "scale":
-                return f"scale_a{s.alpha}"
-            return kind
-
-        if isinstance(program, DynamicSequence):
-            ops = "+".join(_step_label_dynamic(s) for s in program.steps)
-            params = (f"M{program.M},N{program.N},K{program.K},"
-                      f"bM{program.block_M},bN{program.block_N},bK{program.block_K},"
-                      f"t{program.threads},{program.loop_kind},s{program.num_stages},{program.dtype}")
+        from src.ir.region import RegionProgram
+        from src.ir.extended import ExtendedProgram
+        if isinstance(program, ExtendedProgram):
             digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
-            return f"dynamic_{ops}_{params}"[:210] + f"_{digest}"
-        if isinstance(program, TilePipeline):
-            ops = "+".join(_step_label_pipeline(s) for s in program.steps)
-            lk = program.loop_kind.value if hasattr(program.loop_kind, "value") else program.loop_kind
-            dt = program.dtype.value if hasattr(program.dtype, "value") else program.dtype
-            params = (f"M{program.M},N{program.N},K{program.K},"
-                      f"bM{program.block_M},bN{program.block_N},bK{program.block_K},"
-                      f"t{program.threads},{lk},s{program.num_stages},{dt}")
-            return f"pipeline_{ops}_{params}"
-        kernel = program.kernels[0] if program.kernels else None
-        if kernel:
-            op = kernel.compute_kind.value
-            lk = kernel.loop_kind.value if hasattr(kernel.loop_kind, "value") else kernel.loop_kind
-            dt = kernel.dtype.value if hasattr(kernel.dtype, "value") else kernel.dtype
-            alpha_suffix = f",a{kernel.alpha}" if op == "scale" else ""
-            params = (f"M{kernel.M},N{kernel.N},K{kernel.K},"
-                      f"bM{kernel.block_M},bN{kernel.block_N},bK{kernel.block_K},"
-                      f"t{kernel.threads},{lk},s{kernel.num_stages},{dt}{alpha_suffix}")
-            if kernel.coverage_probe:
-                digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
-                return f"probe_{op}_{params}_{kernel.input_layout}_{kernel.input_pattern}_{digest}"
-            return f"single_{op}_{params}"
-        return "single_unknown"
+            return f'extended_{program.family}_{digest}'
+        if isinstance(program, RegionProgram):
+            calls = program.call_label()
+            if len(calls) > 190:
+                calls = calls[:190] + '~'
+            digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
+            return f"calls_{calls}_{digest}"
+
+        raise TypeError(f'Unsupported program: {type(program).__name__}')
 
     def _save_bug(self, bug: BugReport, iteration: int, program):
         """
@@ -690,15 +558,17 @@ class TileSmith:
         Save passing programs under:
           passed/passed_{type_label}.{json,py}
         """
-        passed_dir = self.output_dir / "passed"
+        status = 'compiled' if self.config.compile_only else 'passed'
+        passed_dir = self.output_dir / status
         passed_dir.mkdir(exist_ok=True)
 
         kind_label = self._kind_label(program)
-        name = f"passed_{kind_label}"
+        name = f"{status}_{kind_label}"
         code = self.oracle._emit_code(program)
 
         meta = self._program_to_dict(program)
         meta["input_seed"] = self.config.input_seed
+        meta['validation_mode'] = 'compile_only' if self.config.compile_only else 'execute'
 
         with open(passed_dir / f"{name}.json", "w") as f:
             json.dump(meta, f, indent=2)

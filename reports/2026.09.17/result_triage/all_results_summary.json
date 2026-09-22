@@ -1,0 +1,41 @@
+{
+  "captured_at": "2026-09-17T21:16:02.304247+08:00",
+  "total": 14425,
+  "categories": {
+    "shared_memory_overflow": 562,
+    "timeout": 169,
+    "wrong_result": 10687,
+    "assertion_failure": 5,
+    "dtype_mismatch": 2442,
+    "ptx_async_boundary": 209,
+    "warp_partition": 88,
+    "gpu_oom": 57,
+    "layout_inference": 163,
+    "other": 10,
+    "segfault": 15,
+    "nondeterminism": 1,
+    "schedule_mismatch": 17
+  },
+  "decisions": {
+    "非有效目标编译器bug": 637,
+    "超时证据不足": 169,
+    "oracle语义不一致，当前记录不能作目标bug证据": 3255,
+    "待确认": 7223,
+    "已确认缓存机制的同类候选，未逐条复现": 1953,
+    "已确认cp.async机制的同类候选，未逐条复现": 160,
+    "不支持的调度组合，暂不计真实bug": 88,
+    "已确认缺陷机制，同类记录": 538,
+    "布局编译失败候选，待缩减": 163,
+    "K=8已知错误机制候选": 218,
+    "历史NVCC崩溃，待缩减": 2,
+    "疑似数值不稳定，暂不报目标bug": 1,
+    "已复现目标编译器bug": 16,
+    "数值容差候选，待确认": 2
+  },
+  "unchanged_prior": 2295,
+  "flags": {
+    "tile/global归约语义不一致": 2947,
+    "分母sum+eps与clamp(sum)语义不一致": 1689,
+    "fp16_K8：已知真实缺陷配置候选，非逐条确认": 4086
+  }
+}

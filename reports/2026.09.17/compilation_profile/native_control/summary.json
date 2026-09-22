@@ -1,0 +1,514 @@
+{
+  "program_source": "/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/corpus/native.json",
+  "program_sha256": "3195f16d648248564a3450845ecf37032a8570c115adfbf4fe30c5e60a4c0190",
+  "complete": true,
+  "trials": [
+    {
+      "label": "triton_0_cold",
+      "backend": "triton",
+      "repeat": 0,
+      "cache": "cold",
+      "subprocess_seconds": 4.076190054999643,
+      "emit_seconds": 1.5834056080002483,
+      "returncode": 0,
+      "source_sha256": "75e866c23dc4f65830b741a75f7224d44e34abbe1154c82cf88dcdb9ff0a9049",
+      "success": true,
+      "torch": "2.4.0+cu124",
+      "backend_version": "3.0.0",
+      "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+      "cuda_available": true,
+      "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "capability": [
+        8,
+        9
+      ],
+      "stages": {
+        "import.torch": {
+          "calls": 1,
+          "seconds": 1.1621337229998971,
+          "exclusive_seconds": 1.1621337229998971
+        },
+        "import.backend": {
+          "calls": 1,
+          "seconds": 0.0807599139998274,
+          "exclusive_seconds": 0.0807599139998274
+        },
+        "runtime.cuda_context": {
+          "calls": 1,
+          "seconds": 0.12833324299936066,
+          "exclusive_seconds": 0.12833324299936066
+        },
+        "instrumentation.setup": {
+          "calls": 1,
+          "seconds": 9.922200024448102e-05,
+          "exclusive_seconds": 9.922200024448102e-05
+        },
+        "module.load": {
+          "calls": 1,
+          "seconds": 0.012847887999669183,
+          "exclusive_seconds": 0.012847887999669183
+        },
+        "runtime.inputs": {
+          "calls": 4,
+          "seconds": 0.024786148999737634,
+          "exclusive_seconds": 0.024786148999737634
+        },
+        "runtime.reference": {
+          "calls": 2,
+          "seconds": 0.16132522200041421,
+          "exclusive_seconds": 0.16132522200041421
+        },
+        "prepare_variant": {
+          "calls": 4,
+          "seconds": 0.00018458100021234713,
+          "exclusive_seconds": 0.00018458100021234713
+        },
+        "triton.frontend": {
+          "calls": 2,
+          "seconds": 0.02853169800073374,
+          "exclusive_seconds": 0.02853169800073374
+        },
+        "triton.ttir": {
+          "calls": 2,
+          "seconds": 0.008823631000268506,
+          "exclusive_seconds": 0.008823631000268506
+        },
+        "triton.ttgir": {
+          "calls": 2,
+          "seconds": 0.02527287199973216,
+          "exclusive_seconds": 0.02527287199973216
+        },
+        "triton.llir": {
+          "calls": 2,
+          "seconds": 0.15193527399969753,
+          "exclusive_seconds": 0.15193527399969753
+        },
+        "triton.ptx": {
+          "calls": 2,
+          "seconds": 0.027880210999683186,
+          "exclusive_seconds": 0.027880210999683186
+        },
+        "triton.cubin": {
+          "calls": 2,
+          "seconds": 0.07339225499981694,
+          "exclusive_seconds": 0.07339225499981694
+        },
+        "triton.compile_total": {
+          "calls": 2,
+          "seconds": 0.6616325819995836,
+          "exclusive_seconds": 0.34579664099965157
+        },
+        "runtime.kernel": {
+          "calls": 12,
+          "seconds": 1.6569083090016647,
+          "exclusive_seconds": 0.9952757270020811
+        },
+        "runtime.compare": {
+          "calls": 46,
+          "seconds": 0.141832546999467,
+          "exclusive_seconds": 0.141832546999467
+        },
+        "harness.total": {
+          "calls": 1,
+          "seconds": 2.048636911000358,
+          "exclusive_seconds": 0.06360010299886198
+        },
+        "worker": {
+          "calls": 1,
+          "seconds": 3.502310421999937,
+          "exclusive_seconds": 0.06949952100057999
+        }
+      },
+      "span_accounting_valid": true
+    },
+    {
+      "label": "triton_0_warm",
+      "backend": "triton",
+      "repeat": 0,
+      "cache": "warm",
+      "subprocess_seconds": 3.2100958499995613,
+      "emit_seconds": 0.009024934000080975,
+      "returncode": 0,
+      "source_sha256": "75e866c23dc4f65830b741a75f7224d44e34abbe1154c82cf88dcdb9ff0a9049",
+      "success": true,
+      "torch": "2.4.0+cu124",
+      "backend_version": "3.0.0",
+      "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+      "cuda_available": true,
+      "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "capability": [
+        8,
+        9
+      ],
+      "stages": {
+        "import.torch": {
+          "calls": 1,
+          "seconds": 1.3518412069997794,
+          "exclusive_seconds": 1.3518412069997794
+        },
+        "import.backend": {
+          "calls": 1,
+          "seconds": 0.09468119499979366,
+          "exclusive_seconds": 0.09468119499979366
+        },
+        "runtime.cuda_context": {
+          "calls": 1,
+          "seconds": 0.1595420119992923,
+          "exclusive_seconds": 0.1595420119992923
+        },
+        "instrumentation.setup": {
+          "calls": 1,
+          "seconds": 0.00010577900047792355,
+          "exclusive_seconds": 0.00010577900047792355
+        },
+        "module.load": {
+          "calls": 1,
+          "seconds": 0.016680437999639253,
+          "exclusive_seconds": 0.016680437999639253
+        },
+        "runtime.inputs": {
+          "calls": 4,
+          "seconds": 0.027766216999225435,
+          "exclusive_seconds": 0.027766216999225435
+        },
+        "runtime.reference": {
+          "calls": 2,
+          "seconds": 0.18307384800027648,
+          "exclusive_seconds": 0.18307384800027648
+        },
+        "prepare_variant": {
+          "calls": 4,
+          "seconds": 0.00018996500148205087,
+          "exclusive_seconds": 0.00018996500148205087
+        },
+        "triton.compile_total": {
+          "calls": 2,
+          "seconds": 0.33417162300065684,
+          "exclusive_seconds": 0.33417162300065684
+        },
+        "runtime.kernel": {
+          "calls": 12,
+          "seconds": 0.40190457700100524,
+          "exclusive_seconds": 0.0677329540003484
+        },
+        "runtime.compare": {
+          "calls": 46,
+          "seconds": 0.12552746399978787,
+          "exclusive_seconds": 0.12552746399978787
+        },
+        "harness.total": {
+          "calls": 1,
+          "seconds": 0.8194677629999205,
+          "exclusive_seconds": 0.08100569199814345
+        },
+        "worker": {
+          "calls": 1,
+          "seconds": 2.5548073390000354,
+          "exclusive_seconds": 0.11248894500113238
+        }
+      },
+      "span_accounting_valid": true
+    },
+    {
+      "label": "tilelang_0_cold",
+      "backend": "tilelang",
+      "repeat": 0,
+      "cache": "cold",
+      "subprocess_seconds": 5.300360074000309,
+      "emit_seconds": 0.01455411099959747,
+      "returncode": 1,
+      "source_sha256": "f102817b35de203fe65ed23bdd36e2f294869090731e0e21a813f21f65785638",
+      "success": false,
+      "torch": "2.4.0+cu124",
+      "backend_version": "0.1.11",
+      "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+      "cuda_available": true,
+      "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "capability": [
+        8,
+        9
+      ],
+      "error": "Traceback (most recent call last):\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 202, in worker\n    tests[0]()\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_cold/repro.py\", line 498, in test_kernel_0\n    _run_region([lambda: prepare_0(a_storage, b_storage), lambda: prepare_1(a_storage, b_storage)], (a_storage, b_storage), ref, 3, 0.05, relative=True)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_cold/repro.py\", line 134, in _run_region\n    launch = prepare()\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_cold/repro.py\", line 498, in <lambda>\n    _run_region([lambda: prepare_0(a_storage, b_storage), lambda: prepare_1(a_storage, b_storage)], (a_storage, b_storage), ref, 3, 0.05, relative=True)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 164, in prepare\n    launch = _original(*args, **kwargs)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_cold/repro.py\", line 385, in prepare_0\n    kernel = typed_kernel_0()\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/__init__.py\", line 494, in __call__\n    kernel = self.compile(*args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/__init__.py\", line 391, in compile\n    kernel_result = compile(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/__init__.py\", line 111, in compile\n    return cached(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cache/__init__.py\", line 115, in cached\n    return cache.cached(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cache/kernel_cache.py\", line 377, in cached\n    kernel = JITKernel(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/kernel.py\", line 133, in __init__\n    adapter = self._compile_and_create_adapter(func, out_idx)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 64, in measured\n    result = function(*args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/kernel.py\", line 248, in _compile_and_create_adapter\n    artifact = tilelang.lower(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/engine/lower.py\", line 325, in lower\n    host_mod, device_mod, params, target, target_host = lower_to_host_device_ir(\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 64, in measured\n    result = function(*args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/engine/lower.py\", line 302, in lower_to_host_device_ir\n    mod = pipeline.lower(mod, target)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/backend/pass_pipeline/pipeline.py\", line 23, in lower\n    return self._lower(mod, target)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/pipeline.py\", line 144, in CUDAPassPipelineBody\n    mod = CUDAPassPipelineBodyPrologue(mod, target)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/pipeline.py\", line 113, in CUDAPassPipelineBodyPrologue\n    mod = tilelang.transform.LayoutInference()(mod)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/3rdparty/tvm/python/tvm/ir/transform.py\", line 171, in __call__\n    return _ffi_transform_api.RunPass(self, mod)\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule) const\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tirx::transform::PrimFuncPassNode::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tl::LayoutInferencer::Substitute(tvm::tirx::PrimFunc, bool)\n  File \"<unknown>\", line 0, in tvm::tl::BufferUseDefCollector::Run()\n  File \"<unknown>\", line 0, in tvm::tl::BufferUseDefCollector::RunInferStep(int, tvm::tl::InferLevel, bool, tvm::ffi::Map<tvm::tirx::Buffer, tvm::tl::Layout, void>&, tvm::ffi::Map<tvm::tirx::Buffer, tvm::tl::Layout, void> const&, std::deque<int, std::allocator<int> >&, std::vector<bool, std::allocator<bool> >&)\n  File \"<unknown>\", line 0, in tvm::tl::GemmNode::InferLayout(tvm::tl::LayoutInferArgs const&, tvm::tl::InferLevel) const\n  File \"<unknown>\", line 0, in TVMFFIPyCallback(void*, TVMFFIAny const*, int, TVMFFIAny*)\n  File \"<unknown>\", line 0, in TVMFFICyErrorSetRaisedFromPyError(_object*)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/tileop/gemm/__init__.py\", line 15, in gemm_infer_layout\n    return gemm.infer_layout(target, thread_nums)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/tileop/gemm/__init__.py\", line 125, in infer_layout\n    return impl_class(self).infer_layout(target, thread_nums)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/op/gemm/gemm_mma.py\", line 43, in infer_layout\n    mma_emitter = self._make_mma_emitter(target, thread_nums)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/op/gemm/gemm_mma.py\", line 24, in _make_mma_emitter\n    m_warp, n_warp = self.policy.compute_warp_partition(self.M, self.N, thread_nums, target, GEMM_INST_MMA)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/ir.py\", line 32, in compute_warp_partition\n    _ffi_api.GemmWarpPolicyComputeWarpPartition(self, int(M), int(N), int(block_size), target, gemm_inst)\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::tl::GemmWarpPolicyNode::computeWarpPartition(int, int, int, tvm::Target, tvm::ffi::String) const\n  File \"/project/src/cuda/op/gemm.cc\", line 179, in std::pair<int, int> tvm::tl::cuda::{anonymous}::ComputeDefaultWarpPartition(const tvm::tl::GemmWarpPolicyNode&, int, int, int, int)\ntvm.error.InternalError: Check failed: (m_warp * n_warp == num_warps) is false: m_warp * n_warp must equal num_warps, m_warp: 1, n_warp: 1, num_warps: 8\n",
+      "stages": {
+        "import.torch": {
+          "calls": 1,
+          "seconds": 1.2855492469998353,
+          "exclusive_seconds": 1.2855492469998353
+        },
+        "import.backend": {
+          "calls": 1,
+          "seconds": 1.0094721089999439,
+          "exclusive_seconds": 1.0094721089999439
+        },
+        "runtime.cuda_context": {
+          "calls": 1,
+          "seconds": 0.14726642700043158,
+          "exclusive_seconds": 0.14726642700043158
+        },
+        "instrumentation.setup": {
+          "calls": 1,
+          "seconds": 0.0002889300003516837,
+          "exclusive_seconds": 0.0002889300003516837
+        },
+        "module.load": {
+          "calls": 1,
+          "seconds": 0.1541449090000242,
+          "exclusive_seconds": 0.1541449090000242
+        },
+        "runtime.inputs": {
+          "calls": 2,
+          "seconds": 0.026630256000316876,
+          "exclusive_seconds": 0.026630256000316876
+        },
+        "runtime.reference": {
+          "calls": 1,
+          "seconds": 0.14806149899959564,
+          "exclusive_seconds": 0.14806149899959564
+        },
+        "tilelang.frontend": {
+          "calls": 1,
+          "seconds": 0.06266137100010383,
+          "exclusive_seconds": 0.06266137100010383
+        },
+        "tilelang.pass.pass_fn": {
+          "calls": 3,
+          "seconds": 0.0021976949992676964,
+          "exclusive_seconds": 0.0021976949992676964
+        },
+        "tilelang.pass.tirx.BindTarget": {
+          "calls": 1,
+          "seconds": 0.00012128700018365635,
+          "exclusive_seconds": 0.00012128700018365635
+        },
+        "tilelang.pass.tl.LegalizeNegativeIndex": {
+          "calls": 1,
+          "seconds": 0.004194081000605365,
+          "exclusive_seconds": 0.004194081000605365
+        },
+        "tilelang.pass.tl.VerifyParallelLoop": {
+          "calls": 1,
+          "seconds": 0.02744107700073073,
+          "exclusive_seconds": 0.02744107700073073
+        },
+        "tilelang.pass.tl.InjectAssumes": {
+          "calls": 1,
+          "seconds": 0.0001609129994903924,
+          "exclusive_seconds": 0.0001609129994903924
+        },
+        "tilelang.pass.tl.Simplify": {
+          "calls": 2,
+          "seconds": 0.02578562599956058,
+          "exclusive_seconds": 0.02578562599956058
+        },
+        "tilelang.pass.tl.LayoutReducer": {
+          "calls": 1,
+          "seconds": 0.002784559999781777,
+          "exclusive_seconds": 0.002784559999781777
+        },
+        "tilelang.pass.tl.LowerBlackwell2SM": {
+          "calls": 1,
+          "seconds": 2.897000013035722e-05,
+          "exclusive_seconds": 2.897000013035722e-05
+        },
+        "tilelang.pass.tl.IfStmtBinding": {
+          "calls": 1,
+          "seconds": 0.00011248499959037872,
+          "exclusive_seconds": 0.00011248499959037872
+        },
+        "tilelang.pass.tl.PipelinePlanning": {
+          "calls": 1,
+          "seconds": 6.221500007086433e-05,
+          "exclusive_seconds": 6.221500007086433e-05
+        },
+        "tilelang.pass.tl.InjectSoftwarePipeline": {
+          "calls": 1,
+          "seconds": 0.0001276359998882981,
+          "exclusive_seconds": 0.0001276359998882981
+        },
+        "tilelang.pass.tl.LayoutInference": {
+          "calls": 1,
+          "seconds": 1.5883473280000544,
+          "exclusive_seconds": 1.5883473280000544
+        },
+        "tilelang.lower_to_host_device_ir": {
+          "calls": 1,
+          "seconds": 1.6539163130000816,
+          "exclusive_seconds": 0.0025524400007270742
+        },
+        "tilelang.compile_total": {
+          "calls": 1,
+          "seconds": 1.6541343409999172,
+          "exclusive_seconds": 0.00021802799983561272
+        },
+        "prepare_variant": {
+          "calls": 1,
+          "seconds": 1.9068843349996314,
+          "exclusive_seconds": 0.19008862299961038
+        },
+        "harness.total": {
+          "calls": 1,
+          "seconds": 2.082723241000167,
+          "exclusive_seconds": 0.0011471510006231256
+        },
+        "worker": {
+          "calls": 1,
+          "seconds": 4.7279784490001475,
+          "exclusive_seconds": 0.048533585999393836
+        }
+      },
+      "span_accounting_valid": true
+    },
+    {
+      "label": "tilelang_0_warm",
+      "backend": "tilelang",
+      "repeat": 0,
+      "cache": "warm",
+      "subprocess_seconds": 4.443340705000082,
+      "emit_seconds": 0.008010533000742726,
+      "returncode": 1,
+      "source_sha256": "f102817b35de203fe65ed23bdd36e2f294869090731e0e21a813f21f65785638",
+      "success": false,
+      "torch": "2.4.0+cu124",
+      "backend_version": "0.1.11",
+      "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+      "cuda_available": true,
+      "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+      "capability": [
+        8,
+        9
+      ],
+      "error": "Traceback (most recent call last):\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 202, in worker\n    tests[0]()\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_warm/repro.py\", line 498, in test_kernel_0\n    _run_region([lambda: prepare_0(a_storage, b_storage), lambda: prepare_1(a_storage, b_storage)], (a_storage, b_storage), ref, 3, 0.05, relative=True)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_warm/repro.py\", line 134, in _run_region\n    launch = prepare()\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_warm/repro.py\", line 498, in <lambda>\n    _run_region([lambda: prepare_0(a_storage, b_storage), lambda: prepare_1(a_storage, b_storage)], (a_storage, b_storage), ref, 3, 0.05, relative=True)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 164, in prepare\n    launch = _original(*args, **kwargs)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.09.17/compilation_profile/native_control/tilelang_0_warm/repro.py\", line 385, in prepare_0\n    kernel = typed_kernel_0()\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/__init__.py\", line 494, in __call__\n    kernel = self.compile(*args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/__init__.py\", line 391, in compile\n    kernel_result = compile(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/__init__.py\", line 111, in compile\n    return cached(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cache/__init__.py\", line 115, in cached\n    return cache.cached(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cache/kernel_cache.py\", line 377, in cached\n    kernel = JITKernel(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/kernel.py\", line 133, in __init__\n    adapter = self._compile_and_create_adapter(func, out_idx)\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 64, in measured\n    result = function(*args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/jit/kernel.py\", line 248, in _compile_and_create_adapter\n    artifact = tilelang.lower(\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/engine/lower.py\", line 325, in lower\n    host_mod, device_mod, params, target, target_host = lower_to_host_device_ir(\n  File \"/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/tests/profile_compilation.py\", line 64, in measured\n    result = function(*args, **kwargs)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/engine/lower.py\", line 302, in lower_to_host_device_ir\n    mod = pipeline.lower(mod, target)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/backend/pass_pipeline/pipeline.py\", line 23, in lower\n    return self._lower(mod, target)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/pipeline.py\", line 144, in CUDAPassPipelineBody\n    mod = CUDAPassPipelineBodyPrologue(mod, target)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/pipeline.py\", line 113, in CUDAPassPipelineBodyPrologue\n    mod = tilelang.transform.LayoutInference()(mod)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/3rdparty/tvm/python/tvm/ir/transform.py\", line 171, in __call__\n    return _ffi_transform_api.RunPass(self, mod)\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule) const\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tirx::transform::PrimFuncPassNode::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tl::LayoutInferencer::Substitute(tvm::tirx::PrimFunc, bool)\n  File \"<unknown>\", line 0, in tvm::tl::BufferUseDefCollector::Run()\n  File \"<unknown>\", line 0, in tvm::tl::BufferUseDefCollector::RunInferStep(int, tvm::tl::InferLevel, bool, tvm::ffi::Map<tvm::tirx::Buffer, tvm::tl::Layout, void>&, tvm::ffi::Map<tvm::tirx::Buffer, tvm::tl::Layout, void> const&, std::deque<int, std::allocator<int> >&, std::vector<bool, std::allocator<bool> >&)\n  File \"<unknown>\", line 0, in tvm::tl::GemmNode::InferLayout(tvm::tl::LayoutInferArgs const&, tvm::tl::InferLevel) const\n  File \"<unknown>\", line 0, in TVMFFIPyCallback(void*, TVMFFIAny const*, int, TVMFFIAny*)\n  File \"<unknown>\", line 0, in TVMFFICyErrorSetRaisedFromPyError(_object*)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/tileop/gemm/__init__.py\", line 15, in gemm_infer_layout\n    return gemm.infer_layout(target, thread_nums)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/tileop/gemm/__init__.py\", line 125, in infer_layout\n    return impl_class(self).infer_layout(target, thread_nums)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/op/gemm/gemm_mma.py\", line 43, in infer_layout\n    mma_emitter = self._make_mma_emitter(target, thread_nums)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/cuda/op/gemm/gemm_mma.py\", line 24, in _make_mma_emitter\n    m_warp, n_warp = self.policy.compute_warp_partition(self.M, self.N, thread_nums, target, GEMM_INST_MMA)\n  File \"/home/lifang535/anaconda3/envs/tile_program_fuzzing/lib/python3.10/site-packages/tilelang/ir.py\", line 32, in compute_warp_partition\n    _ffi_api.GemmWarpPolicyComputeWarpPartition(self, int(M), int(N), int(block_size), target, gemm_inst)\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::tl::GemmWarpPolicyNode::computeWarpPartition(int, int, int, tvm::Target, tvm::ffi::String) const\n  File \"/project/src/cuda/op/gemm.cc\", line 179, in std::pair<int, int> tvm::tl::cuda::{anonymous}::ComputeDefaultWarpPartition(const tvm::tl::GemmWarpPolicyNode&, int, int, int, int)\ntvm.error.InternalError: Check failed: (m_warp * n_warp == num_warps) is false: m_warp * n_warp must equal num_warps, m_warp: 1, n_warp: 1, num_warps: 8\n",
+      "stages": {
+        "import.torch": {
+          "calls": 1,
+          "seconds": 1.1015563629998724,
+          "exclusive_seconds": 1.1015563629998724
+        },
+        "import.backend": {
+          "calls": 1,
+          "seconds": 0.8970143259994074,
+          "exclusive_seconds": 0.8970143259994074
+        },
+        "runtime.cuda_context": {
+          "calls": 1,
+          "seconds": 0.13603430300008768,
+          "exclusive_seconds": 0.13603430300008768
+        },
+        "instrumentation.setup": {
+          "calls": 1,
+          "seconds": 0.00024898799983930076,
+          "exclusive_seconds": 0.00024898799983930076
+        },
+        "module.load": {
+          "calls": 1,
+          "seconds": 0.18307569899934606,
+          "exclusive_seconds": 0.18307569899934606
+        },
+        "runtime.inputs": {
+          "calls": 2,
+          "seconds": 0.025300793000496924,
+          "exclusive_seconds": 0.025300793000496924
+        },
+        "runtime.reference": {
+          "calls": 1,
+          "seconds": 0.13389618400015024,
+          "exclusive_seconds": 0.13389618400015024
+        },
+        "tilelang.frontend": {
+          "calls": 1,
+          "seconds": 0.07101785699978791,
+          "exclusive_seconds": 0.07101785699978791
+        },
+        "tilelang.pass.pass_fn": {
+          "calls": 3,
+          "seconds": 0.0020812849998037564,
+          "exclusive_seconds": 0.0020812849998037564
+        },
+        "tilelang.pass.tirx.BindTarget": {
+          "calls": 1,
+          "seconds": 0.00010955400011880556,
+          "exclusive_seconds": 0.00010955400011880556
+        },
+        "tilelang.pass.tl.LegalizeNegativeIndex": {
+          "calls": 1,
+          "seconds": 0.004342339999311662,
+          "exclusive_seconds": 0.004342339999311662
+        },
+        "tilelang.pass.tl.VerifyParallelLoop": {
+          "calls": 1,
+          "seconds": 0.03413439199994173,
+          "exclusive_seconds": 0.03413439199994173
+        },
+        "tilelang.pass.tl.InjectAssumes": {
+          "calls": 1,
+          "seconds": 9.25820004340494e-05,
+          "exclusive_seconds": 9.25820004340494e-05
+        },
+        "tilelang.pass.tl.Simplify": {
+          "calls": 2,
+          "seconds": 0.02040131299963832,
+          "exclusive_seconds": 0.02040131299963832
+        },
+        "tilelang.pass.tl.LayoutReducer": {
+          "calls": 1,
+          "seconds": 0.002812620000440802,
+          "exclusive_seconds": 0.002812620000440802
+        },
+        "tilelang.pass.tl.LowerBlackwell2SM": {
+          "calls": 1,
+          "seconds": 2.160599979106337e-05,
+          "exclusive_seconds": 2.160599979106337e-05
+        },
+        "tilelang.pass.tl.IfStmtBinding": {
+          "calls": 1,
+          "seconds": 0.00010113100051967194,
+          "exclusive_seconds": 0.00010113100051967194
+        },
+        "tilelang.pass.tl.PipelinePlanning": {
+          "calls": 1,
+          "seconds": 4.075700053363107e-05,
+          "exclusive_seconds": 4.075700053363107e-05
+        },
+        "tilelang.pass.tl.InjectSoftwarePipeline": {
+          "calls": 1,
+          "seconds": 0.0001281020004171296,
+          "exclusive_seconds": 0.0001281020004171296
+        },
+        "tilelang.pass.tl.LayoutInference": {
+          "calls": 1,
+          "seconds": 0.9642804649993195,
+          "exclusive_seconds": 0.9642804649993195
+        },
+        "tilelang.lower_to_host_device_ir": {
+          "calls": 1,
+          "seconds": 1.0307387120001295,
+          "exclusive_seconds": 0.0021925649998593144
+        },
+        "tilelang.compile_total": {
+          "calls": 1,
+          "seconds": 1.0309431550003865,
+          "exclusive_seconds": 0.00020444300025701523
+        },
+        "prepare_variant": {
+          "calls": 1,
+          "seconds": 1.295813203999387,
+          "exclusive_seconds": 0.19385219199921266
+        },
+        "harness.total": {
+          "calls": 1,
+          "seconds": 1.456350227999792,
+          "exclusive_seconds": 0.0013400469997577602
+        },
+        "worker": {
+          "calls": 1,
+          "seconds": 3.800625425999897,
+          "exclusive_seconds": 0.02634551900155202
+        }
+      },
+      "span_accounting_valid": true
+    }
+  ],
+  "instrumented": true,
+  "cache_policy": "Private DSL caches per backend/trial; warm reuses them; CUDA driver cache is inherited",
+  "timing_note": "Wall time; stages nest. Use exclusive_seconds for additive totals. Kernel wrappers synchronize."
+}

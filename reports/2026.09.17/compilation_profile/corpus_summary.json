@@ -1,0 +1,154 @@
+[
+  {
+    "case": "arithmetic",
+    "type": "extended",
+    "nodes": 22,
+    "operations": {
+      "index": 2,
+      "constant": 6,
+      "load": 2,
+      "mul": 2,
+      "cast": 2,
+      "bitand": 1,
+      "lt": 1,
+      "and": 1,
+      "select": 1,
+      "add": 2,
+      "sub": 1,
+      "reduce": 1
+    },
+    "functions": 0,
+    "max_result_elements": 512
+  },
+  {
+    "case": "control_calls",
+    "type": "extended",
+    "nodes": 51,
+    "operations": {
+      "reduce": 3,
+      "add": 10,
+      "reshape": 1,
+      "cast": 3,
+      "index": 2,
+      "constant": 14,
+      "load": 3,
+      "mul": 4,
+      "call": 3,
+      "parameter": 1,
+      "lt": 1,
+      "for": 1,
+      "if": 2,
+      "sub": 2,
+      "while": 1
+    },
+    "functions": 1,
+    "max_result_elements": 512
+  },
+  {
+    "case": "indexed_memory",
+    "type": "extended",
+    "nodes": 22,
+    "operations": {
+      "index": 2,
+      "constant": 4,
+      "load": 4,
+      "mul": 2,
+      "parameter": 1,
+      "lt": 1,
+      "store": 2,
+      "barrier": 3,
+      "add": 2,
+      "bitxor": 1
+    },
+    "functions": 0,
+    "max_result_elements": 512
+  },
+  {
+    "case": "mixed",
+    "type": "extended",
+    "nodes": 106,
+    "operations": {
+      "reduce": 3,
+      "add": 15,
+      "reshape": 4,
+      "cast": 6,
+      "index": 7,
+      "constant": 26,
+      "load": 9,
+      "mul": 6,
+      "bitxor": 2,
+      "lt": 4,
+      "parameter": 3,
+      "and": 1,
+      "select": 1,
+      "store": 2,
+      "barrier": 3,
+      "transpose": 1,
+      "matmul": 2,
+      "sub": 4,
+      "call": 3,
+      "for": 1,
+      "if": 2,
+      "while": 1
+    },
+    "functions": 1,
+    "max_result_elements": 512
+  },
+  {
+    "case": "native",
+    "type": "region",
+    "spec": {
+      "M": 2849,
+      "N": 870,
+      "K": 1042,
+      "block_M": 32,
+      "block_N": 16,
+      "block_K": 16,
+      "threads": 256,
+      "num_stages": 1,
+      "loop_kind": "serial",
+      "compute_kind": "gemm",
+      "dtype": "float32",
+      "name": "kernel_0"
+    },
+    "functions": 2
+  },
+  {
+    "case": "native_matched",
+    "type": "region",
+    "spec": {
+      "M": 7165,
+      "N": 977,
+      "K": 977,
+      "block_M": 128,
+      "block_N": 16,
+      "block_K": 32,
+      "threads": 256,
+      "num_stages": 1,
+      "loop_kind": "serial",
+      "compute_kind": "gemm",
+      "dtype": "float32",
+      "name": "kernel_0"
+    },
+    "functions": 2
+  },
+  {
+    "case": "shape_matmul",
+    "type": "extended",
+    "nodes": 20,
+    "operations": {
+      "index": 1,
+      "constant": 3,
+      "load": 1,
+      "mul": 3,
+      "cast": 4,
+      "transpose": 1,
+      "matmul": 2,
+      "reduce": 1,
+      "reshape": 3,
+      "sub": 1
+    },
+    "functions": 0,
+    "max_result_elements": 512
+  }
+]

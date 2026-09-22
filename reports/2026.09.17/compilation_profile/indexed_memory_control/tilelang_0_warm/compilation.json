@@ -1,0 +1,86 @@
+[
+  {
+    "variant": "tilelang_0",
+    "options": {
+      "threads": 128,
+      "stages": 1,
+      "pass_configs": {}
+    },
+    "stages": {
+      "tir": {
+        "sha256": "f1e44347ac3073ea6c4c7e6d37a2af55098811643a02fb37aa7731e7f207f860",
+        "bytes": 4714
+      },
+      "cuda": {
+        "sha256": "d4107292935edc6602a9ff98e6f90767e3fe7bdf6c8bcf84c68075ce3ba9d93f",
+        "bytes": 4928
+      }
+    },
+    "features": [],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_1",
+    "options": {
+      "threads": 128,
+      "stages": 1,
+      "pass_configs": {}
+    },
+    "stages": {
+      "tir": {
+        "sha256": "412e3b82a6e36c2dcf8775f24e03fef8a991f8cb22b9b1aafb25c2f09946c527",
+        "bytes": 5545
+      },
+      "cuda": {
+        "sha256": "cfd0af67b3dc5871072bf08a4d67fba24a705639815308e3b19bcedaf1f435bf",
+        "bytes": 6163
+      }
+    },
+    "features": [],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_2",
+    "options": {
+      "threads": 256,
+      "stages": 2,
+      "pass_configs": {
+        "tirx.disable_vectorize": true
+      }
+    },
+    "stages": {
+      "tir": {
+        "sha256": "c467cb5fca69636df8fd8c55de4f3e26ecacc3ff2cec59a476667628ff16212f",
+        "bytes": 4714
+      },
+      "cuda": {
+        "sha256": "0acfbbc8aba6880d6478a50ff69c10b396c0ca67fb1b31dee164b174d5e81a66",
+        "bytes": 4963
+      }
+    },
+    "features": [],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_3",
+    "options": {
+      "threads": 256,
+      "stages": 2,
+      "pass_configs": {
+        "tirx.disable_vectorize": true
+      }
+    },
+    "stages": {
+      "tir": {
+        "sha256": "88c9964652cc1d25ea5730eadab635f9dfcadb8ed82f76aa91eefcd130b2bfa0",
+        "bytes": 5545
+      },
+      "cuda": {
+        "sha256": "214f9b06c0dd516d18e6f5aa1147eb10f6efdc26f783b2459f4f5b545b36bbe0",
+        "bytes": 5988
+      }
+    },
+    "features": [],
+    "complete": true
+  }
+]

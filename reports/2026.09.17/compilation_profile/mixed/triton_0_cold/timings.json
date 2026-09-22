@@ -1,0 +1,121 @@
+{
+  "backend": "triton",
+  "success": true,
+  "torch": "2.4.0+cu124",
+  "backend_version": "3.0.0",
+  "python": "3.10.20 (main, Jun 11 2026, 15:17:37) [GCC 14.3.0]",
+  "cuda_available": true,
+  "gpu": "NVIDIA GeForce RTX 4060 Laptop GPU",
+  "capability": [
+    8,
+    9
+  ],
+  "stages": {
+    "import.torch": {
+      "calls": 1,
+      "seconds": 1.1044523270002173,
+      "exclusive_seconds": 1.1044523270002173
+    },
+    "import.backend": {
+      "calls": 1,
+      "seconds": 0.08082981400002609,
+      "exclusive_seconds": 0.08082981400002609
+    },
+    "runtime.cuda_context": {
+      "calls": 1,
+      "seconds": 0.1277656879992719,
+      "exclusive_seconds": 0.1277656879992719
+    },
+    "instrumentation.setup": {
+      "calls": 1,
+      "seconds": 9.816500005399575e-05,
+      "exclusive_seconds": 9.816500005399575e-05
+    },
+    "module.load": {
+      "calls": 1,
+      "seconds": 0.06621959699987201,
+      "exclusive_seconds": 0.06621959699987201
+    },
+    "artifacts.progress": {
+      "calls": 30,
+      "seconds": 0.0072265329990841565,
+      "exclusive_seconds": 0.0072265329990841565
+    },
+    "triton.frontend": {
+      "calls": 4,
+      "seconds": 0.136052214999836,
+      "exclusive_seconds": 0.136052214999836
+    },
+    "triton.ttir": {
+      "calls": 4,
+      "seconds": 0.03348944000026677,
+      "exclusive_seconds": 0.03348944000026677
+    },
+    "triton.ttgir": {
+      "calls": 4,
+      "seconds": 0.17154824899989762,
+      "exclusive_seconds": 0.17154824899989762
+    },
+    "triton.llir": {
+      "calls": 4,
+      "seconds": 0.41176899899983255,
+      "exclusive_seconds": 0.41176899899983255
+    },
+    "triton.ptx": {
+      "calls": 4,
+      "seconds": 0.08790347899866902,
+      "exclusive_seconds": 0.08790347899866902
+    },
+    "triton.cubin": {
+      "calls": 4,
+      "seconds": 0.18094037100036076,
+      "exclusive_seconds": 0.18094037100036076
+    },
+    "triton.compile_total": {
+      "calls": 4,
+      "seconds": 1.3949394879991814,
+      "exclusive_seconds": 0.37323673500031873
+    },
+    "artifacts.write": {
+      "calls": 4,
+      "seconds": 0.04279031199894234,
+      "exclusive_seconds": 0.04279031199894234
+    },
+    "prepare_all": {
+      "calls": 1,
+      "seconds": 1.4387009200008833,
+      "exclusive_seconds": 0.0004872880044786143
+    },
+    "runtime.inputs": {
+      "calls": 2,
+      "seconds": 0.002512887999728264,
+      "exclusive_seconds": 0.002512887999728264
+    },
+    "runtime.reference": {
+      "calls": 6,
+      "seconds": 0.03516861699972651,
+      "exclusive_seconds": 0.03516861699972651
+    },
+    "runtime.kernel": {
+      "calls": 72,
+      "seconds": 0.9058732099992994,
+      "exclusive_seconds": 0.9058732099992994
+    },
+    "runtime.compare": {
+      "calls": 1290,
+      "seconds": 1.05964592699911,
+      "exclusive_seconds": 1.05964592699911
+    },
+    "harness.total": {
+      "calls": 1,
+      "seconds": 4.074116855999819,
+      "exclusive_seconds": 0.6254725930002678
+    },
+    "worker": {
+      "calls": 1,
+      "seconds": 5.5282969910003885,
+      "exclusive_seconds": 0.07481454400112852
+    }
+  },
+  "span_accounting_valid": true
+}

@@ -1,5 +1,29 @@
 """Reference helpers embedded into generated, standalone reproducers."""
 
+import inspect
+
+
+def double_reference_source(function):
+    """Double-precision copy of a reference interpreter, returned as source text.
+
+    Used by the oracle trust gate: chaotic programs (nonlinear feedback loops,
+    e.g. carry = rowsum(cos(carry)) + carry) amplify arithmetic-order noise by
+    orders of magnitude, so no real kernel can reproduce the fp32 reference
+    within tolerance and every such program would be reported as a wrong_result
+    without a compiler bug (MLIRSmith counts exactly this as wasted effort).
+    The fp64 copy computes the ideal continuous semantics; op-level storage
+    quantizations are removed, `.float()` becomes `.double()`, and only the
+    final output cast stays so both copies round to the same storage dtype.
+    """
+    source = inspect.getsource(function)
+    name = function.__name__
+    source = source.replace(f'def {name}(', f'def {name}_double(', 1)
+    source = source.replace(".to(getattr(torch, attrs.get('dtype', 'float32')))", '')
+    source = source.replace(".to(getattr(torch, attrs['dtype'])).float()", '.double()')
+    source = source.replace(".to(getattr(torch, attrs['dtype']))", '')
+    source = source.replace('.float()', '.double()')
+    return source
+
 
 def _finite_compare(C, ref, check_signed_zero=False):
     """Check exceptional values before measuring finite numerical error.
@@ -38,103 +62,3 @@ def _finite_compare(C, ref, check_signed_zero=False):
     max_diff = max_error.item()
     ref_norm = magnitude_sum.item() / count + 1e-6
     return max_diff, ref_norm, max_diff / ref_norm
-
-
-def _max_diff(C, ref, check_signed_zero=False):
-    return _finite_compare(C, ref, check_signed_zero=check_signed_zero)[0]
-
-
-def _dynamic_reference(inputs, steps, block_n, output_dtype):
-    """Interpret buffer dataflow, including padded lanes and tile-local reductions.
-
-    Keep the N padding throughout the sequence: e.g. exp(0) in an inactive
-    lane contributes to a later tile-local sum. Crop only at global writeback.
-    Each fragment assignment rounds to its declared dtype.
-    """
-    import torch
-    m, n = inputs['A'].shape[0], inputs['B'].shape[1]
-    padding = (-n) % block_n
-    buffers = {}
-
-    def padded(x):
-        return torch.nn.functional.pad(x, (0, padding))
-
-    def operand(desc):
-        name, scope, dtype = desc
-        if scope == 'global':
-            return padded(inputs[name])
-        return buffers[name]
-
-    def branch(kind, x):
-        if kind == 'exp':
-            return torch.exp(x)
-        if kind == 'sqrt':
-            return torch.sqrt(x.abs())
-        if kind == 'neg':
-            return -x
-        if kind == 'scale':
-            return x * 0.5
-        if kind == 'abs':
-            return x.abs()
-        raise ValueError(f"Unknown branch: {kind}")
-
-    gemm = None
-    for step in steps:
-        kind, args, outputs, attrs = step
-        if kind == 'gemm':
-            gemm = padded(inputs['A'].float() @ inputs['B'].float())
-            value = gemm
-        elif kind in ('copy_g2s', 'copy_s2f'):
-            value = operand(args[0]).clone()
-        elif kind == 'copy_f2g':
-            return operand(args[0])[:, :n].to(getattr(torch, output_dtype))
-        else:
-            x = operand(args[0]).float()
-            if kind == 'scale':
-                value = x * attrs['alpha']
-            elif kind == 'exp':
-                value = torch.exp(x)
-            elif kind == 'sqrt':
-                value = torch.sqrt(x.abs())
-            elif kind == 'elemwise_add':
-                value = x + operand(args[1]).float()
-            elif kind == 'elemwise_mul':
-                value = x * operand(args[1]).float()
-            elif kind == 'elemwise_max':
-                value = torch.maximum(x, operand(args[1]).float())
-            elif kind == 'if_epilogue':
-                value = torch.where(x > attrs['threshold'],
-                                    branch(attrs['branch_a'], x), branch(attrs['branch_b'], x))
-            elif kind == 'double_pipeline':
-                # Old pending programs may explicitly consume this temporary.
-                buffers[attrs['c2_name']] = gemm
-                value = x + gemm
-            elif kind == 'accumulate_reduce':
-                tiles = x.reshape(m, -1, block_n)
-                if attrs['mode'] == 'subtract_max':
-                    value = tiles - tiles.max(dim=-1, keepdim=True).values
-                elif attrs['mode'] == 'divide_sum':
-                    value = tiles / (tiles.sum(dim=-1, keepdim=True) + 1e-6)
-                else:
-                    raise ValueError(f"Unknown reduction mode: {attrs['mode']}")
-                value = value.reshape(m, -1)
-            elif kind in ('softmax', 'reduce_sum', 'reduce_max', 'reduce_min'):
-                if n != block_n:
-                    raise ValueError("Terminal row operations require N == block_N")
-                if kind == 'softmax':
-                    # Match the explicit fragment store between exp and sum.
-                    dtype = getattr(torch, outputs[0][2])
-                    exps = torch.exp(x - x.max(dim=-1, keepdim=True).values).to(dtype).float()
-                    value = exps / exps.sum(dim=-1, keepdim=True)
-                elif kind == 'reduce_sum':
-                    value = x.sum(dim=-1)
-                elif kind == 'reduce_max':
-                    value = x.max(dim=-1).values
-                else:
-                    value = x.min(dim=-1).values
-                return value.to(getattr(torch, output_dtype))
-            else:
-                raise ValueError(f"Unknown dynamic op: {kind}")
-        name, scope, dtype = outputs[0]
-        buffers[name] = value.to(getattr(torch, dtype))
-    raise ValueError("Dynamic sequence has no output writeback")

@@ -1,0 +1,174 @@
+[
+  {
+    "variant": "tilelang_0",
+    "options": {
+      "threads": 128,
+      "stages": 1,
+      "pass_configs": {}
+    },
+    "stages": {
+      "tir": {
+        "sha256": "c100a7b5f6bee0ee880a2a3b45587ecf2713cb07d7288d436ae8a726b4338d67",
+        "bytes": 5727
+      },
+      "cuda": {
+        "sha256": "059b5a034070a32cbb57640e6db6c9c33d848539270ebecb469fa656d9a63388",
+        "bytes": 5555
+      },
+      "lowered_tir": {
+        "sha256": "5e9d72494f138d3cbc06b5347b933bc2eaab7f41d29fe9f32546d4987bfb3c34",
+        "bytes": 7070
+      }
+    },
+    "features": [
+      "[\"compiler\",\"lowered_tir\",\"T.Cast\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.alloc_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bitwise_and\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bool\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.call_extern\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.decl_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float16\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float32\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.func_attr\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.handle\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.if_then_else\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int64\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int8\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.launch_thread\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.prim_func\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.target\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.unroll\"]"
+    ],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_1",
+    "options": {
+      "threads": 128,
+      "stages": 1,
+      "pass_configs": {}
+    },
+    "stages": {
+      "tir": {
+        "sha256": "6531df6ac034c06d7c59444d7f415c3da6f43e83ec0f4e65dceefcfad08b8f2a",
+        "bytes": 6222
+      },
+      "cuda": {
+        "sha256": "efd5f1205a55de999b7ba271217147a136b8cf054075a32a651f466127a8914c",
+        "bytes": 6474
+      },
+      "lowered_tir": {
+        "sha256": "e9b838e0cfd701ebf1d4ccdcec562113d11dbc5a099f4d3b08a919523b5af95c",
+        "bytes": 7655
+      }
+    },
+    "features": [
+      "[\"compiler\",\"lowered_tir\",\"T.Cast\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.alloc_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bitwise_and\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bool\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.call_extern\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.decl_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float16\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float32\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.func_attr\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.handle\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.if_then_else\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int64\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int8\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.launch_thread\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.prim_func\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.target\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.unroll\"]"
+    ],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_2",
+    "options": {
+      "threads": 256,
+      "stages": 2,
+      "pass_configs": {
+        "tirx.disable_vectorize": true
+      }
+    },
+    "stages": {
+      "tir": {
+        "sha256": "a277a7dd4dc6537bdf6770baadae431aac27895073623bfa145ad403cca42b18",
+        "bytes": 5727
+      },
+      "cuda": {
+        "sha256": "0864c24d2a3ed0e214d09f8411392b514e5999130d0cf02fbbb21738990d0687",
+        "bytes": 5146
+      },
+      "lowered_tir": {
+        "sha256": "1ea61620d07610af94acd71e8275f29719ca57ef8d87fe2f462d51b83ccc99ab",
+        "bytes": 7109
+      }
+    },
+    "features": [
+      "[\"compiler\",\"lowered_tir\",\"T.Cast\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.alloc_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bitwise_and\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bool\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.call_extern\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.decl_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float16\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float32\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.func_attr\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.handle\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.if_then_else\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int64\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int8\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.launch_thread\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.prim_func\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.target\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.unroll\"]"
+    ],
+    "complete": true
+  },
+  {
+    "variant": "tilelang_3",
+    "options": {
+      "threads": 256,
+      "stages": 2,
+      "pass_configs": {
+        "tirx.disable_vectorize": true
+      }
+    },
+    "stages": {
+      "tir": {
+        "sha256": "1818ab153ce9528ad0e60838af7f812868fb9914baeb5d97272b825f24058ed4",
+        "bytes": 6222
+      },
+      "cuda": {
+        "sha256": "a96dc24aaa9433890b6e4092d201d5c29576978f666f0b7b7027bc363fb73e8a",
+        "bytes": 5773
+      },
+      "lowered_tir": {
+        "sha256": "95b7d566108007b7cbb5c6ace8917b4df3fd472c08a82da40901cea4a4c0f723",
+        "bytes": 7708
+      }
+    },
+    "features": [
+      "[\"compiler\",\"lowered_tir\",\"T.Cast\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.alloc_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bitwise_and\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.bool\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.call_extern\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.decl_buffer\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float16\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.float32\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.func_attr\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.handle\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.if_then_else\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int64\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.int8\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.launch_thread\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.prim_func\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.target\"]",
+      "[\"compiler\",\"lowered_tir\",\"T.unroll\"]"
+    ],
+    "complete": true
+  }
+]

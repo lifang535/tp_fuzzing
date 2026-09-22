@@ -1,0 +1,26 @@
+[
+  {
+    "case": "arithmetic",
+    "returncode": 0
+  },
+  {
+    "case": "indexed_memory",
+    "returncode": 0
+  },
+  {
+    "case": "shape_matmul",
+    "returncode": 0
+  },
+  {
+    "case": "control_calls",
+    "returncode": 0
+  },
+  {
+    "case": "native",
+    "returncode": 1
+  },
+  {
+    "case": "mixed_single",
+    "returncode": 0
+  }
+]

@@ -1,0 +1,287 @@
+{
+  "type": "region",
+  "version": 4,
+  "value_type": "tile<float32>",
+  "spec": {
+    "M": 2849,
+    "N": 870,
+    "K": 1042,
+    "block_M": 32,
+    "block_N": 16,
+    "block_K": 16,
+    "threads": 256,
+    "num_stages": 1,
+    "loop_kind": "serial",
+    "compute_kind": "gemm",
+    "dtype": "float32",
+    "name": "kernel_0"
+  },
+  "body": {
+    "arguments": [],
+    "operations": [
+      {
+        "kind": "gemm",
+        "result": "v1",
+        "operands": [],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "kind": "scale",
+        "result": "v2",
+        "operands": [
+          "v1"
+        ],
+        "attrs": {
+          "alpha": 0.12710619066818765
+        },
+        "regions": []
+      },
+      {
+        "kind": "scale",
+        "result": "v3",
+        "operands": [
+          "v2"
+        ],
+        "attrs": {
+          "alpha": 8.368798436106088
+        },
+        "regions": []
+      },
+      {
+        "kind": "scale",
+        "result": "v4",
+        "operands": [
+          "v1"
+        ],
+        "attrs": {
+          "alpha": 0.9918184684016523
+        },
+        "regions": []
+      },
+      {
+        "kind": "to_tile",
+        "result": "v5",
+        "operands": [
+          "v4"
+        ],
+        "attrs": {},
+        "regions": []
+      },
+      {
+        "kind": "call",
+        "result": "v6",
+        "operands": [
+          "v1"
+        ],
+        "attrs": {
+          "callee": "fn_1"
+        },
+        "regions": []
+      }
+    ],
+    "yield_value": "v6"
+  },
+  "input_scale": 0.1,
+  "functions": [
+    {
+      "name": "fn_0",
+      "body": {
+        "arguments": [
+          "arg0",
+          "arg1"
+        ],
+        "operations": [
+          {
+            "kind": "if",
+            "result": "v8",
+            "operands": [
+              "arg0"
+            ],
+            "attrs": {
+              "predicate": "checkerboard",
+              "modulus": 2,
+              "parity": 0
+            },
+            "regions": [
+              {
+                "arguments": [
+                  "v1"
+                ],
+                "operations": [
+                  {
+                    "kind": "mul",
+                    "result": "v2",
+                    "operands": [
+                      "v1",
+                      "arg1"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "kind": "cast",
+                    "result": "v3",
+                    "operands": [
+                      "v2"
+                    ],
+                    "attrs": {
+                      "dtype": "float16"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "kind": "round",
+                    "result": "v4",
+                    "operands": [
+                      "v3"
+                    ],
+                    "attrs": {
+                      "dtype": "float16"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "kind": "copy",
+                    "result": "v5",
+                    "operands": [
+                      "v3"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "kind": "to_tile",
+                    "result": "v6",
+                    "operands": [
+                      "v3"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  }
+                ],
+                "yield_value": "v6"
+              },
+              {
+                "arguments": [
+                  "v7"
+                ],
+                "operations": [],
+                "yield_value": "v7"
+              }
+            ]
+          },
+          {
+            "kind": "to_tile",
+            "result": "v9",
+            "operands": [
+              "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+          }
+        ],
+        "yield_value": "v9"
+      }
+    },
+    {
+      "name": "fn_1",
+      "body": {
+        "arguments": [
+          "arg0"
+        ],
+        "operations": [
+          {
+            "kind": "store_tile",
+            "result": "v1",
+            "operands": [
+              "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "row_min",
+            "result": "v2",
+            "operands": [
+              "arg0"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "exp",
+            "result": "v3",
+            "operands": [
+              "v2"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "write_tile",
+            "result": "v4",
+            "operands": [
+              "v1",
+              "v2"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "round",
+            "result": "v5",
+            "operands": [
+              "v3"
+            ],
+            "attrs": {
+              "dtype": "float32"
+            },
+            "regions": []
+          },
+          {
+            "kind": "load_tile",
+            "result": "v6",
+            "operands": [
+              "v1"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "to_tile",
+            "result": "v7",
+            "operands": [
+              "v6"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "call",
+            "result": "v8",
+            "operands": [
+              "v7",
+              "v6"
+            ],
+            "attrs": {
+              "callee": "fn_0"
+            },
+            "regions": []
+          }
+        ],
+        "yield_value": "v8"
+      }
+    }
+  ],
+  "execution": {
+    "input_pattern": "normal",
+    "input_seed_count": 2,
+    "repeat_count": 3,
+    "schedule_pair": true,
+    "input_layout_a": "strided"
+  },
+  "typed": true,
+  "input_seed": 0,
+  "validation_mode": "execute"
+}

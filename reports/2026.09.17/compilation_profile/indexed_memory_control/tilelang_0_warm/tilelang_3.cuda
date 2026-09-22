@@ -1,0 +1,169 @@
+#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940
+#define _tl_orig_alignas alignas
+#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)
+#include <cuda.h>
+#undef alignas
+#define alignas _tl_orig_alignas
+#endif
+#include <tl_templates/cuda/gemm.h>
+#include <tl_templates/cuda/copy.h>
+#include <tl_templates/cuda/reduce.h>
+#include <tl_templates/cuda/scan.h>
+#include <tl_templates/cuda/ldsm.h>
+#include <tl_templates/cuda/threadblock_swizzle.h>
+#include <tl_templates/cuda/debug.h>
+#ifdef ENABLE_BF16
+#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>
+#endif
+
+extern "C" __global__ void impl_kernel(const half_t* __restrict__ mem0, half_t* __restrict__ mem1, half_t* __restrict__ out_e12, int* __restrict__ out_e13, half_t* __restrict__ out_e17, signed char* __restrict__ out_e2, half_t* __restrict__ out_e3, half_t* __restrict__ out_e8, int limit);
+extern "C" __global__ void __launch_bounds__(256, 1) impl_kernel(const half_t* __restrict__ mem0, half_t* __restrict__ mem1, half_t* __restrict__ out_e12, int* __restrict__ out_e13, half_t* __restrict__ out_e17, signed char* __restrict__ out_e2, half_t* __restrict__ out_e3, half_t* __restrict__ out_e8, int limit) {
+  int e1[2];
+  signed char e2[2];
+  half_t e3[2];
+  half_t e4[2];
+  int e5[2];
+  int e6[1];
+  signed char e7[2];
+  half_t e8[2];
+  half_t e9[2];
+  half_t e10[2];
+  signed char e11[2];
+  half_t e12[2];
+  int e13[2];
+  int e14[2];
+  half_t e15[2];
+  half_t e16[2];
+  half_t e17[2];
+  #pragma unroll
+  for (int i = 0; i < 2; ++i) {
+    e1[i] = (((24 - i) - (((int)threadIdx.x) * 2)) & 511);
+  }
+  #pragma unroll
+  for (int i_1 = 0; i_1 < 2; ++i_1) {
+    e2[i_1] = (signed char)1;
+  }
+  #pragma unroll
+  for (int i_2 = 0; i_2 < 2; ++i_2) {
+    half_t condval;
+    if (((((((bool)e2[i_2]) && (0 <= e1[i_2])) && (e1[i_2] < 512)) && (-16 <= e1[i_2])) && (e1[i_2] < 528))) {
+      condval = mem0[(((((int64_t)((int)blockIdx.x)) * (int64_t)544) + ((int64_t)e1[((int64_t)i_2)])) + (int64_t)16)];
+    } else {
+      condval = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e3[i_2] = condval;
+  }
+  #pragma unroll
+  for (int i_3 = 0; i_3 < 2; ++i_3) {
+    e4[i_3] = (e3[i_3] * e3[i_3]);
+  }
+  #pragma unroll
+  for (int i_4 = 0; i_4 < 2; ++i_4) {
+    e5[i_4] = (((88 - i_4) - (((int)threadIdx.x) * 2)) & 511);
+  }
+  e6[0] = limit;
+  #pragma unroll
+  for (int i_5 = 0; i_5 < 2; ++i_5) {
+    e7[i_5] = ((signed char)(e5[i_5] < e6[0]));
+  }
+  #pragma unroll
+  for (int i_6 = 0; i_6 < 2; ++i_6) {
+    if ((((bool)e7[i_6]) && (0 <= e5[i_6])) && (e5[i_6] < 512)) {
+      if (-8 <= e5[i_6]) {
+        if (e5[i_6] < 522) {
+          mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)1060) + (((int64_t)e5[((int64_t)i_6)]) * (int64_t)2)) + (int64_t)17)] = e4[i_6];
+        }
+      }
+    }
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_7 = 0; i_7 < 2; ++i_7) {
+    half_t condval_1;
+    if (((((((bool)e7[i_7]) && (0 <= e5[i_7])) && (e5[i_7] < 512)) && (-8 <= e5[i_7])) && (e5[i_7] < 522))) {
+      condval_1 = mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)1060) + (((int64_t)e5[((int64_t)i_7)]) * (int64_t)2)) + (int64_t)17)];
+    } else {
+      condval_1 = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e8[i_7] = condval_1;
+  }
+  #pragma unroll
+  for (int i_8 = 0; i_8 < 2; ++i_8) {
+    e9[i_8] = half_t(0x1p-3f/*1.250000e-01*/);
+  }
+  #pragma unroll
+  for (int i_9 = 0; i_9 < 2; ++i_9) {
+    e10[i_9] = (e8[i_9] + e9[i_9]);
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_10 = 0; i_10 < 2; ++i_10) {
+    if ((((bool)e7[i_10]) && (0 <= e5[i_10])) && (e5[i_10] < 512)) {
+      if (-18 <= e5[i_10]) {
+        if (e5[i_10] < 1042) {
+          mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)1060) + ((int64_t)e5[((int64_t)i_10)])) + (int64_t)18)] = e10[i_10];
+        }
+      }
+    }
+  }
+  __syncthreads();
+  #pragma unroll
+  for (int i_11 = 0; i_11 < 2; ++i_11) {
+    e11[i_11] = (signed char)1;
+  }
+  #pragma unroll
+  for (int i_12 = 0; i_12 < 2; ++i_12) {
+    half_t condval_2;
+    if (((((((bool)e11[i_12]) && (0 <= e5[i_12])) && (e5[i_12] < 512)) && (-8 <= e5[i_12])) && (e5[i_12] < 522))) {
+      condval_2 = mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)1060) + (((int64_t)e5[((int64_t)i_12)]) * (int64_t)2)) + (int64_t)17)];
+    } else {
+      condval_2 = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e12[i_12] = condval_2;
+  }
+  #pragma unroll
+  for (int i_13 = 0; i_13 < 2; ++i_13) {
+    e13[i_13] = 1;
+  }
+  #pragma unroll
+  for (int i_14 = 0; i_14 < 2; ++i_14) {
+    e14[i_14] = (e5[i_14] ^ e13[i_14]);
+  }
+  #pragma unroll
+  for (int i_15 = 0; i_15 < 2; ++i_15) {
+    half_t condval_3;
+    if (((((((bool)e7[i_15]) && (0 <= e14[i_15])) && (e14[i_15] < 512)) && (-18 <= e14[i_15])) && (e14[i_15] < 1042))) {
+      condval_3 = mem1[(((((int64_t)((int)blockIdx.x)) * (int64_t)1060) + ((int64_t)e14[((int64_t)i_15)])) + (int64_t)18)];
+    } else {
+      condval_3 = half_t(0x0p+0f/*0.000000e+00*/);
+    }
+    e15[i_15] = condval_3;
+  }
+  #pragma unroll
+  for (int i_16 = 0; i_16 < 2; ++i_16) {
+    e16[i_16] = (e12[i_16] + e15[i_16]);
+  }
+  #pragma unroll
+  for (int i_17 = 0; i_17 < 2; ++i_17) {
+    e17[i_17] = (e16[i_17] * e9[i_17]);
+  }
+  for (int i_18 = 0; i_18 < 2; ++i_18) {
+    out_e17[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_18) + 16)] = e17[i_18];
+  }
+  for (int i_19 = 0; i_19 < 2; ++i_19) {
+    out_e3[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_19) + 16)] = e3[i_19];
+  }
+  for (int i_20 = 0; i_20 < 2; ++i_20) {
+    out_e8[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_20) + 16)] = e8[i_20];
+  }
+  for (int i_21 = 0; i_21 < 2; ++i_21) {
+    out_e12[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_21) + 16)] = e12[i_21];
+  }
+  for (int i_22 = 0; i_22 < 2; ++i_22) {
+    out_e13[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_22) + 16)] = e13[i_22];
+  }
+  for (int i_23 = 0; i_23 < 2; ++i_23) {
+    out_e2[((((((int)blockIdx.x) * 544) + (((int)threadIdx.x) * 2)) + i_23) + 16)] = ((signed char)((bool)e2[i_23]));
+  }
+}
+
