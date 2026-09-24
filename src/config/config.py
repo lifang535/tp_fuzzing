@@ -153,13 +153,21 @@ class Config:
     pool_rotation_interval: int = 100
 
     # ── Bug deduplication ───────────────────────────────────────────────
-    # Maximum times the same root_cause is reported before being marked "dup".
-    # Every occurrence still counts in summary.json root_causes; only example
-    # *saving* (failed/{root_cause}/*.py,*.json) is capped. Systematic
-    # front-end rejections — a version-gapped DSL binding, a cache collision —
-    # can fire hundreds of identical reports per campaign; keeping a handful
-    # of reproducers per root cause preserves disk and review signal.
-    max_same_root_cause: int = 10
+    # Maximum reproducers saved per root_cause; 0 (the default) means no cap.
+    # Every occurrence counts in summary.json root_causes either way — this
+    # only gates *saving* (failed/{root_cause}/*.py,*.json). Coarse labels
+    # merge distinct defects: unclassified compiler diagnostics all collapse
+    # to 'other', so a per-label cap silently drops real bugs past the tenth
+    # one. Set a positive value only to throttle a systematic front-end
+    # rejection (a version-gapped DSL binding, a cache collision) that would
+    # otherwise flood the output directory.
+    max_same_root_cause: int = 0
+
+    # Reproducers kept for the oracle trust gate. These are not bugs — the
+    # reference disagrees with its own fp64/jittered copy, so no kernel could
+    # pass the numeric check — only audit samples of wasted fuzzing effort,
+    # and they stay capped regardless of max_same_root_cause.
+    max_oracle_unstable_saved: int = 10
 
     # ── Oracle timeouts ─────────────────────────────────────────────────
     compile_timeout: int = 60   # seconds for compilation

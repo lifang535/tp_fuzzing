@@ -374,20 +374,27 @@ class TileSmith:
                         # A few reproducers are saved for auditing, and the
                         # failed-program feedback demotion still applies.
                         self.stats.oracle_unstable += 1
-                        if self.stats.oracle_unstable <= self.config.max_same_root_cause:
+                        if self.stats.oracle_unstable <= self.config.max_oracle_unstable_saved:
                             self._save_bug(bug, i, program)
                         if verbose:
                             print(f"[{i}] [ORACLE UNSTABLE] {self._kind_label(program)}")
                         continue
                     self.stats.bugs_found.append(bug)
-                    is_new = self.known_root_causes.get(bug.root_cause, 0) < self.config.max_same_root_cause
-                    if is_new:
+                    seen = self.known_root_causes.get(bug.root_cause, 0)
+                    # max_same_root_cause == 0 disables throttling: every failure
+                    # writes a reproducer. A coarse label merges distinct defects
+                    # (unclassified diagnostics all land in 'other'), so capping
+                    # *saving* per label discards real bugs that cannot be
+                    # recovered afterwards — the count stays in summary.json but
+                    # the program is gone.
+                    saved = self.config.max_same_root_cause <= 0 or seen < self.config.max_same_root_cause
+                    if saved:
                         self.stats.unique_bugs.append(bug)
                         self._save_bug(bug, i, program)
-                    self.known_root_causes[bug.root_cause] = self.known_root_causes.get(bug.root_cause, 0) + 1
+                    self.known_root_causes[bug.root_cause] = seen + 1
                     self.root_cause_locations.setdefault(bug.root_cause, Counter())[bug.location] += 1
                     if verbose:
-                        marker = "NEW" if is_new else "dup"
+                        marker = 'NEW' if seen == 0 else ('saved' if saved else 'dup')
                         print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}")
                 else:
                     self._save_passed(program, i)
@@ -417,6 +424,9 @@ class TileSmith:
                 "programs_passed": self.stats.programs_passed,
                 "coverage_probe_prob": self.config.coverage_probe_prob,
                 "dtype_mutate_prob": self.config.dtype_mutate_prob,
+                # 0 means every failure saved a reproducer this run.
+                "max_same_root_cause": self.config.max_same_root_cause,
+                "max_oracle_unstable_saved": self.config.max_oracle_unstable_saved,
                 "generation_config": {
                     "extended_prob": self.config.extended_prob,
                     "extended_configuration_pair": self.config.extended_configuration_pair,
