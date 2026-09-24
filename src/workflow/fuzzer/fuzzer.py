@@ -371,13 +371,17 @@ class TileSmith:
                         # The numeric check was skipped: no implementation could
                         # pass it, so this is wasted fuzzing effort (MLIRSmith
                         # counts invalid programs the same way), not a bug.
-                        # A few reproducers are saved for auditing, and the
+                        # Every reproducer is kept for auditing (0 = no cap,
+                        # same convention as max_same_root_cause) and the
                         # failed-program feedback demotion still applies.
                         self.stats.oracle_unstable += 1
-                        if self.stats.oracle_unstable <= self.config.max_oracle_unstable_saved:
+                        saved = (self.config.max_oracle_unstable_saved <= 0
+                                 or self.stats.oracle_unstable <= self.config.max_oracle_unstable_saved)
+                        if saved:
                             self._save_bug(bug, i, program)
                         if verbose:
-                            print(f"[{i}] [ORACLE UNSTABLE] {self._kind_label(program)}")
+                            marker = 'saved' if saved else 'dup'
+                            print(f"[{i}] [ORACLE UNSTABLE] ({marker}) {self._kind_label(program)}")
                         continue
                     self.stats.bugs_found.append(bug)
                     seen = self.known_root_causes.get(bug.root_cause, 0)
@@ -426,6 +430,7 @@ class TileSmith:
                 "dtype_mutate_prob": self.config.dtype_mutate_prob,
                 # 0 means every failure saved a reproducer this run.
                 "max_same_root_cause": self.config.max_same_root_cause,
+                # Likewise: 0 means every oracle_unstable sample was saved.
                 "max_oracle_unstable_saved": self.config.max_oracle_unstable_saved,
                 "generation_config": {
                     "extended_prob": self.config.extended_prob,

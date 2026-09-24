@@ -163,11 +163,14 @@ class Config:
     # otherwise flood the output directory.
     max_same_root_cause: int = 0
 
-    # Reproducers kept for the oracle trust gate. These are not bugs — the
+    # Reproducers kept for the oracle trust gate; 0 (the default) means no cap,
+    # the same convention as max_same_root_cause. These are not bugs — the
     # reference disagrees with its own fp64/jittered copy, so no kernel could
-    # pass the numeric check — only audit samples of wasted fuzzing effort,
-    # and they stay capped regardless of max_same_root_cause.
-    max_oracle_unstable_saved: int = 10
+    # pass the numeric check — but each one is a distinct program whose numeric
+    # check was skipped, and the mix of structures that reach the gate is only
+    # auditable if the samples survive the run. The counter behind this is
+    # global, not per root cause, so the two knobs never interact.
+    max_oracle_unstable_saved: int = 0
 
     # ── Oracle timeouts ─────────────────────────────────────────────────
     compile_timeout: int = 60   # seconds for compilation
