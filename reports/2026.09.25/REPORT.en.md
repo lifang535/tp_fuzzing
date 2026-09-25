@@ -91,7 +91,7 @@ Both harness defects in the tables above — the tilelang callback import and th
 - **tilelang**: 0.1.14 moved `tilelang_callback_cuda_compile` from `tilelang.engine.lower` to `tilelang.cuda.backend` (same name and signature). In the emitted program that import sits **after the per-variant compile loop and before `make_launch`**, so what it discards is programs whose variants did compile and would have run; a program that raises inside `tilelang.compile` is classified at `device_compile:<variant>` and never reaches the line. The emitted program now does `try: from tilelang.cuda.backend ... except ImportError: from tilelang.engine.lower ...`, so older releases keep taking the fallback.
 - **triton**: 3.8 requires the `ASTSource` signature to be keyed by **parameter-name strings** (`triton/compiler/compiler.py:69`, `Signature keys must be string`); integer keys raise TypeError. The signature is now keyed by the generated program's real parameter names, which 3.0 accepts as well.
 
-**Before the fix** (both servers, `tp_fuzzing_latest`, started 2026-09-24 23:39 and still running; counted from the `.json` of each saved case on disk, a different basis from the "occurrences" of the tables above)
+**Before the fix** (both servers, `tp_fuzzing_latest`, started 2026-09-24 23:39 and stopped 2026-09-25 23:00/23:14; counted from the `.json` of each saved case, a different basis from the "occurrences" of the tables above)
 
 | Machine | Backend | Passed | extended passed | extended failed |
 |---|---|---:|---:|---|
@@ -102,6 +102,17 @@ Both harness defects in the tables above — the tilelang callback import and th
 
 369 of 370 of A's `other` cases (610 of 611 on B) are that ImportError. The codegen part (88 / 134, e.g. the `boolx16` PrintType crash) is a **genuine bug** that dies before the import — those still fail after the fix and are not counted as a gain.
 
+The `summary.json` written on shutdown (the run's own counters) agrees, and its locations separate the two failures further:
+
+| Machine | Backend | tested | passed | locations inside `other` |
+|---|---|---:|---:|---|
+| A | tilelang | 3266 | 2461 | 375 of 398 at `lowering:tilelang_7/8_ident/9_prec`, 21 at `tvm.error` |
+| A | triton | 10612 | 8632 | 1513 of 1517 at `compile:triton_0` |
+| B | tilelang | 5157 | 3910 | 616 of 640 likewise |
+| B | triton | 16989 | 13912 | 2348 of 2359 likewise |
+
+The tilelang `tilelang_codegen_error` cases located at `device_compile:*` (88 on A, 137 on B) are that batch of genuine bugs.
+
 **After the fix** (machine A, target pair, 30 iterations, same flags as the live campaigns)
 
 - The eight extended fixture variants pass 8/8 on both machines;
@@ -110,9 +121,23 @@ Both harness defects in the tables above — the tilelang callback import and th
 
 **Harness defects fixed along the way**
 
-- **Probe bit comparison**: a degenerate-strided reference could not be compared at all — torch's contiguity check skips size-1 dimensions, so `.contiguous()` left `stride(-1) == 0` and `view(uint8)` raised `stride(-1) must be 1 to view Float as Byte`. Five live cases were misevaluated this way (1 tilelang, 4 triton). The tensor is now materialized only when the byte view would be illegal.
+- **Probe bit comparison**: a degenerate-strided reference could not be compared at all — torch's contiguity check skips size-1 dimensions, so `.contiguous()` left `stride(-1) == 0` and `view(uint8)` raised `stride(-1) must be 1 to view Float/Half as Byte`. Misevaluated live cases: 5 on A (1 tilelang, 4 triton) and 12 on B (1 tilelang, 11 triton) — that is every non-extended `other` case on the triton arms of both machines. The tensor is now materialized only when the byte view would be illegal.
 - **Diagnostics wording**: tilelang gains the 0.1.14 layout-inference and warp-partition rewordings, triton gains a class for `PassManager::run failed`. The dotted `'triton.compiler'` pattern is deliberately left alone, since widening it to the source-path form would relabel harness-side errors — such as that signature TypeError — out of `other`.
 - **Version marking**: `src/backends/common/versions.py` plus the startup banner and `environment` / `target_versions` in `summary.json`; a resume under a different environment now warns.
 - **Both re-verification candidates stay excluded after measurement**: `tl.config_index_bitwidth` is still a universal breaker on 0.1.14 (MakePackedAPI: `impl variables (limit,) are used, but are not passed in as API arguments`, `make_packed_api.cc:1060`; `:577` on 0.1.11), and bfloat16 is not a pool edit at all (the `DataType` in `ir/ir.py`, `DTYPES` in `ir/extended.py` and the triton signature map all reject it) — it needs the IR whitelists, the emitters and the tolerances extended first.
 
 Tests: 303 OK on the branch against 282 OK on main, with 21 new tests. The four fixture cases whose emission changed on purpose have their digests updated after diffing every case; the other 23 emissions are byte-identical.
+
+## Deployment and acceptance (2026-09-25 23:00–23:15)
+
+- Branch `tilelang-0.1.14-triton-3.8`: locally `2fe7c95b` → `17984092` → `e23f6810`, pushed to origin. Neither server can reach github.com (`git ls-remote` and `curl` both time out), so the branch was applied as a patch: the sha256 list of its 16 files matches the laptop byte for byte on both machines (digest of the list `413e56fc3ffafd3631c08f737b77e76d`). The server-side commits are patch replicas with different hashes (A: `ad597aab` + `beaa67b6`, B: `4ee2ba63` + `85d6d796`); to realign a server with the remote: `git fetch origin && git reset --hard origin/tilelang-0.1.14-triton-3.8`.
+- The old campaigns stopped cleanly through `run_fuzzers.sh stop`: the SIGINT reaches the worker, its `finally` block runs, and `summary.json` is complete (that is where the second table above comes from).
+- The new campaigns started at 23:10 (A) and 23:14 (B) with the same flags, writing to new directories `results/2026.09.25-23.10_*` and `results/2026.09.25-23.14_*`.
+- Acceptance: the first extended passes appear within **20 seconds** on A and **60 seconds** on B. A: tilelang 12 passed / 6 extended / 1 genuine codegen failure, triton 40 passed / 13 extended / 0 failures; B: tilelang 4 passed / 1 extended / 1 genuine codegen failure — against 0 in 23 hours before the fix.
+- On the deployed trees: 303 tests OK on both machines, and all 6 fixtures (including both probes) PASS.
+
+## The dtype_mismatch class is unreachable on 0.1.14
+
+`tests/test_dtype_mismatch.py` pins a frontend-cache collision: tilelang 0.1.11's `jit/__init__.py:_frontend_cache_key_data` keys on `inspect.getsource(impl)`, and the region emitter deliberately binds the dtype at module scope (invisible in that source), so two dtypes share one cache entry and the second program gets the first one's kernel. 0.1.14 deleted that method and keys the kernel cache on a hash of `func.script(show_meta=True)` (`cache/kernel_cache.py:_generate_key`) — the parsed TIR, where the dtype is a concrete buffer type — so the two dtypes no longer share an entry.
+
+Measurement: on 0.1.14 the second program exits 0 with no dtype message at all (the old assertion fails), and it fails the same way at the unpatched `ed7fb818`, so this is a pre-existing difference rather than something this round introduced. The test now picks its expectation from the installed version: 0.1.11 and older keep asserting the collision, 0.1.14 and newer assert the fix instead of being skipped, so a reintroduction fails here. The precondition still holds — `test_impl_source_is_dtype_insensitive` passes on 0.1.14 as well, the dtype is still absent from the jit source; only the cache key changed.

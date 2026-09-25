@@ -91,7 +91,7 @@ T.ptx_cp_async(T.address_of(As[T.shift_right(thread_binding, 3) * 64 + ...
 - **tilelang**：0.1.14 把 `tilelang_callback_cuda_compile` 从 `tilelang.engine.lower` 移到 `tilelang.cuda.backend`（同名同签名）。生成程序里这句 import 位于**各 variant 的编译循环之后、`make_launch` 之前**，所以它丢掉的是已经编译成功、本来能跑的程序；真正在 `tilelang.compile` 里就抛错的程序会被记成 `device_compile:<variant>`，走不到那行。修复方式是在生成程序里 `try: from tilelang.cuda.backend ... except ImportError: from tilelang.engine.lower ...`，旧版本继续走 fallback。
 - **triton**：3.8 要求 `ASTSource` 的 signature 用**参数名字符串键**（`triton/compiler/compiler.py:69`，`Signature keys must be string`），整数键直接 TypeError。修复方式是用生成程序真实的参数名做键，3.0 同样接受。
 
-**修复前的实测**（两台服务器，`tp_fuzzing_latest`，2026-09-24 23:39 启动、仍在运行；口径为磁盘上保存的 `.json` 个案数，与上表的"次数"口径不同）
+**修复前的实测**（两台服务器，`tp_fuzzing_latest`，2026-09-24 23:39 启动、2026-09-25 23:00/23:14 停止；口径为磁盘上保存的 `.json` 个案数，与上表的"次数"口径不同）
 
 | 机器 | 后端 | 通过 | extended 通过 | extended 失败 |
 |---|---|---:|---:|---|
@@ -102,6 +102,17 @@ T.ptx_cp_async(T.address_of(As[T.shift_right(thread_binding, 3) * 64 + ...
 
 `other` 里 369/370（A）、610/611（B）就是那句 ImportError。codegen 那部分（88 / 134，例如 `boolx16` 的 PrintType 崩溃）是**真 bug**，在 import 之前就挂了——修完 import 它们仍会失败，不计入修复收益。
 
+停止后落盘的 `summary.json`（运行自身的计数）与之一致，location 分布把两类失败分得更开：
+
+| 机器 | 后端 | tested | passed | `other` 的 location |
+|---|---|---:|---:|---|
+| A | tilelang | 3266 | 2461 | 398 例中 375 例 `lowering:tilelang_7/8_ident/9_prec`，21 例 `tvm.error` |
+| A | triton | 10612 | 8632 | 1517 例中 1513 例 `compile:triton_0` |
+| B | tilelang | 5157 | 3910 | 640 例中 616 例同上 |
+| B | triton | 16989 | 13912 | 2359 例中 2348 例同上 |
+
+tilelang 的 `tilelang_codegen_error` 里落在 `device_compile:*` 的（A 88、B 137）就是上面那批真 bug。
+
 **修复后的实测**（服务器 A，target pair，30 次迭代，与线上同参数）
 
 - 8 个 extended fixture 变体在两台机器上 8/8 通过；
@@ -110,9 +121,23 @@ T.ptx_cp_async(T.address_of(As[T.shift_right(thread_binding, 3) * 64 + ...
 
 **顺带修掉的 harness 缺陷**
 
-- **probe 按位比较**：退化 stride 的参考张量无法比较——torch 的 contiguity 检查跳过 size-1 维，`.contiguous()` 之后 `stride(-1)` 仍为 0，`view(uint8)` 抛 `stride(-1) must be 1 to view Float as Byte`。线上已有 5 例被误判（tilelang 1、triton 4）。改为只在字节视图非法时才物化张量。
+- **probe 按位比较**：退化 stride 的参考张量无法比较——torch 的 contiguity 检查跳过 size-1 维，`.contiguous()` 之后 `stride(-1)` 仍为 0，`view(uint8)` 抛 `stride(-1) must be 1 to view Float/Half as Byte`。线上被误判的个案：A 机 5 例（tilelang 1、triton 4）、B 机 12 例（tilelang 1、triton 11），也就是两台机器 triton 侧非 extended 的 `other` 全部。改为只在字节视图非法时才物化张量。
 - **diagnostics 措辞**：tilelang 补 0.1.14 的 layout inference / warp partition 新措辞，triton 补 `PassManager::run failed` 一类；`'triton.compiler'` 保持点号形式不变，否则会把 harness 侧错误（如上面那个 signature TypeError）从 `other` 里挪走。
 - **版本标记**：`src/backends/common/versions.py` + 启动横幅 + `summary.json` 的 `environment` / `target_versions`；resume 时环境漂移会告警。
 - **两个候选旋钮实测后继续排除**：`tl.config_index_bitwidth` 在 0.1.14 上仍是"一击必杀"（MakePackedAPI：`impl variables (limit,) are used, but are not passed in as API arguments`，`make_packed_api.cc:1060`；0.1.11 为 :577），bfloat16 则根本不是改池子的事（`ir/ir.py` 的 DataType、`ir/extended.py` 的 DTYPES、triton 的 signature 表都不认），需要先扩 IR 白名单、emitter 与容差。
 
 测试：分支 303 OK / main 282 OK，新增 21 个测试；4 个 fixture 的 emission digest 属故意更新（逐条 diff 过，其余 23 条字节一致）。
+
+## 部署与验收（2026-09-25 23:00–23:15）
+
+- 分支 `tilelang-0.1.14-triton-3.8`：本地 `2fe7c95b` → `17984092` → `e23f6810`，已 push 到 origin。两台服务器都连不上 github.com（`git ls-remote` 与 `curl` 均超时），所以按 patch 应用：16 个文件的 sha256 清单在本地与两台机器上逐条一致（清单 md5 `413e56fc3ffafd3631c08f737b77e76d`）；服务器侧提交是 patch 复刻，哈希不同（A：`ad597aab` + `beaa67b6`，B：`4ee2ba63` + `85d6d796`）。服务器要归位到远端分支：`git fetch origin && git reset --hard origin/tilelang-0.1.14-triton-3.8`。
+- 旧 campaign 用 `run_fuzzers.sh stop` 正常停止：SIGINT 送达 worker，`finally` 落盘，`summary.json` 完整（上面第二张表就来自它）。
+- 新 campaign：A 于 23:10、B 于 23:14 启动，参数不变，新结果目录 `results/2026.09.25-23.10_*`、`results/2026.09.25-23.14_*`。
+- 验收：重启后 **20 秒内**（A）、**60 秒内**（B）出现第一批 extended 通过。A：tilelang 12 通过 / 6 extended / 1 例真 codegen 失败，triton 40 通过 / 13 extended / 0 失败；B：tilelang 4 通过 / 1 extended / 1 例真 codegen 失败。对照修复前 23 小时 0 例。
+- 部署树上两台机器各 303 tests OK，6 个 fixture（含 2 个 probe）全 PASS。
+
+## dtype_mismatch 类在 0.1.14 上已不可达
+
+`tests/test_dtype_mismatch.py` 钉住的是前端缓存碰撞：tilelang 0.1.11 的 `jit/__init__.py:_frontend_cache_key_data` 用 `inspect.getsource(impl)` 做键，而 region emitter 故意把 dtype 绑在 module 作用域（源码里看不到），于是两个 dtype 共用一个缓存条目、第二个程序拿到第一个的 kernel。0.1.14 删掉了这个方法，把 kernel cache 的键换成 `func.script(show_meta=True)` 的哈希（`cache/kernel_cache.py:_generate_key`）——解析后的 TIR 里 dtype 是具体的 buffer 类型，两个 dtype 不再共用条目。
+
+实测：0.1.14 上第二个程序 returncode 0、且没有任何 dtype 报错（旧断言失败）；在未打补丁的 `ed7fb818` 上同样失败，所以这是既有差异、不是本轮改动引入的。测试改为按安装版本选择断言：0.1.11 及更旧继续断言碰撞，0.1.14 及更新改为断言修复（不跳过），上游若重新引入就会在这里报错。前提条件仍然成立——`test_impl_source_is_dtype_insensitive` 在 0.1.14 上照样通过，dtype 依旧不在 jit 源码里，变的只是缓存键。
