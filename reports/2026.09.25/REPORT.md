@@ -82,6 +82,30 @@ T.ptx_cp_async(T.address_of(As[T.shift_right(thread_binding, 3) * 64 + ...
 
 **harness 缺陷造成 extended 轨道全部失败** — 本轮没有一个 extended 程序通过。triton 侧 100% 死在 `src/backends/triton/extended.py:194` 的 int 键 signature；tilelang 侧死在 `src/backends/tilelang/extended.py:328` 函数体顶层 import 已被 0.1.14 删除的 `tilelang_callback_cuda_compile`。tilelang 另有 146/67 条 extended 程序在 lowering 阶段就因**真实编译错误**退出（早于该 import 行），已计入上面的 tilelang 计数。
 
+## 复现用例
+
+每个真实 bug 类各挑 1–2 例落盘，放在 `cases/<后端>/<标签>/`：`.py` 是完整复现脚本（生成的 kernel 加内嵌校验，在对应环境里直接 `python <文件>` 即可跑），`.json` 是同一用例的元数据（`spec`、`dtype`、报错原文）。**全部 24 例的来源、spec、报错尾部见 [`cases/manifest.json`](cases/manifest.json)**，它的 `original` 字段是服务器上的原始路径 `results/<run>/failed/<标签>/<原文件名>`，文件名 `<机器>_<run 时间>_<用例哈希>` 与之逐条对应；用例第一层目录区分后端。
+
+前 11 组取自审计的那四次 campaign（A 机 `2026.09.24-00.45`、B 机 `2026.09.24-00.46`），最后两组取自修复后的新 campaign（A 机 `2026.09.25-23.10`）—— `precision_mismatch` 与 `triton_compile_error` 这两个类在修复前根本不可达。`tilelang_codegen_error` 里的 `boolx16` 一例同样取自新 campaign：同一个用例哈希在修复后仍然复现，脚本里已是 try/except 双路 import。
+
+| 后端 | 类 | 用例（`cases/<后端>/<类>/`） | 现象 |
+|---|---|---|---|
+| tilelang | `tilelang_codegen_error` | [`A_00.45_8f95cc992e257d90.py`](cases/tilelang/tilelang_codegen_error/A_00.45_8f95cc992e257d90.py)（M=163 N=4673 K=1，block 256×128×128）、[`A_23.10_16367aeaf0b9a947.py`](cases/tilelang/tilelang_codegen_error/A_23.10_16367aeaf0b9a947.py) | reduce layout lowering 断言；CUDA 打印器拒绝向量化 bool（`boolx16`） |
+| tilelang | `ptx_async_boundary` | [`A_00.45_25bfb8e636a0a556.py`](cases/tilelang/ptx_async_boundary/A_00.45_25bfb8e636a0a556.py)（M=1 N=9282 K=10937）、[`A_00.45_8c9106558a159743.py`](cases/tilelang/ptx_async_boundary/A_00.45_8c9106558a159743.py)（M=1 N=7165 K=6516） | cp.async 最终 PTX 宽度 = 2 字节，不落在 {4, 8, 16} |
+| tilelang | `wrong_result` | [`A_00.45_f52211dddbafb2f9.py`](cases/tilelang/wrong_result/A_00.45_f52211dddbafb2f9.py)（5.21 / 0.1）、[`A_00.45_5524a15327084413.py`](cases/tilelang/wrong_result/A_00.45_5524a15327084413.py)（1.32 / 0.05） | 与 fp64 参考不符，远超容差 |
+| tilelang | `layout_inference` | [`A_00.45_6f0afb4fce5168c4.py`](cases/tilelang/layout_inference/A_00.45_6f0afb4fce5168c4.py)（float16）、[`A_00.45_ae32dac28ad4de9e.py`](cases/tilelang/layout_inference/A_00.45_ae32dac28ad4de9e.py)（float32） | `has_best` 断言：no available layout found |
+| tilelang | `schedule_mismatch` | [`A_00.45_07a5c873a92d6085.py`](cases/tilelang/schedule_mismatch/A_00.45_07a5c873a92d6085.py)（16.34 / 0.1）、[`A_00.45_32239334deb2e60e.py`](cases/tilelang/schedule_mismatch/A_00.45_32239334deb2e60e.py)（1.64 / 0.1） | 只换线程划分，结果不逐位相同 |
+| tilelang | `layout_mismatch` | [`A_00.45_f0a755de5a293485.py`](cases/tilelang/layout_mismatch/A_00.45_f0a755de5a293485.py)（1.0 / 0.001）、[`A_00.45_91f1095ccb6b439c.py`](cases/tilelang/layout_mismatch/A_00.45_91f1095ccb6b439c.py)（0.5 / 0.001） | 只换输入 layout，结果不一致 |
+| tilelang | `pass_config_mismatch` | [`B_00.46_1aaffdf3be5b7a0f.py`](cases/tilelang/pass_config_mismatch/B_00.46_1aaffdf3be5b7a0f.py)（0.277 / 0.1） | 只换 `pass_configs`，结果不一致（该类审计里只有 1 例） |
+| triton | `wrong_result` | [`B_00.46_8b63dfab0796d417.py`](cases/triton/wrong_result/B_00.46_8b63dfab0796d417.py)（2.79 / 0.05） | 与 fp64 参考不符 |
+| triton | `pass_config_mismatch` | [`B_00.46_73593c68a503cf7f.py`](cases/triton/pass_config_mismatch/B_00.46_73593c68a503cf7f.py)（67108864.0 / 0.001）、[`B_00.46_18725a7ed0e4723d.py`](cases/triton/pass_config_mismatch/B_00.46_18725a7ed0e4723d.py)（841.6 / 0.1） | 本类误差最夸张的两个样本 |
+| triton | `layout_mismatch` | [`B_00.46_ef09537b1c296f98.py`](cases/triton/layout_mismatch/B_00.46_ef09537b1c296f98.py)（8.0 / 0.001）、[`B_00.46_aca8f4d3c04adc06.py`](cases/triton/layout_mismatch/B_00.46_aca8f4d3c04adc06.py)（2.0 / 0.001） | 只换输入 layout，结果不一致 |
+| triton | `schedule_mismatch` | [`B_00.46_031d1a78dc0e8992.py`](cases/triton/schedule_mismatch/B_00.46_031d1a78dc0e8992.py)（4.24 / 0.1）、[`B_00.46_28ca4667d73df20c.py`](cases/triton/schedule_mismatch/B_00.46_28ca4667d73df20c.py)（3.65 / 0.1） | 只换 `num_warps` / `num_stages`，结果不一致 |
+| triton | `precision_mismatch`（修复后才可达） | [`A_23.10_a10067f5d3a5584b.py`](cases/triton/precision_mismatch/A_23.10_a10067f5d3a5584b.py)（max_abs=17.25）、[`A_23.10_ff2a71bae3656acc.py`](cases/triton/precision_mismatch/A_23.10_ff2a71bae3656acc.py)（max_abs=0.03125） | extended 轨道，`precision:triton_8_prec` |
+| triton | `triton_compile_error`（修复后才可达） | [`A_23.10_171987725a81b4e9.py`](cases/triton/triton_compile_error/A_23.10_171987725a81b4e9.py)（`tl.flip(e67)`）、[`A_23.10_21d1379f4c12b5f7.py`](cases/triton/triton_compile_error/A_23.10_21d1379f4c12b5f7.py)（`tl.flip(e22)`） | extended 轨道，triton 编译器自身报错 |
+
+表里标 ❌ 的几类（两处 harness 缺陷、`shared_memory_overflow`、`timeout` / `gpu_oom`、`oracle_unstable`）不是被测实现的 bug，没有落盘；需要的话可以补上（harness 缺陷那两类能帮着重放当时的判型过程）。
+
 ## 修复：最新版适配（分支 `tilelang-0.1.14-triton-3.8`，提交 `2fe7c95b`）
 
 上面两张表里两个 harness 缺陷行（tilelang 的 callback import、triton 的 int 键 signature）已经修掉，并做了实测。

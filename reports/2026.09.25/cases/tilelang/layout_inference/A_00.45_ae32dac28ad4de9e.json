@@ -1,0 +1,366 @@
+{
+  "bug_type": "compile_crash",
+  "root_cause": "layout_inference",
+  "location": "tvm.error",
+  "compute_kind": "region:for->if->sin->sin->to_tile->load_input->tanh->to_tile->to_tile->add->to_tile->gemm->if->reduce_tile->if->tile_transpose->index_add->cos->store_tile->row_max->to_tile->to_tile->to_tile->call",
+  "params": {
+    "region_program": {
+      "type": "region",
+      "version": 4,
+      "value_type": "tile<float32>",
+      "spec": {
+        "M": 2140,
+        "N": 3930,
+        "K": 6249,
+        "block_M": 64,
+        "block_N": 64,
+        "block_K": 8,
+        "threads": 256,
+        "num_stages": 3,
+        "loop_kind": "pipelined",
+        "compute_kind": "gemm",
+        "dtype": "float32",
+        "name": "kernel_0"
+      },
+      "body": {
+        "arguments": [],
+        "operations": [
+          {
+            "kind": "gemm",
+            "result": "v1",
+            "operands": [],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "if",
+            "result": "v15",
+            "operands": [
+              "v1"
+            ],
+            "attrs": {
+              "predicate": "column",
+              "modulus": 4,
+              "parity": 0
+            },
+            "regions": [
+              {
+                "arguments": [
+                  "v2"
+                ],
+                "operations": [
+                  {
+                    "kind": "reduce_tile",
+                    "result": "v3",
+                    "operands": [
+                      "v1"
+                    ],
+                    "attrs": {
+                      "axis": 1,
+                      "reduction": "max"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "kind": "if",
+                    "result": "v12",
+                    "operands": [
+                      "v1"
+                    ],
+                    "attrs": {
+                      "predicate": "checkerboard",
+                      "modulus": 2,
+                      "parity": 1
+                    },
+                    "regions": [
+                      {
+                        "arguments": [
+                          "v4"
+                        ],
+                        "operations": [
+                          {
+                            "kind": "tile_transpose",
+                            "result": "v5",
+                            "operands": [
+                              "v2"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          },
+                          {
+                            "kind": "index_add",
+                            "result": "v6",
+                            "operands": [
+                              "v5"
+                            ],
+                            "attrs": {
+                              "axis": "column",
+                              "scale": 1.0
+                            },
+                            "regions": []
+                          },
+                          {
+                            "kind": "cos",
+                            "result": "v7",
+                            "operands": [
+                              "v6"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          },
+                          {
+                            "kind": "store_tile",
+                            "result": "v8",
+                            "operands": [
+                              "v2"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          },
+                          {
+                            "kind": "row_max",
+                            "result": "v9",
+                            "operands": [
+                              "v7"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          },
+                          {
+                            "kind": "to_tile",
+                            "result": "v10",
+                            "operands": [
+                              "v9"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "yield_value": "v10"
+                      },
+                      {
+                        "arguments": [
+                          "v11"
+                        ],
+                        "operations": [],
+                        "yield_value": "v11"
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "to_tile",
+                    "result": "v13",
+                    "operands": [
+                      "v12"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  }
+                ],
+                "yield_value": "v13"
+              },
+              {
+                "arguments": [
+                  "v14"
+                ],
+                "operations": [],
+                "yield_value": "v14"
+              }
+            ]
+          },
+          {
+            "kind": "to_tile",
+            "result": "v16",
+            "operands": [
+              "v15"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "call",
+            "result": "v17",
+            "operands": [
+              "v16",
+              "v16"
+            ],
+            "attrs": {
+              "callee": "fn_0"
+            },
+            "regions": []
+          }
+        ],
+        "yield_value": "v17"
+      },
+      "input_scale": 0.1,
+      "functions": [
+        {
+          "name": "fn_0",
+          "body": {
+            "arguments": [
+              "arg0",
+              "arg1"
+            ],
+            "operations": [
+              {
+                "kind": "for",
+                "result": "v13",
+                "operands": [
+                  "arg0"
+                ],
+                "attrs": {
+                  "trip_count": 0,
+                  "start": 2,
+                  "step": 1
+                },
+                "regions": [
+                  {
+                    "arguments": [
+                      "v1"
+                    ],
+                    "operations": [
+                      {
+                        "kind": "if",
+                        "result": "v10",
+                        "operands": [
+                          "v1"
+                        ],
+                        "attrs": {
+                          "predicate": "iteration",
+                          "modulus": 3,
+                          "parity": 0
+                        },
+                        "regions": [
+                          {
+                            "arguments": [
+                              "v2"
+                            ],
+                            "operations": [
+                              {
+                                "kind": "sin",
+                                "result": "v3",
+                                "operands": [
+                                  "arg1"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              },
+                              {
+                                "kind": "sin",
+                                "result": "v4",
+                                "operands": [
+                                  "v3"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              },
+                              {
+                                "kind": "to_tile",
+                                "result": "v5",
+                                "operands": [
+                                  "arg1"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              }
+                            ],
+                            "yield_value": "v5"
+                          },
+                          {
+                            "arguments": [
+                              "v6"
+                            ],
+                            "operations": [
+                              {
+                                "kind": "load_input",
+                                "result": "v7",
+                                "operands": [],
+                                "attrs": {
+                                  "source": "B",
+                                  "dtype": "float16",
+                                  "row_offset": 1,
+                                  "col_offset": 1
+                                },
+                                "regions": []
+                              },
+                              {
+                                "kind": "tanh",
+                                "result": "v8",
+                                "operands": [
+                                  "v7"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              },
+                              {
+                                "kind": "to_tile",
+                                "result": "v9",
+                                "operands": [
+                                  "v8"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              }
+                            ],
+                            "yield_value": "v9"
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "to_tile",
+                        "result": "v11",
+                        "operands": [
+                          "v10"
+                        ],
+                        "attrs": {},
+                        "regions": []
+                      },
+                      {
+                        "kind": "add",
+                        "result": "v12",
+                        "operands": [
+                          "v11",
+                          "v1"
+                        ],
+                        "attrs": {},
+                        "regions": []
+                      }
+                    ],
+                    "yield_value": "v12"
+                  }
+                ]
+              },
+              {
+                "kind": "to_tile",
+                "result": "v14",
+                "operands": [
+                  "arg0"
+                ],
+                "attrs": {},
+                "regions": []
+              }
+            ],
+            "yield_value": "v14"
+          }
+        }
+      ],
+      "execution": {
+        "input_pattern": "normal",
+        "input_seed_count": 2,
+        "repeat_count": 3,
+        "schedule_pair": true,
+        "stage_sweep": true,
+        "loop_sweep": true,
+        "layout_sweep": true,
+        "pass_sweep": true,
+        "swizzle_sweep": true,
+        "warp_policy_sweep": true
+      },
+      "typed": true
+    },
+    "input_seed": 0
+  },
+  "dtype": "float32",
+  "error_message": "ilelang/backend/module.py\", line 115, in lower\n    return self.get_pipeline(target).lower(mod, target)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/pass_pipeline/pipeline.py\", line 31, in lower\n    return self._lower(mod, target)\n           ^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cuda/pipeline.py\", line 169, in CUDAPassPipelineBody\n    mod = CUDAPassPipelineBodyPrologue(mod, target)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cuda/pipeline.py\", line 132, in CUDAPassPipelineBodyPrologue\n    mod = tilelang.transform.LayoutInference()(mod)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/3rdparty/tvm/python/tvm/ir/transform.py\", line 171, in __call__\n    return _ffi_transform_api.RunPass(self, mod)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule) const\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tirx::transform::PrimFuncPassNode::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tl::LayoutInferencer::Substitute(tvm::tirx::PrimFunc)\n  File \"<unknown>\", line 0, in tvm::tl::BufferUseDefCollector::Run()\n  File \"/project/src/transform/layout_inference/layout_inference.cc\", line 1523, in void tvm::tl::BufferUseDefCollector::InferInFreeMode(tvm::tl::LayoutMap&, const tvm::tl::LayoutMap&)\ntvm.error.InternalError: Check failed: (has_best) is false: no available layout found",
+  "timestamp": 1790200273.533713
+}

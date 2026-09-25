@@ -1,0 +1,1387 @@
+{
+  "bug_type": "runtime_crash",
+  "root_cause": "tilelang_codegen_error",
+  "location": "device_compile:tilelang_0",
+  "compute_kind": "extended:mixed",
+  "params": {
+    "extended_program": {
+      "type": "extended",
+      "version": 1,
+      "body": {
+        "arguments": [],
+        "operations": [
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e1",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 44,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e2",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e3",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e1",
+              "e2"
+            ],
+            "attrs": {
+              "buffer": "mem0"
+            },
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e4",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e3",
+              "e3"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e5",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 370,
+              "reverse": false
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e6",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e7",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e5",
+              "e6"
+            ],
+            "attrs": {
+              "buffer": "mem1"
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e8",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e4",
+              "e7"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e9",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e8"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e10",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e9",
+              "e9"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e11",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e10"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e12",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.5
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e13",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e11",
+              "e12"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e14",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 389,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e15",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e16",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e14",
+              "e15"
+            ],
+            "attrs": {
+              "buffer": "mem2"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e17",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 7
+            },
+            "regions": []
+          },
+          {
+            "op": "bitxor",
+            "results": [
+              {
+                "name": "e18",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e16",
+              "e17"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e19",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 3
+            },
+            "regions": []
+          },
+          {
+            "op": "lt",
+            "results": [
+              {
+                "name": "e20",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e18",
+              "e19"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e21",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 166,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "parameter",
+            "results": [
+              {
+                "name": "e22",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "name": "limit"
+            },
+            "regions": []
+          },
+          {
+            "op": "lt",
+            "results": [
+              {
+                "name": "e23",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e21",
+              "e22"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "and",
+            "results": [
+              {
+                "name": "e24",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e20",
+              "e23"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e25",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": -0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "select",
+            "results": [
+              {
+                "name": "e26",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e24",
+              "e13",
+              "e25"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e27",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e26"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "transpose",
+            "results": [
+              {
+                "name": "e28",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e27"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e29",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.0
+            },
+            "regions": []
+          },
+          {
+            "op": "matmul",
+            "results": [
+              {
+                "name": "e30",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e28",
+              "e10",
+              "e29"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reduce",
+            "results": [
+              {
+                "name": "e31",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e30"
+            ],
+            "attrs": {
+              "axis": 1,
+              "kind": "max"
+            },
+            "regions": []
+          },
+          {
+            "op": "reshape",
+            "results": [
+              {
+                "name": "e32",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    1
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e31"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "sub",
+            "results": [
+              {
+                "name": "e33",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e30",
+              "e32"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e34",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e35",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e33",
+              "e34"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e36",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 125,
+              "reverse": false
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e37",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e38",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e36",
+              "e37"
+            ],
+            "attrs": {
+              "buffer": "mem3"
+            },
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e39",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e35"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "matmul",
+            "results": [
+              {
+                "name": "e40",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e39",
+              "e38",
+              "e29"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reshape",
+            "results": [
+              {
+                "name": "e41",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e40"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reshape",
+            "results": [
+              {
+                "name": "e42",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e41"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e43",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e44",
+                "type": {
+                  "dtype": "bool",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e45",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e43",
+              "e44"
+            ],
+            "attrs": {
+              "buffer": "mem4"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e46",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 1
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e47",
+                "type": {
+                  "dtype": "bool",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e48",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e46",
+              "e47"
+            ],
+            "attrs": {
+              "buffer": "mem4"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e49",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 2
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e50",
+                "type": {
+                  "dtype": "bool",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e51",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e49",
+              "e50"
+            ],
+            "attrs": {
+              "buffer": "mem4"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e52",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 1.0
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e53",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e45",
+              "e52"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e54",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e55",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e48",
+              "e54"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e56",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": -0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e57",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e51",
+              "e56"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "fma",
+            "results": [
+              {
+                "name": "e58",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e53",
+              "e55",
+              "e57"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "fma",
+            "results": [
+              {
+                "name": "e59",
+                "type": {
+                  "dtype": "float16",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e58",
+              "e55",
+              "e57"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e60",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e42",
+              "e40"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e61",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e60"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "sub",
+            "results": [
+              {
+                "name": "e62",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e61",
+              "e39"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e63",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e62"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e64",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e63",
+              "e63"
+            ],
+            "attrs": {},
+            "regions": []
+          }
+        ],
+        "returns": [
+          "e64",
+          "e18",
+          "e24"
+        ]
+      },
+      "buffers": [
+        {
+          "name": "mem0",
+          "dtype": "float32",
+          "size": 512,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem1",
+          "dtype": "float32",
+          "size": 512,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem2",
+          "dtype": "int32",
+          "size": 512,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem3",
+          "dtype": "float16",
+          "size": 256,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem4",
+          "dtype": "float16",
+          "size": 4,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        }
+      ],
+      "functions": [],
+      "observations": [
+        "e3",
+        "e13",
+        "e30",
+        "e35",
+        "e58",
+        "e59",
+        "e22",
+        "e47"
+      ],
+      "blocks": 3,
+      "input_pattern": "integer",
+      "runtime_cases": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          511
+        ],
+        [
+          3,
+          512
+        ]
+      ],
+      "configuration_pair": true,
+      "observation_pair": true,
+      "pass_config_pair": false,
+      "fast_math_pair": false,
+      "precision_pair": true,
+      "identity_pair": true,
+      "family": "mixed"
+    },
+    "input_seed": 0
+  },
+  "dtype": "bool+float16+float32+int32",
+  "error_message": "trumentation/session.py\", line 110, in run_codegen\n    return wrapped()\n           ^^^^^^^^^\n  File \"/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/device_codegen.py\", line 25, in <lambda>\n    lambda: tvm.ffi.get_global_func(global_func_name)(mod, target),\n            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"python/tvm_ffi/cython/function.pxi\", line 968, in tvm_ffi.core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::codegen::BuildTileLangCUDA(tvm::IRModule, tvm::Target)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::AddFunction(tvm::GlobalVar const&, tvm::tirx::PrimFunc const&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::VisitStmt_(tvm::tirx::SeqStmtNode const*)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::VisitStmt_(tvm::tirx::SeqStmtNode const*)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::VisitStmt_(tvm::tirx::SeqStmtNode const*)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::VisitStmt_(tvm::tirx::BufferStoreNode const*)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::PrintExpr[abi:cxx11](tvm::PrimExpr const&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::VisitExpr_(tvm::tirx::CastNode const*, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::PrintExpr[abi:cxx11](tvm::PrimExpr const&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::VisitExpr_(tvm::tirx::AndNode const*, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::PrintVecBinaryOp(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tvm::runtime::DataType, tvm::PrimExpr, tvm::PrimExpr, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::PrintType(tvm::runtime::DataType, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::runtime::detail::LogFatal::~LogFatal()\ntvm.error.InternalError: Cannot convert type boolx16 to CUDA type",
+  "timestamp": 1790349049.5192392
+}

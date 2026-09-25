@@ -1,0 +1,2728 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "precision_mismatch",
+  "location": "execute:triton_8_prec",
+  "compute_kind": "extended:mixed",
+  "params": {
+    "extended_program": {
+      "type": "extended",
+      "version": 1,
+      "body": {
+        "arguments": [],
+        "operations": [
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e1",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 10,
+              "reverse": false
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e2",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e3",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e1",
+              "e2"
+            ],
+            "attrs": {
+              "buffer": "mem0"
+            },
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e4",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 17,
+              "reverse": false
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e5",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e6",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e4",
+              "e5"
+            ],
+            "attrs": {
+              "buffer": "mem1"
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e7",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e3",
+              "e6"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e8",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e7"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e9",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e8"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e10",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.5
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e11",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e9",
+              "e10"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e12",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 71,
+              "reverse": false
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e13",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e14",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e12",
+              "e13"
+            ],
+            "attrs": {
+              "buffer": "mem2"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e15",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 3
+            },
+            "regions": []
+          },
+          {
+            "op": "bitand",
+            "results": [
+              {
+                "name": "e16",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e14",
+              "e15"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e17",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 3
+            },
+            "regions": []
+          },
+          {
+            "op": "lt",
+            "results": [
+              {
+                "name": "e18",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e16",
+              "e17"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e19",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 252,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "parameter",
+            "results": [
+              {
+                "name": "e20",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "name": "limit"
+            },
+            "regions": []
+          },
+          {
+            "op": "lt",
+            "results": [
+              {
+                "name": "e21",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e19",
+              "e20"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "and",
+            "results": [
+              {
+                "name": "e22",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e18",
+              "e21"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e23",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": -0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "select",
+            "results": [
+              {
+                "name": "e24",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e22",
+              "e11",
+              "e23"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e25",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 305,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "parameter",
+            "results": [
+              {
+                "name": "e26",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "name": "limit"
+            },
+            "regions": []
+          },
+          {
+            "op": "lt",
+            "results": [
+              {
+                "name": "e27",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e25",
+              "e26"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "store",
+            "results": [],
+            "operands": [
+              "e25",
+              "e27",
+              "e24"
+            ],
+            "attrs": {
+              "buffer": "mem4"
+            },
+            "regions": []
+          },
+          {
+            "op": "barrier",
+            "results": [],
+            "operands": [],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e28",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e25",
+              "e27"
+            ],
+            "attrs": {
+              "buffer": "mem4"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e29",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e30",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e28",
+              "e29"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "barrier",
+            "results": [],
+            "operands": [],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "store",
+            "results": [],
+            "operands": [
+              "e25",
+              "e27",
+              "e30"
+            ],
+            "attrs": {
+              "buffer": "mem5"
+            },
+            "regions": []
+          },
+          {
+            "op": "barrier",
+            "results": [],
+            "operands": [],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e31",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e32",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e25",
+              "e31"
+            ],
+            "attrs": {
+              "buffer": "mem4"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e33",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 3
+            },
+            "regions": []
+          },
+          {
+            "op": "bitxor",
+            "results": [
+              {
+                "name": "e34",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e25",
+              "e33"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e35",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e34",
+              "e27"
+            ],
+            "attrs": {
+              "buffer": "mem5"
+            },
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e36",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e32",
+              "e35"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e37",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    32
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e36"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "transpose",
+            "results": [
+              {
+                "name": "e38",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    32,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e37"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "slice",
+            "results": [
+              {
+                "name": "e39",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e38"
+            ],
+            "attrs": {
+              "offsets": [
+                8,
+                0
+              ]
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e40",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.0
+            },
+            "regions": []
+          },
+          {
+            "op": "matmul",
+            "results": [
+              {
+                "name": "e41",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e39",
+              "e39",
+              "e40"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reduce",
+            "results": [
+              {
+                "name": "e42",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e41"
+            ],
+            "attrs": {
+              "axis": 1,
+              "kind": "max"
+            },
+            "regions": []
+          },
+          {
+            "op": "reshape",
+            "results": [
+              {
+                "name": "e43",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    1
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e42"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e44",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e41",
+              "e43"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e45",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "mul",
+            "results": [
+              {
+                "name": "e46",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e44",
+              "e45"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e47",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 44,
+              "reverse": false
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e48",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e49",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e47",
+              "e48"
+            ],
+            "attrs": {
+              "buffer": "mem6"
+            },
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e50",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e46"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "matmul",
+            "results": [
+              {
+                "name": "e51",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e50",
+              "e49",
+              "e40"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reshape",
+            "results": [
+              {
+                "name": "e52",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e51"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reshape",
+            "results": [
+              {
+                "name": "e53",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e52"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e54",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e53"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e63",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e42"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "call",
+            "results": [
+              {
+                "name": "e64",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "name": "e65",
+                "type": {
+                  "dtype": "float32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e54",
+              "e63"
+            ],
+            "attrs": {
+              "callee": "mixed_helper"
+            },
+            "regions": []
+          },
+          {
+            "op": "parameter",
+            "results": [
+              {
+                "name": "e66",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "name": "steps"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e67",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e68",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e69",
+                "type": {
+                  "dtype": "bool",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e70",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e68",
+              "e69"
+            ],
+            "attrs": {
+              "buffer": "mem7"
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e71",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": 0
+            },
+            "regions": []
+          },
+          {
+            "op": "lt",
+            "results": [
+              {
+                "name": "e72",
+                "type": {
+                  "dtype": "bool",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e70",
+              "e71"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "for",
+            "results": [
+              {
+                "name": "e92",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "name": "e93",
+                "type": {
+                  "dtype": "float32",
+                  "shape": []
+                }
+              },
+              {
+                "name": "e94",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e66",
+              "e64",
+              "e65",
+              "e67"
+            ],
+            "attrs": {
+              "max_steps": 4,
+              "pipelined": false
+            },
+            "regions": [
+              {
+                "arguments": [
+                  {
+                    "name": "e73",
+                    "type": {
+                      "dtype": "int32",
+                      "shape": []
+                    }
+                  },
+                  {
+                    "name": "e74",
+                    "type": {
+                      "dtype": "float16",
+                      "shape": [
+                        16,
+                        16
+                      ]
+                    }
+                  },
+                  {
+                    "name": "e75",
+                    "type": {
+                      "dtype": "float32",
+                      "shape": []
+                    }
+                  },
+                  {
+                    "name": "e76",
+                    "type": {
+                      "dtype": "int32",
+                      "shape": []
+                    }
+                  }
+                ],
+                "operations": [
+                  {
+                    "op": "if",
+                    "results": [
+                      {
+                        "name": "e83",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e72",
+                      "e74"
+                    ],
+                    "attrs": {},
+                    "regions": [
+                      {
+                        "arguments": [
+                          {
+                            "name": "e77",
+                            "type": {
+                              "dtype": "float16",
+                              "shape": [
+                                16,
+                                16
+                              ]
+                            }
+                          }
+                        ],
+                        "operations": [
+                          {
+                            "op": "constant",
+                            "results": [
+                              {
+                                "name": "e78",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [],
+                            "attrs": {
+                              "value": 0.125
+                            },
+                            "regions": []
+                          },
+                          {
+                            "op": "add",
+                            "results": [
+                              {
+                                "name": "e79",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [
+                              "e77",
+                              "e78"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "returns": [
+                          "e79"
+                        ]
+                      },
+                      {
+                        "arguments": [
+                          {
+                            "name": "e80",
+                            "type": {
+                              "dtype": "float16",
+                              "shape": [
+                                16,
+                                16
+                              ]
+                            }
+                          }
+                        ],
+                        "operations": [
+                          {
+                            "op": "constant",
+                            "results": [
+                              {
+                                "name": "e81",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [],
+                            "attrs": {
+                              "value": 0.125
+                            },
+                            "regions": []
+                          },
+                          {
+                            "op": "sub",
+                            "results": [
+                              {
+                                "name": "e82",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [
+                              "e80",
+                              "e81"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "returns": [
+                          "e82"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "op": "call",
+                    "results": [
+                      {
+                        "name": "e84",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      },
+                      {
+                        "name": "e85",
+                        "type": {
+                          "dtype": "float32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e83",
+                      "e63"
+                    ],
+                    "attrs": {
+                      "callee": "mixed_helper"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "op": "constant",
+                    "results": [
+                      {
+                        "name": "e86",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      }
+                    ],
+                    "operands": [],
+                    "attrs": {
+                      "value": 0.125
+                    },
+                    "regions": []
+                  },
+                  {
+                    "op": "mul",
+                    "results": [
+                      {
+                        "name": "e87",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e84",
+                      "e86"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "op": "add",
+                    "results": [
+                      {
+                        "name": "e88",
+                        "type": {
+                          "dtype": "float32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e75",
+                      "e85"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "op": "constant",
+                    "results": [
+                      {
+                        "name": "e89",
+                        "type": {
+                          "dtype": "int32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [],
+                    "attrs": {
+                      "value": 1
+                    },
+                    "regions": []
+                  },
+                  {
+                    "op": "add",
+                    "results": [
+                      {
+                        "name": "e90",
+                        "type": {
+                          "dtype": "int32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e73",
+                      "e89"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "op": "add",
+                    "results": [
+                      {
+                        "name": "e91",
+                        "type": {
+                          "dtype": "int32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e76",
+                      "e90"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  }
+                ],
+                "returns": [
+                  "e87",
+                  "e88",
+                  "e91"
+                ]
+              }
+            ]
+          },
+          {
+            "op": "while",
+            "results": [
+              {
+                "name": "e114",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "name": "e115",
+                "type": {
+                  "dtype": "float32",
+                  "shape": []
+                }
+              },
+              {
+                "name": "e116",
+                "type": {
+                  "dtype": "int32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [
+              "e66",
+              "e92",
+              "e93",
+              "e94"
+            ],
+            "attrs": {
+              "max_steps": 4,
+              "pipelined": false
+            },
+            "regions": [
+              {
+                "arguments": [
+                  {
+                    "name": "e95",
+                    "type": {
+                      "dtype": "int32",
+                      "shape": []
+                    }
+                  },
+                  {
+                    "name": "e96",
+                    "type": {
+                      "dtype": "float16",
+                      "shape": [
+                        16,
+                        16
+                      ]
+                    }
+                  },
+                  {
+                    "name": "e97",
+                    "type": {
+                      "dtype": "float32",
+                      "shape": []
+                    }
+                  },
+                  {
+                    "name": "e98",
+                    "type": {
+                      "dtype": "int32",
+                      "shape": []
+                    }
+                  }
+                ],
+                "operations": [
+                  {
+                    "op": "if",
+                    "results": [
+                      {
+                        "name": "e105",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e72",
+                      "e96"
+                    ],
+                    "attrs": {},
+                    "regions": [
+                      {
+                        "arguments": [
+                          {
+                            "name": "e99",
+                            "type": {
+                              "dtype": "float16",
+                              "shape": [
+                                16,
+                                16
+                              ]
+                            }
+                          }
+                        ],
+                        "operations": [
+                          {
+                            "op": "constant",
+                            "results": [
+                              {
+                                "name": "e100",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [],
+                            "attrs": {
+                              "value": 0.125
+                            },
+                            "regions": []
+                          },
+                          {
+                            "op": "add",
+                            "results": [
+                              {
+                                "name": "e101",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [
+                              "e99",
+                              "e100"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "returns": [
+                          "e101"
+                        ]
+                      },
+                      {
+                        "arguments": [
+                          {
+                            "name": "e102",
+                            "type": {
+                              "dtype": "float16",
+                              "shape": [
+                                16,
+                                16
+                              ]
+                            }
+                          }
+                        ],
+                        "operations": [
+                          {
+                            "op": "constant",
+                            "results": [
+                              {
+                                "name": "e103",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [],
+                            "attrs": {
+                              "value": 0.125
+                            },
+                            "regions": []
+                          },
+                          {
+                            "op": "sub",
+                            "results": [
+                              {
+                                "name": "e104",
+                                "type": {
+                                  "dtype": "float16",
+                                  "shape": [
+                                    16,
+                                    16
+                                  ]
+                                }
+                              }
+                            ],
+                            "operands": [
+                              "e102",
+                              "e103"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "returns": [
+                          "e104"
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "op": "call",
+                    "results": [
+                      {
+                        "name": "e106",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      },
+                      {
+                        "name": "e107",
+                        "type": {
+                          "dtype": "float32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e105",
+                      "e63"
+                    ],
+                    "attrs": {
+                      "callee": "mixed_helper"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "op": "constant",
+                    "results": [
+                      {
+                        "name": "e108",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      }
+                    ],
+                    "operands": [],
+                    "attrs": {
+                      "value": 0.125
+                    },
+                    "regions": []
+                  },
+                  {
+                    "op": "mul",
+                    "results": [
+                      {
+                        "name": "e109",
+                        "type": {
+                          "dtype": "float16",
+                          "shape": [
+                            16,
+                            16
+                          ]
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e106",
+                      "e108"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "op": "add",
+                    "results": [
+                      {
+                        "name": "e110",
+                        "type": {
+                          "dtype": "float32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e97",
+                      "e107"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "op": "constant",
+                    "results": [
+                      {
+                        "name": "e111",
+                        "type": {
+                          "dtype": "int32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [],
+                    "attrs": {
+                      "value": 1
+                    },
+                    "regions": []
+                  },
+                  {
+                    "op": "add",
+                    "results": [
+                      {
+                        "name": "e112",
+                        "type": {
+                          "dtype": "int32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e95",
+                      "e111"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "op": "add",
+                    "results": [
+                      {
+                        "name": "e113",
+                        "type": {
+                          "dtype": "int32",
+                          "shape": []
+                        }
+                      }
+                    ],
+                    "operands": [
+                      "e98",
+                      "e112"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  }
+                ],
+                "returns": [
+                  "e109",
+                  "e110",
+                  "e113"
+                ]
+              }
+            ]
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e117",
+                "type": {
+                  "dtype": "float32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": -0.125
+            },
+            "regions": []
+          },
+          {
+            "op": "broadcast",
+            "results": [
+              {
+                "name": "e118",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e117"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e119",
+                "type": {
+                  "dtype": "float32",
+                  "shape": []
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": -0.25
+            },
+            "regions": []
+          },
+          {
+            "op": "broadcast",
+            "results": [
+              {
+                "name": "e120",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e119"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "sub",
+            "results": [
+              {
+                "name": "e121",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e118",
+              "e120"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e122",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 28,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e123",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "atomic_max",
+            "results": [],
+            "operands": [
+              "e122",
+              "e123",
+              "e121"
+            ],
+            "attrs": {
+              "buffer": "mem8"
+            },
+            "regions": []
+          },
+          {
+            "op": "sub",
+            "results": [
+              {
+                "name": "e124",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e114",
+              "e92"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e125",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e124"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "index",
+            "results": [
+              {
+                "name": "e126",
+                "type": {
+                  "dtype": "int32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "shift": 194,
+              "reverse": true
+            },
+            "regions": []
+          },
+          {
+            "op": "constant",
+            "results": [
+              {
+                "name": "e127",
+                "type": {
+                  "dtype": "bool",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [],
+            "attrs": {
+              "value": true
+            },
+            "regions": []
+          },
+          {
+            "op": "load",
+            "results": [
+              {
+                "name": "e128",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e126",
+              "e127"
+            ],
+            "attrs": {
+              "buffer": "mem9"
+            },
+            "regions": []
+          },
+          {
+            "op": "sub",
+            "results": [
+              {
+                "name": "e129",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e125",
+              "e128"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "cast",
+            "results": [
+              {
+                "name": "e130",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e129"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "add",
+            "results": [
+              {
+                "name": "e131",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e130",
+              "e49"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "op": "reduce",
+            "results": [
+              {
+                "name": "e132",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16
+                  ]
+                }
+              }
+            ],
+            "operands": [
+              "e131"
+            ],
+            "attrs": {
+              "axis": 0,
+              "kind": "max"
+            },
+            "regions": []
+          }
+        ],
+        "returns": [
+          "e131",
+          "e16",
+          "e22",
+          "e115",
+          "e116",
+          "e132"
+        ]
+      },
+      "buffers": [
+        {
+          "name": "mem0",
+          "dtype": "float16",
+          "size": 512,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem1",
+          "dtype": "float16",
+          "size": 512,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem2",
+          "dtype": "int32",
+          "size": 512,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem3",
+          "dtype": "float16",
+          "size": 1028,
+          "role": "scratch",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem4",
+          "dtype": "float16",
+          "size": 512,
+          "role": "scratch",
+          "base": "mem3",
+          "offset": 1,
+          "stride": 2
+        },
+        {
+          "name": "mem5",
+          "dtype": "float16",
+          "size": 512,
+          "role": "scratch",
+          "base": "mem3",
+          "offset": 2,
+          "stride": 1
+        },
+        {
+          "name": "mem6",
+          "dtype": "float16",
+          "size": 256,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem7",
+          "dtype": "int32",
+          "size": 1,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem8",
+          "dtype": "float32",
+          "size": 256,
+          "role": "scratch",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        },
+        {
+          "name": "mem9",
+          "dtype": "float32",
+          "size": 256,
+          "role": "input",
+          "base": null,
+          "offset": 0,
+          "stride": 1
+        }
+      ],
+      "functions": [
+        {
+          "name": "mixed_helper",
+          "body": {
+            "arguments": [
+              {
+                "name": "e55",
+                "type": {
+                  "dtype": "float16",
+                  "shape": [
+                    16,
+                    16
+                  ]
+                }
+              },
+              {
+                "name": "e56",
+                "type": {
+                  "dtype": "float32",
+                  "shape": [
+                    16
+                  ]
+                }
+              }
+            ],
+            "operations": [
+              {
+                "op": "reduce",
+                "results": [
+                  {
+                    "name": "e57",
+                    "type": {
+                      "dtype": "float32",
+                      "shape": [
+                        16
+                      ]
+                    }
+                  }
+                ],
+                "operands": [
+                  "e55"
+                ],
+                "attrs": {
+                  "axis": 1,
+                  "kind": "sum"
+                },
+                "regions": []
+              },
+              {
+                "op": "add",
+                "results": [
+                  {
+                    "name": "e58",
+                    "type": {
+                      "dtype": "float32",
+                      "shape": [
+                        16
+                      ]
+                    }
+                  }
+                ],
+                "operands": [
+                  "e57",
+                  "e56"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "op": "reduce",
+                "results": [
+                  {
+                    "name": "e59",
+                    "type": {
+                      "dtype": "float32",
+                      "shape": []
+                    }
+                  }
+                ],
+                "operands": [
+                  "e58"
+                ],
+                "attrs": {
+                  "axis": 0,
+                  "kind": "sum"
+                },
+                "regions": []
+              },
+              {
+                "op": "reshape",
+                "results": [
+                  {
+                    "name": "e60",
+                    "type": {
+                      "dtype": "float32",
+                      "shape": [
+                        16,
+                        1
+                      ]
+                    }
+                  }
+                ],
+                "operands": [
+                  "e58"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "op": "cast",
+                "results": [
+                  {
+                    "name": "e61",
+                    "type": {
+                      "dtype": "float16",
+                      "shape": [
+                        16,
+                        1
+                      ]
+                    }
+                  }
+                ],
+                "operands": [
+                  "e60"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "op": "add",
+                "results": [
+                  {
+                    "name": "e62",
+                    "type": {
+                      "dtype": "float16",
+                      "shape": [
+                        16,
+                        16
+                      ]
+                    }
+                  }
+                ],
+                "operands": [
+                  "e55",
+                  "e61"
+                ],
+                "attrs": {},
+                "regions": []
+              }
+            ],
+            "returns": [
+              "e62",
+              "e59"
+            ]
+          }
+        }
+      ],
+      "observations": [
+        "e3",
+        "e11",
+        "e28",
+        "e32",
+        "e41",
+        "e46",
+        "e21",
+        "e4"
+      ],
+      "blocks": 2,
+      "input_pattern": "integer",
+      "runtime_cases": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          511
+        ],
+        [
+          3,
+          512
+        ]
+      ],
+      "configuration_pair": true,
+      "observation_pair": true,
+      "pass_config_pair": false,
+      "fast_math_pair": false,
+      "precision_pair": true,
+      "identity_pair": true,
+      "family": "mixed"
+    },
+    "input_seed": 0
+  },
+  "dtype": "bool+float16+float32+int32",
+  "error_message": "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.\n  import pynvml  # type: ignore[import]\nTraceback (most recent call last):\n  File \"/root/autodl-tmp/tmp/tilesmith_svzb7mm8.py\", line 2409, in <module>\n    run_extended(PROGRAM, prepare_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)\n  File \"/root/autodl-tmp/tmp/tilesmith_svzb7mm8.py\", line 407, in run_extended\n    extended_check(actual, variant_expected[name],\n  File \"/root/autodl-tmp/tmp/tilesmith_svzb7mm8.py\", line 262, in extended_check\n    raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '\nRuntimeError: WRONG RESULT: precision:triton_8_prec:e131:seed=1:steps=3:limit=512; max_abs=0.03125; index=112; actual=27.3125; expected=27.28125",
+  "timestamp": 1790360435.920421
+}

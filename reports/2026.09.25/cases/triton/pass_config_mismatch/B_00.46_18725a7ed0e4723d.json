@@ -1,0 +1,352 @@
+{
+  "bug_type": "wrong_result",
+  "root_cause": "pass_config_mismatch",
+  "location": "pass-config invariance",
+  "compute_kind": "region:reduce_tile->mul->sub->cast->row_max->cast->to_tile->floor->broadcast_tile->broadcast_tile->load_input->mul->load_input->to_tile->call->gemm->if->call->for->to_tile->add->to_tile->to_tile->call",
+  "params": {
+    "region_program": {
+      "type": "region",
+      "version": 4,
+      "value_type": "tile<float32>",
+      "spec": {
+        "M": 12897,
+        "N": 10589,
+        "K": 10589,
+        "block_M": 16,
+        "block_N": 256,
+        "block_K": 128,
+        "threads": 128,
+        "num_stages": 1,
+        "loop_kind": "serial",
+        "compute_kind": "gemm",
+        "dtype": "float16",
+        "name": "kernel_0"
+      },
+      "body": {
+        "arguments": [],
+        "operations": [
+          {
+            "kind": "gemm",
+            "result": "v1",
+            "operands": [],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "if",
+            "result": "v10",
+            "operands": [
+              "v1"
+            ],
+            "attrs": {
+              "predicate": "row",
+              "modulus": 3,
+              "parity": 0
+            },
+            "regions": [
+              {
+                "arguments": [
+                  "v2"
+                ],
+                "operations": [
+                  {
+                    "kind": "call",
+                    "result": "v3",
+                    "operands": [
+                      "v2",
+                      "v2",
+                      "v1"
+                    ],
+                    "attrs": {
+                      "callee": "fn_0"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "kind": "for",
+                    "result": "v7",
+                    "operands": [
+                      "v2"
+                    ],
+                    "attrs": {
+                      "trip_count": 0,
+                      "start": 1,
+                      "step": 1
+                    },
+                    "regions": [
+                      {
+                        "arguments": [
+                          "v4"
+                        ],
+                        "operations": [
+                          {
+                            "kind": "to_tile",
+                            "result": "v5",
+                            "operands": [
+                              "v1"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          },
+                          {
+                            "kind": "add",
+                            "result": "v6",
+                            "operands": [
+                              "v5",
+                              "v4"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "yield_value": "v6"
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "to_tile",
+                    "result": "v8",
+                    "operands": [
+                      "v7"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  }
+                ],
+                "yield_value": "v8"
+              },
+              {
+                "arguments": [
+                  "v9"
+                ],
+                "operations": [],
+                "yield_value": "v9"
+              }
+            ]
+          },
+          {
+            "kind": "to_tile",
+            "result": "v11",
+            "operands": [
+              "v1"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "call",
+            "result": "v12",
+            "operands": [
+              "v11"
+            ],
+            "attrs": {
+              "callee": "fn_1"
+            },
+            "regions": []
+          }
+        ],
+        "yield_value": "v12"
+      },
+      "input_scale": 0.1,
+      "functions": [
+        {
+          "name": "fn_0",
+          "body": {
+            "arguments": [
+              "arg0",
+              "arg1",
+              "arg2"
+            ],
+            "operations": [
+              {
+                "kind": "reduce_tile",
+                "result": "v1",
+                "operands": [
+                  "arg0"
+                ],
+                "attrs": {
+                  "axis": 1,
+                  "reduction": "sum"
+                },
+                "regions": []
+              },
+              {
+                "kind": "mul",
+                "result": "v2",
+                "operands": [
+                  "v1",
+                  "v1"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "sub",
+                "result": "v3",
+                "operands": [
+                  "v2",
+                  "v2"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "cast",
+                "result": "v4",
+                "operands": [
+                  "v3"
+                ],
+                "attrs": {
+                  "dtype": "float16"
+                },
+                "regions": []
+              },
+              {
+                "kind": "row_max",
+                "result": "v5",
+                "operands": [
+                  "v4"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "cast",
+                "result": "v6",
+                "operands": [
+                  "v5"
+                ],
+                "attrs": {
+                  "dtype": "float16"
+                },
+                "regions": []
+              },
+              {
+                "kind": "to_tile",
+                "result": "v7",
+                "operands": [
+                  "v6"
+                ],
+                "attrs": {},
+                "regions": []
+              }
+            ],
+            "yield_value": "v7"
+          }
+        },
+        {
+          "name": "fn_1",
+          "body": {
+            "arguments": [
+              "arg0"
+            ],
+            "operations": [
+              {
+                "kind": "floor",
+                "result": "v1",
+                "operands": [
+                  "arg0"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "broadcast_tile",
+                "result": "v2",
+                "operands": [
+                  "v1"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "broadcast_tile",
+                "result": "v3",
+                "operands": [
+                  "v2"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "load_input",
+                "result": "v4",
+                "operands": [],
+                "attrs": {
+                  "source": "A",
+                  "dtype": "float32",
+                  "row_offset": 2,
+                  "col_offset": 3
+                },
+                "regions": []
+              },
+              {
+                "kind": "mul",
+                "result": "v5",
+                "operands": [
+                  "v4",
+                  "v2"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "load_input",
+                "result": "v6",
+                "operands": [],
+                "attrs": {
+                  "source": "B",
+                  "dtype": "float16",
+                  "row_offset": 1,
+                  "col_offset": 2
+                },
+                "regions": []
+              },
+              {
+                "kind": "to_tile",
+                "result": "v7",
+                "operands": [
+                  "v6"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "call",
+                "result": "v8",
+                "operands": [
+                  "v5",
+                  "v7",
+                  "v1"
+                ],
+                "attrs": {
+                  "callee": "fn_0"
+                },
+                "regions": []
+              }
+            ],
+            "yield_value": "v8"
+          }
+        }
+      ],
+      "execution": {
+        "input_pattern": "integer",
+        "input_seed_count": 2,
+        "repeat_count": 3,
+        "schedule_pair": true,
+        "input_layout_b": "broadcast_rows",
+        "stage_sweep": true,
+        "loop_sweep": true,
+        "layout_sweep": true,
+        "pass_sweep": true,
+        "swizzle_sweep": true,
+        "warp_policy_sweep": true
+      },
+      "typed": true
+    },
+    "input_seed": 0
+  },
+  "dtype": "float16",
+  "error_message": "', 'result': 'v4', 'operands': ['v3'], 'attrs': {'dtype': 'float16'}, 'regions': []}, {'kind': 'row_max', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'cast', 'result': 'v6', 'operands': ['v5'], 'attrs': {'dtype': 'float16'}, 'regions': []}, {'kind': 'to_tile', 'result': 'v7', 'operands': ['v6'], 'attrs': {}, 'regions': []}], 'yield_value': 'v7'}}, {'name': 'fn_1', 'body': {'arguments': ['arg0'], 'operations': [{'kind': 'floor', 'result': 'v1', 'operands': ['arg0'], 'attrs': {}, 'regions': []}, {'kind': 'broadcast_tile', 'result': 'v2', 'operands': ['v1'], 'attrs': {}, 'regions': []}, {'kind': 'broadcast_tile', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'load_input', 'result': 'v4', 'operands': [], 'attrs': {'source': 'A', 'dtype': 'float32', 'row_offset': 2, 'col_offset': 3}, 'regions': []}, {'kind': 'mul', 'result': 'v5', 'operands': ['v4', 'v2'], 'attrs': {}, 'regions': []}, {'kind': 'load_input', 'result': 'v6', 'operands': [], 'attrs': {'source': 'B', 'dtype': 'float16', 'row_offset': 1, 'col_offset': 2}, 'regions': []}, {'kind': 'to_tile', 'result': 'v7', 'operands': ['v6'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v8', 'operands': ['v5', 'v7', 'v1'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v8'}}]))\n  File \"/root/autodl-tmp/tmp/tilesmith_useerqxs.py\", line 311, in _run_layout_case\n    return _run_region(launches, inputs, reference, repeats, tolerance, relative=relative, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/tmp/tilesmith_useerqxs.py\", line 286, in _run_region\n    _region_check(actual, baseline, relative, tolerance,\n  File \"/root/autodl-tmp/tmp/tilesmith_useerqxs.py\", line 125, in _region_check\n    raise RuntimeError(f'WRONG RESULT: {label}: error={error}, tolerance={tolerance}')\nRuntimeError: WRONG RESULT: pass-config invariance: error=841.6175842285156, tolerance=0.1",
+  "timestamp": 1790191377.1774187
+}

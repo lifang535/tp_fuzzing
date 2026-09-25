@@ -1,0 +1,365 @@
+{
+  "bug_type": "compile_crash",
+  "root_cause": "tilelang_codegen_error",
+  "location": "tvm.error",
+  "compute_kind": "region:round->where->index_add->if->broadcast_tile->if->cast->to_tile->to_tile->to_tile->to_tile->gemm->for->row_softmax->reduce_tile->mul->log2->for->to_tile->add->to_tile->add->to_tile->call",
+  "params": {
+    "region_program": {
+      "type": "region",
+      "version": 4,
+      "value_type": "tile<float32>",
+      "spec": {
+        "M": 163,
+        "N": 4673,
+        "K": 1,
+        "block_M": 256,
+        "block_N": 128,
+        "block_K": 128,
+        "threads": 128,
+        "num_stages": 4,
+        "loop_kind": "pipelined",
+        "compute_kind": "gemm",
+        "dtype": "float16",
+        "name": "kernel_0"
+      },
+      "body": {
+        "arguments": [],
+        "operations": [
+          {
+            "kind": "gemm",
+            "result": "v1",
+            "operands": [],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "for",
+            "result": "v13",
+            "operands": [
+              "v1"
+            ],
+            "attrs": {
+              "trip_count": 3,
+              "start": 2,
+              "step": 3
+            },
+            "regions": [
+              {
+                "arguments": [
+                  "v2"
+                ],
+                "operations": [
+                  {
+                    "kind": "row_softmax",
+                    "result": "v3",
+                    "operands": [
+                      "v1"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "kind": "reduce_tile",
+                    "result": "v4",
+                    "operands": [
+                      "v3"
+                    ],
+                    "attrs": {
+                      "axis": 0,
+                      "reduction": "min"
+                    },
+                    "regions": []
+                  },
+                  {
+                    "kind": "mul",
+                    "result": "v5",
+                    "operands": [
+                      "v4",
+                      "v4"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "kind": "log2",
+                    "result": "v6",
+                    "operands": [
+                      "v5"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "kind": "for",
+                    "result": "v10",
+                    "operands": [
+                      "v1"
+                    ],
+                    "attrs": {
+                      "trip_count": 3,
+                      "start": 3,
+                      "step": 3
+                    },
+                    "regions": [
+                      {
+                        "arguments": [
+                          "v7"
+                        ],
+                        "operations": [
+                          {
+                            "kind": "to_tile",
+                            "result": "v8",
+                            "operands": [
+                              "v7"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          },
+                          {
+                            "kind": "add",
+                            "result": "v9",
+                            "operands": [
+                              "v8",
+                              "v7"
+                            ],
+                            "attrs": {},
+                            "regions": []
+                          }
+                        ],
+                        "yield_value": "v9"
+                      }
+                    ]
+                  },
+                  {
+                    "kind": "to_tile",
+                    "result": "v11",
+                    "operands": [
+                      "v10"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  },
+                  {
+                    "kind": "add",
+                    "result": "v12",
+                    "operands": [
+                      "v11",
+                      "v2"
+                    ],
+                    "attrs": {},
+                    "regions": []
+                  }
+                ],
+                "yield_value": "v12"
+              }
+            ]
+          },
+          {
+            "kind": "to_tile",
+            "result": "v14",
+            "operands": [
+              "v1"
+            ],
+            "attrs": {},
+            "regions": []
+          },
+          {
+            "kind": "call",
+            "result": "v15",
+            "operands": [
+              "v14",
+              "v1"
+            ],
+            "attrs": {
+              "callee": "fn_0"
+            },
+            "regions": []
+          }
+        ],
+        "yield_value": "v15"
+      },
+      "input_scale": 0.1,
+      "functions": [
+        {
+          "name": "fn_0",
+          "body": {
+            "arguments": [
+              "arg0",
+              "arg1"
+            ],
+            "operations": [
+              {
+                "kind": "round",
+                "result": "v1",
+                "operands": [
+                  "arg1"
+                ],
+                "attrs": {
+                  "dtype": "float16"
+                },
+                "regions": []
+              },
+              {
+                "kind": "where",
+                "result": "v2",
+                "operands": [
+                  "v1",
+                  "v1",
+                  "v1"
+                ],
+                "attrs": {},
+                "regions": []
+              },
+              {
+                "kind": "index_add",
+                "result": "v3",
+                "operands": [
+                  "v2"
+                ],
+                "attrs": {
+                  "axis": "column",
+                  "scale": 1.0
+                },
+                "regions": []
+              },
+              {
+                "kind": "if",
+                "result": "v14",
+                "operands": [
+                  "v3"
+                ],
+                "attrs": {
+                  "predicate": "column",
+                  "modulus": 2,
+                  "parity": 1
+                },
+                "regions": [
+                  {
+                    "arguments": [
+                      "v4"
+                    ],
+                    "operations": [
+                      {
+                        "kind": "broadcast_tile",
+                        "result": "v5",
+                        "operands": [
+                          "v4"
+                        ],
+                        "attrs": {},
+                        "regions": []
+                      },
+                      {
+                        "kind": "if",
+                        "result": "v11",
+                        "operands": [
+                          "v5"
+                        ],
+                        "attrs": {
+                          "predicate": "row",
+                          "modulus": 2,
+                          "parity": 0
+                        },
+                        "regions": [
+                          {
+                            "arguments": [
+                              "v6"
+                            ],
+                            "operations": [
+                              {
+                                "kind": "cast",
+                                "result": "v7",
+                                "operands": [
+                                  "v4"
+                                ],
+                                "attrs": {
+                                  "dtype": "float16"
+                                },
+                                "regions": []
+                              },
+                              {
+                                "kind": "to_tile",
+                                "result": "v8",
+                                "operands": [
+                                  "v7"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              }
+                            ],
+                            "yield_value": "v8"
+                          },
+                          {
+                            "arguments": [
+                              "v9"
+                            ],
+                            "operations": [
+                              {
+                                "kind": "to_tile",
+                                "result": "v10",
+                                "operands": [
+                                  "v4"
+                                ],
+                                "attrs": {},
+                                "regions": []
+                              }
+                            ],
+                            "yield_value": "v10"
+                          }
+                        ]
+                      },
+                      {
+                        "kind": "to_tile",
+                        "result": "v12",
+                        "operands": [
+                          "v11"
+                        ],
+                        "attrs": {},
+                        "regions": []
+                      }
+                    ],
+                    "yield_value": "v12"
+                  },
+                  {
+                    "arguments": [
+                      "v13"
+                    ],
+                    "operations": [],
+                    "yield_value": "v13"
+                  }
+                ]
+              },
+              {
+                "kind": "to_tile",
+                "result": "v15",
+                "operands": [
+                  "v14"
+                ],
+                "attrs": {},
+                "regions": []
+              }
+            ],
+            "yield_value": "v15"
+          }
+        }
+      ],
+      "execution": {
+        "input_pattern": "normal",
+        "input_seed_count": 2,
+        "repeat_count": 3,
+        "schedule_pair": true,
+        "input_layout_a": "transposed",
+        "stage_sweep": true,
+        "loop_sweep": true,
+        "layout_sweep": true,
+        "pass_sweep": true,
+        "swizzle_sweep": true,
+        "warp_policy_sweep": true
+      },
+      "typed": true
+    },
+    "input_seed": 0
+  },
+  "dtype": "float16",
+  "error_message": " const&)>*) const\n  File \"<unknown>\", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#10}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)\n  File \"<unknown>\", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::EvaluateNode const*)\n  File \"<unknown>\", line 0, in tvm::tl::ReduceOpNode::Lower(tvm::tl::LowerArgs const&, tvm::arith::Analyzer*) const\n  File \"<unknown>\", line 0, in tvm::tl::backend::ReduceLowerer<tvm::tl::cuda::Reduce>::Lower(tvm::tl::ReduceOpNode const&, tvm::tl::LowerArgs const&, tvm::arith::Analyzer*)\n  File \"<unknown>\", line 0, in tvm::tl::backend::reduce::MakeReduceOwnershipPlan(tvm::ffi::Array<tvm::PrimExpr, void> const&, tvm::PrimExpr const&, tvm::ffi::Array<tvm::tirx::IterVar, void> const&, tvm::tirx::Var const&, tvm::arith::Analyzer*)\n  File \"<unknown>\", line 0, in tvm::tl::backend::reduce::BuildLocalReduceIterator(tvm::PrimExpr const&, tvm::ffi::Array<tvm::tirx::IterVar, void> const&, tvm::tirx::Var const&, std::vector<tvm::tl::backend::reduce::ThreadReduceStep, std::allocator<tvm::tl::backend::reduce::ThreadReduceStep> > const&, tvm::arith::Analyzer*)\n  File \"/project/src/backend/common/op/reduce.h\", line 534, in void tvm::tl::backend::reduce::CheckThreadOwnedStepsProjectable(const tvm::PrimExpr&, const tvm::tirx::Var&, const std::vector<ThreadReduceStep>&, tvm::arith::Analyzer*)\ntvm.error.InternalError: Check failed: (analyzer->CanProveEqual(projected_index, simplified_index)) is false: ReduceOp cannot lower a layout where a source index depends on a thread-owned reduce segment: src_index=rv % 128 // 16 * 32 + i % 64 // 8 * 4 + rv % 16 // 8 * 2 + i % 2, projected_src_index=(rv - rv % 8) % 128 // 16 * 32 + i % 64 // 8 * 4 + (rv - rv % 8) % 16 // 8 * 2 + i % 2, reduce_var=rv, projected_reduce_var=rv - rv // 128 % 2 * 128 - T.FloorDiv(rv, 1) % 8",
+  "timestamp": 1790187046.7961593
+}
