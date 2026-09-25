@@ -10,6 +10,10 @@ dtype) share one cache entry, so the second program reuses the first dtype's
 compiled kernel and the call fails with "kernel impl input A dtype mismatch".
 The region emitter keeps that bug class reachable by binding dtype at module
 scope instead of inlining it into the impl source.
+
+That reachability is version-dependent, and the tests below assert whichever
+behaviour the installed tilelang has (see _frontend_cache_collides): the class
+is unreachable on 0.1.14, where the kernel cache is keyed on the parsed TIR.
 """
 import os
 import re
@@ -23,8 +27,27 @@ import torch
 
 from src.config import Config
 from src.ir import DataType
+from src.backends.common import versions
 from src.backends.tilelang.region import tilelang_code
 from src.workflow.oracle import Oracle
+
+
+def _version_tuple(text):
+    return tuple(int(part) for part in re.findall(r'\d+', text or '')[:3])
+
+
+def _frontend_cache_collides() -> bool:
+    """Does the installed tilelang still collide two dtypes onto one kernel?
+
+    0.1.11 keys its frontend cache on ``inspect.getsource(impl)``
+    (``jit/__init__.py:_frontend_cache_key_data``), which cannot see a dtype
+    bound at module scope. 0.1.14 deleted that method and keys the kernel cache
+    on a hash of ``func.script(show_meta=True)``
+    (``cache/kernel_cache.py:_generate_key``) -- the parsed TIR, where the dtype
+    is a concrete buffer type -- so the two dtypes no longer share an entry.
+    """
+    installed = versions.installed('tilelang')
+    return installed is not None and _version_tuple(installed) < (0, 1, 14)
 
 
 def _impl_source(code: str) -> str:
@@ -72,5 +95,14 @@ class DtypeMismatchTests(unittest.TestCase):
         first = run(nested_program('float16', 'gemm'))
         self.assertEqual(first.returncode, 0, f'float16 baseline failed:\n{first.stderr}')
         second = run(nested_program('float32', 'gemm'))
-        self.assertNotEqual(second.returncode, 0)
-        self.assertIn('dtype mismatch, expected float16', second.stderr)
+        if _frontend_cache_collides():
+            self.assertNotEqual(second.returncode, 0)
+            self.assertIn('dtype mismatch, expected float16', second.stderr)
+        else:
+            # Upstream fixed the key: assert the fix, so that a reintroduction
+            # fails here instead of leaving this test red on the target pair.
+            # The precondition above still holds on 0.1.14 -- the dtype is
+            # still absent from the jit source -- so what changed is the key.
+            self.assertEqual(second.returncode, 0,
+                             f'float32 rerun failed:\n{second.stderr}')
+            self.assertNotIn('dtype mismatch', second.stderr)
