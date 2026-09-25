@@ -9,7 +9,7 @@ import torch
 from src.config import Config
 from src.ir import TileKernel, ComputeKind, DataType
 from src.backends.common.probes import generate_probe, mutate_probe, repair_probe, probe_program, KINDS, patterns
-from src.workflow.emitter.probe_runtime import _probe_input, _probe_exact, _run_probe
+from src.workflow.emitter.probe_runtime import _byte_view, _probe_input, _probe_exact, _run_probe
 from src.workflow.emitter import get_emitter
 from src.workflow.fuzzer.fuzzer import TileSmith
 
@@ -24,6 +24,37 @@ class ProbeTests(unittest.TestCase):
             self.assertTrue(torch.all(storage[-16:] == 19))
             if layout != 'contiguous':
                 self.assertFalse(view.is_contiguous())
+
+    def test_bit_comparison_survives_degenerate_strides(self):
+        """Saved 2026.09.24 samples failed here with "self.stride(-1) must be 1
+        to view Half as Byte, but got 0/64": a probe input view whose last
+        extent is 1 (broadcast column, offset/transposed row) stays
+        "contiguous" for torch, so .contiguous() kept the stride and the byte
+        view raised instead of comparing bits."""
+        storage = torch.arange(-4, 4, dtype=torch.float16)
+        broadcast = storage.as_strided((2, 1), (1, 0))
+        self.assertTrue(broadcast.is_contiguous())
+        self.assertEqual(broadcast.stride(-1), 0)
+        _probe_exact(storage[:2].reshape(2, 1).clone(), broadcast, 'broadcast column')
+        row = storage.as_strided((1, 1), (1, 9))
+        self.assertEqual(row.stride(-1), 9)
+        _probe_exact(row.clone(), row, '1x1 strided')
+        _probe_exact(torch.tensor(1.5, dtype=torch.float16), torch.tensor(1.5, dtype=torch.float16),
+                     'scalar')
+
+    def test_degenerate_views_still_compare_bits(self):
+        """The materialized buffer must keep the exact payload, including the
+        signed-zero and NaN cases the byte comparison exists to catch."""
+        negative_zero = torch.tensor([[-0.0]], dtype=torch.float16)
+        view = negative_zero.as_strided((1, 1), (1, 9))
+        with self.assertRaisesRegex(RuntimeError, 'bits differ'):
+            _probe_exact(view, torch.zeros((1, 1), dtype=torch.float16), 'signed zero')
+        nan = torch.tensor([[float('nan')]], dtype=torch.float16)
+        _probe_exact(nan.as_strided((1, 1), (1, 9)), nan.as_strided((1, 1), (1, 5)), 'nan payload')
+        # The copy path pre-fills the output with the reference's flat bytes.
+        storage = torch.arange(-4, 4, dtype=torch.float16)
+        flat = _byte_view(storage.as_strided((2, 1), (1, 0))).reshape(-1)
+        self.assertEqual(flat.tolist(), _byte_view(storage[:2].reshape(2, 1).clone()).reshape(-1).tolist())
 
     def test_special_values_are_not_normalized(self):
         x = _probe_input(2, 8, torch.float32, 'offset', 'special', 'cpu')[1]

@@ -43,6 +43,44 @@ class ClassifierTests(unittest.TestCase):
             classify_root_cause("Check failed: m_warp * n_warp == num_warps"),
             'warp_partition')
 
+    def test_tilelang_0114_rewordings_keep_their_classes(self):
+        """0.1.14 reworded two failures this harness labels; both messages are
+        verbatim from saved 2026.09.24 samples. A lost pattern falls through to
+        `other`, which is how a real bug disappears from the root-cause counts."""
+        self.assertEqual(
+            classify_root_cause(
+                "tvm.error.InternalError: No valid warp partition for T.gemm: M=16, N=16 "
+                "cannot be evenly covered by 4 warps (policy=Square). Each warp must own a "
+                "multiple of 16 rows and 8 columns; adjust `threads` or the block tile shape."),
+            'warp_partition')
+        conflict = ("tvm.error.InternalError: Layout infer conflict between e11 and e24 in "
+                    "T.Parallel loop:\n    loop Fragment((16, 16) -> (8,), replicate: 1, "
+                    "thread: 32, forward_thread: _i % 8 * 4 + _j % 8 // 2)")
+        self.assertEqual(classify_root_cause(conflict), 'layout_inference')
+
+    def test_triton_pass_failure_is_its_own_class(self):
+        """An MLIR pass failure names the failing pass and keeps the verifier
+        diagnostic; it is not a frontend/lowering error."""
+        message = ("triton/compiler/compiler.py\", line 189, in make_ttgir\n"
+                   "    pm.run(mod, 'make_ttgir')\n"
+                   "RuntimeError: PassManager::run failed\n"
+                   "loc(fused[..]): error: 'arith.addf' op requires the same encoding "
+                   "for all operands and results")
+        self.assertEqual(classify_root_cause(message), 'triton_pass_failure')
+
+    def test_harness_side_triton_errors_stay_unclassified(self):
+        """The triton branch must not claim errors raised from inside the
+        triton package: a harness-generated call that triton rejects is a
+        harness defect, and labelling it a DSL bug hides it."""
+        message = ("File \"/tmp/triton/compiler/compiler.py\", line 69, in __init__\n"
+                   "    raise TypeError(\"Signature keys must be string\")\n"
+                   "TypeError: Signature keys must be string")
+        self.assertEqual(classify_root_cause(message), 'other')
+        self.assertEqual(
+            classify_root_cause("triton.runtime.errors.OutOfResources: out of resource: "
+                                "shared memory, Required: 196608, Hardware limit: 99328"),
+            'shared_memory_overflow')
+
     def test_triton_out_of_resources_is_shared_memory_overflow(self):
         self.assertEqual(
             classify_root_cause("triton.runtime.errors.OutOfResources: out of resource: "

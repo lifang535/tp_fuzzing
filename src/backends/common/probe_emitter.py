@@ -8,7 +8,8 @@ from src.workflow.emitter import probe_runtime
 from src.workflow.emitter import _threshold_header
 
 _HELPERS = '\n'.join(inspect.getsource(fn) for fn in (
-    probe_runtime._probe_input, probe_runtime._probe_exact, probe_runtime._run_probe))
+    probe_runtime._byte_view, probe_runtime._probe_input, probe_runtime._probe_exact,
+    probe_runtime._run_probe))
 
 
 def _layout(rows, cols, layout):

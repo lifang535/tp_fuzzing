@@ -176,6 +176,10 @@ class ExtendedLowering:
             if expression is not None:
                 self.add(indent, f'{out} = ({expression}).to(tl.{t.dtype})')
 
+    def parameters(self):
+        """Kernel parameter names, in launch order (see `signature`)."""
+        return [b.name for b in self.roots] + ['out_' + v for v in self.watched] + ['steps', 'limit']
+
     def emit(self):
         for fn in self.program.functions:
             self.add(0, '@triton.jit')
@@ -183,7 +187,7 @@ class ExtendedLowering:
             self.lower(fn.body, fn.name, 1)
             self.add(1, f"return {', '.join(fn.body.returns)}")
         self.add(0, '@triton.jit')
-        self.add(0, f"def {self.name}({', '.join([b.name for b in self.roots] + ['out_' + v for v in self.watched] + ['steps', 'limit'])}):")
+        self.add(0, f"def {self.name}({', '.join(self.parameters())}):")
         self.add(1, 'bid = tl.program_id(0)')
         self.lower(self.program.body, 'main', 1)
         for name in self.watched:
@@ -192,9 +196,18 @@ class ExtendedLowering:
         return '\n'.join(self.lines).replace('tl.bool', 'tl.int1')
 
     def signature(self):
+        """ASTSource signature keyed by parameter name.
+
+        Triton 3.0 accepted positional keys ({0: '*fp16', ...}); 3.8 rejects
+        anything else with "Signature keys must be string" and resolves each
+        key against the kernel's parameter list, so the keys are the emitted
+        parameter names of `parameters()`. Name-keyed signatures compile on
+        3.0 as well, which keeps one harness running on both pairs.
+        """
         dtype = {'float16':'fp16', 'float32':'fp32', 'int32':'i32', 'int8':'i8', 'bool':'i1'}
         pointers = [b.dtype for b in self.roots] + [self.ty('main', v).dtype for v in self.watched]
-        return {i: '*' + dtype[t] for i, t in enumerate(pointers)} | {len(pointers):'i32', len(pointers) + 1:'i32'}
+        types = ['*' + dtype[t] for t in pointers] + ['i32', 'i32']
+        return dict(zip(self.parameters(), types))
 
 
 def compile_source(entries, program):

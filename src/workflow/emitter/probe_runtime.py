@@ -49,12 +49,33 @@ def _probe_input(rows, cols, dtype, layout, pattern, device='cuda'):
     return storage, view, strides, offset
 
 
+def _byte_view(tensor):
+    """Byte view of a tensor's logical contents, valid for any shape/strides.
+
+    `.contiguous()` is not enough: torch's contiguity check skips size-1
+    dimensions, so a broadcast or transposed input whose last extent is 1
+    (strides (1, 0), (1, rows), ...) stays "contiguous" with stride(-1) != 1,
+    and `view(dtype)` then raises "self.stride(-1) must be 1 to view Half as
+    Byte" instead of letting the probe compare bits. Materialize into a fresh
+    buffer when the strides make the view illegal: same logical order, same bit
+    comparison, ordinary strides.
+    """
+    import torch
+    if tensor.dim() == 0:
+        tensor = tensor.reshape(1)
+    if tensor.stride(-1) != 1:
+        buffer = torch.empty(tensor.shape, dtype=tensor.dtype, device=tensor.device)
+        buffer.copy_(tensor)
+        tensor = buffer
+    return tensor.view(torch.uint8)
+
+
 def _probe_exact(actual, expected, label):
     import torch
     # Compare bits, including signed zero and NaN payloads. Also works for int32.
     if actual.shape != expected.shape or actual.dtype != expected.dtype:
         raise RuntimeError(f'WRONG RESULT: {label}: shape/dtype mismatch')
-    if not torch.equal(actual.contiguous().view(torch.uint8), expected.contiguous().view(torch.uint8)):
+    if not torch.equal(_byte_view(actual), _byte_view(expected)):
         raise RuntimeError(f'WRONG RESULT: {label}: bits differ')
 
 
@@ -86,8 +107,10 @@ def _run_probe(launches, inputs, reference, kind, repeats, threshold, instantiat
             output[guard:-guard].fill_(sentinel)
             if kind == 'copy':
                 # Every unwritten byte differs, even when the expected value is NaN.
+                # _byte_view also covers a degenerate-strided reference view,
+                # where .contiguous().reshape(-1).view(uint8) raised before.
                 output[guard:-guard].view(torch.uint8).copy_(
-                    ref.contiguous().reshape(-1).view(torch.uint8).bitwise_not())
+                    _byte_view(ref).reshape(-1).bitwise_not())
             launch(output)
             torch.cuda.synchronize()
             if not torch.all(output[:guard] == 23) or not torch.all(output[-guard:] == 23):

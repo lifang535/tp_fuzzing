@@ -159,6 +159,20 @@ class TileSmith:
                     current = self.root_cause_locations.get(cause, Counter())
                     if sum(counts.values()) > sum(current.values()):
                         self.root_cause_locations[cause] = Counter(counts)
+            # DSL drift between segments: the harness adapts to both pairs, so
+            # this is a warning, not a refusal. The counting matters though —
+            # a root cause that vanished after an upgrade reads as "fixed"
+            # unless the versions differ.
+            from src.backends.common.versions import environment
+            recorded = summary.get('environment')
+            if isinstance(recorded, dict):
+                current = environment()
+                drift = [f'{name}: {recorded[name]} -> {current.get(name)}'
+                         for name in sorted(recorded)
+                         if recorded[name] != current.get(name)]
+                if drift:
+                    print('[resume] WARNING: environment changed since this campaign started '
+                          '(' + '; '.join(drift) + '); counts before and after are not comparable')
 
         self.stats.total_tested = total_count
         self.stats.total_generated = self.stats.total_tested
@@ -309,8 +323,19 @@ class TileSmith:
 
     def run(self, num_iterations: int = 1000, verbose: bool = True):
         if verbose:
+            from src.backends.common.versions import describe
+            from src.backends.common.knobs import missing_option_fields, missing_pool_keys
             print(f"TileSmith: {num_iterations} iterations, backend={self.backend}")
             print(f"Output: {self.output_dir}")
+            print(f"Environment: {describe()}")
+            # A pool key the installed DSL dropped is a silent no-op: the
+            # variant compiles like its baseline and the coverage it was meant
+            # to add disappears without any failure to notice.
+            for label, missing in (('tilelang pass pool', missing_pool_keys()),
+                                   ('triton compile options', missing_option_fields())):
+                if missing:
+                    print(f"WARNING: {label} names {sorted(missing)}, absent from the "
+                          f"installed release (sampled variants there are no-ops)")
             print()
 
         pool_rotation_interval = self.config.pool_rotation_interval
@@ -419,8 +444,14 @@ class TileSmith:
             bugs_total = sum(self.known_root_causes.values())
             bugs_unique = len(self.known_root_causes)
 
+            from src.backends.common.versions import TARGET_TILELANG, TARGET_TRITON, environment
             summary = {
                 "backend": self.backend,
+                # What this campaign actually ran against: the harness adapts
+                # to both the target and the legacy DSL pair, so the recorded
+                # versions are what make two runs comparable.
+                "environment": environment(),
+                "target_versions": {"tilelang": TARGET_TILELANG, "triton": TARGET_TRITON},
                 "input_seed": self.config.input_seed,
                 "compile_only": self.config.compile_only,
                 "save_artifacts": self.config.save_artifacts,

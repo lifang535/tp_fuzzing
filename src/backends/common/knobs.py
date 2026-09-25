@@ -1,12 +1,20 @@
 """MLIRSmith-style random pass-pipeline sampling pools.
 
-Keys are verified against the installed tilelang 0.1.11 (CUDA pipeline
-consumers in cuda/pipeline.py, backend/pass_pipeline/pipeline_utils.py,
-engine/lower.py, jit/adapter/libgen.py, and C++ src/transform) and triton
-3.0.0 CUDAOptions. Sampling is a pure function of (program, config): a local
-Random seeded from sha256(program sig + config.seed). Never the global random
-state — evidence reads and timeout scaling re-derive extended_variants(
-program, config) and must agree.
+Version marking (see backends/common/versions.py): the pools are shared by the
+target pair (tilelang 0.1.14 / triton 3.8.0 — every key below was re-checked
+to still exist as a declared PassConfigKey and to still have consumers in
+cuda/pipeline.py, backend/pass_pipeline/, jit/ and C++ src/transform) and the
+legacy pair (tilelang 0.1.11 / triton 3.0.0). Pool membership stays static so
+that sampling is a pure function of (program, config): a local Random seeded
+from sha256(program sig + config.seed). Never the global random state —
+evidence reads and timeout scaling re-derive extended_variants(program,
+config) and must agree. `missing_pool_keys()` reports a key an installed
+tilelang no longer declares; the campaign's startup banner surfaces it, and
+tests/test_backend_versions.py fails on it.
+
+Consumers are `config.get(key, default)` lookups, so a stale key is a silent
+no-op (the variant compiles identically to the baseline) rather than a crash —
+the failure mode to watch for is lost coverage, not false bugs.
 
 Excluded by policy: tl.enable_fast_math (changes numerics),
 tl.disable_thread_storage_sync (race-prone), tl.disable_safe_memory_legalize
@@ -26,6 +34,21 @@ import random
 # (nvcc subprocesses), so variant kernels compile on a small thread pool
 # while GPU execution stays serial.
 EXTENDED_COMPILE_THREADS = 8
+
+# Exclusions re-checked on the target pair, so that a note from 0.1.11 is not
+# mistaken for a fact about 0.1.14:
+#   * tl.config_index_bitwidth (TILELANG_NUMERIC_POOL) — STILL BROKEN on
+#     0.1.14. Forcing it into every sampled configuration makes
+#     tilelang/extended/0 raise the same MakePackedAPI check as on 0.1.11 ("In
+#     PrimFunc impl variables (limit,) are used, but are not passed in as API
+#     arguments"; make_packed_api.cc line 577 on 0.1.11, line 1060 on 0.1.14),
+#     while the same program passes with the knob absent. Keep it out.
+#   * bfloat16 — NOT a pool edit: neither IR admits it (src/ir/ir.py's
+#     DataType: float16/float32/int8; src/ir/extended.py's DTYPES:
+#     float16/float32/int32/int8/bool; and the triton signature map has no
+#     bf16 spelling), so it needs both whitelists, the emitters and the dtype
+#     tolerances extended first. The 0.1.11 + sm_89 instability is why it was
+#     left out, not the only obstacle.
 
 # Boolean pass_configs switches. Unknown keys can never error (every consumer
 # uses config.get(key, default)), so pool membership is not a crash risk.
@@ -79,6 +102,47 @@ TILELANG_REGION_PASS_POOL: tuple = (
     'tl.disable_shared_memory_reuse',
     'tl.disable_warp_specialized',
 )
+
+
+def pool_keys() -> set:
+    """Every pass-config key any pool can sample."""
+    return set(TILELANG_PASS_POOL) | set(TILELANG_NUMERIC_POOL) | set(TILELANG_REGION_PASS_POOL)
+
+
+def missing_pool_keys():
+    """Pool keys the installed tilelang does not declare as a PassConfigKey.
+
+    Empty on a supported release. A non-empty result means the key silently
+    became a no-op — its consumer no longer reads it, so the sampled variant
+    compiles exactly like the baseline and the coverage it was meant to add is
+    gone. None when tilelang is not importable here (the harness machine need
+    not have the DSL installed at all).
+    """
+    try:
+        from tilelang import PassConfigKey
+    except Exception:
+        try:
+            from tilelang.transform.pass_config import PassConfigKey
+        except Exception:
+            return None
+    return pool_keys() - {member.value for member in PassConfigKey}
+
+
+def missing_option_fields():
+    """Triton compile options the installed CUDAOptions does not declare.
+
+    The triton counterpart of missing_pool_keys(): CUDAOptions is a dataclass,
+    so an unknown keyword is a TypeError at compile time rather than a silent
+    no-op, but a field that vanished is just as lost as a stale pass key.
+    None when triton is not importable here.
+    """
+    import dataclasses
+    try:
+        from triton.backends.nvidia.compiler import CUDAOptions
+    except Exception:
+        return None
+    declared = {field.name for field in dataclasses.fields(CUDAOptions)}
+    return {'num_warps', 'num_stages', 'maxnreg', 'enable_fp_fusion'} - declared
 
 
 def region_pass_configs(program, config) -> dict:

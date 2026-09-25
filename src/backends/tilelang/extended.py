@@ -325,7 +325,16 @@ def compile_source(entries, program):
               '        if errors[index] is not None:',
               '            extended_stage("device_compile", labels[index])',
               '            raise errors[index]',
-              '    from tilelang.engine.lower import tilelang_callback_cuda_compile',
+              # TileLang moved the CUDA compile callback out of engine/lower.py
+              # (0.1.14 keeps it in tilelang/cuda/backend.py, same name and
+              # signature) and 0.1.14's engine/lower.py no longer exports it at
+              # all. Resolve it at run time so one harness runs on both pairs;
+              # an unconditional import here would abort every extended
+              # variant, which is the whole track.
+              '    try:',
+              '        from tilelang.cuda.backend import tilelang_callback_cuda_compile',
+              '    except ImportError:',
+              '        from tilelang.engine.lower import tilelang_callback_cuda_compile',
               '    def make_launch(index):',
               '        def launch(memories, outputs, steps, limit):',
               '            arguments = [memories[n] for n in roots] + [outputs[n] for n in watched[index]]',

@@ -1439,7 +1439,7 @@
    "legacy": null,
    "input_scale": 0.1
   },
-  "emission": "942eda44344b371a82e46602d044182e3150b9323935617a9db661536b9b2d3b"
+  "emission": "a5529c993895eefc50b31367d04c5339228b43021cea702d7c345bf100479157"
  },
  {
   "case": "tilelang/probe/1",
@@ -1485,7 +1485,7 @@
    "legacy": null,
    "input_scale": 0.1
   },
-  "emission": "a49a0f73446e75b6712930a8b262cffad69407a0ec4019675ca6a852784cc16f"
+  "emission": "195b8d2e8b06b3ae82c2399306a4d3db155de55179da82abd8946c66868956e7"
  },
  {
   "case": "tilelang/extended/0",
@@ -1955,7 +1955,7 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "6693f65e400d615471f79c3d506bac967e7e2b88a8c675685e59e12582ea67ce"
+  "emission": "4eb0ff8d96a63fd23bd7b8ffacc731b288baf09b21ceb752b557ad9b7ffd4de2"
  },
  {
   "case": "tilelang/extended/1",
@@ -2425,7 +2425,7 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "09494e5300159f4fb4b8b9bc84fcec92b9bdb47492dc6f6d6871a9b1781912f4"
+  "emission": "94b67f91c8807430c29be7adacb786f5dfe767d1d97d609895303973c3f8de4f"
  },
  {
   "case": "tilelang/nested_program/float16",
@@ -4515,7 +4515,7 @@
    "legacy": null,
    "input_scale": 0.1
   },
-  "emission": "e8120f5ef66e9c71840bbc615ea1c528b574a445daad22746eb935dfb2fa16f3"
+  "emission": "777cb89f4ede82a742daecb00e59384a452edf73eca9b37c6ed95805a84f6408"
  },
  {
   "case": "triton/probe/1",
@@ -4561,7 +4561,7 @@
    "legacy": null,
    "input_scale": 0.1
   },
-  "emission": "7d5ae2e31f244ffb03c9ea540e481829532a1df8f4be7fdfff7ae9cc33fbb181"
+  "emission": "5fd15e86a8ec7e27fc85cf76ab43c06d97401ec58dae8f3bc00da6bc9fc02513"
  },
  {
   "case": "triton/extended/0",
@@ -5031,7 +5031,7 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "d525fac6f957303271635e98bcdafb66b7aa8290bf0139e3bd68dbbc7c05cbc4"
+  "emission": "626cfa008966bac6c71ecabd87ce42b3810ba2b848e7dd247111cb7eb6a1b45b"
  },
  {
   "case": "triton/extended/1",
@@ -5501,7 +5501,7 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "974c7b494be2d51cd0b97390e414daa8e673f72f5cf6daca9b62c7f6268897a2"
+  "emission": "8c55ffeb1c4b508e9ec8cbafc4e8c66db62f40634329dc46e3f1fe6542edac9c"
  },
  {
   "case": "triton/nested_program/float16",
