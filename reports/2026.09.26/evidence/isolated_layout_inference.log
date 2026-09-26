@@ -1,0 +1,8 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+2026-09-26 16:00:21  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "typed_kernel_0", "option": "default", "result": "FAIL", "error": "Check failed: (has_best) is false: no available layout found\n"}
+2026-09-26 16:00:24  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "typed_kernel_0", "option": "no_vector", "result": "FAIL", "error": "Check failed: (has_best) is false: no available layout found\n"}
+2026-09-26 16:00:25  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "typed_kernel_0", "option": "no_async", "result": "FAIL", "error": "Check failed: (has_best) is false: no available layout found\n"}

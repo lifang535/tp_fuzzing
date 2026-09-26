@@ -1,0 +1,96 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[15:59:50] : Fatal: Cannot convert type boolx16 to CUDA type
+[15:59:53] : Fatal: Cannot convert type boolx16 to CUDA type
+[15:59:53] : Fatal: Cannot convert type boolx16 to CUDA type
+[15:59:53] : Fatal: Cannot convert type boolx16 to CUDA type
+[15:59:54] : Fatal: Cannot convert type boolx16 to CUDA type
+[15:59:54] : Fatal: Cannot convert type boolx16 to CUDA type
+[15:59:57] : Fatal: Cannot convert type boolx16 to CUDA type
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:45  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:53  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:54  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:55  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:59:55  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 16:00:02  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_extended_mixed_16367aeaf0b9a947.py", line 2677, in <module>
+    run_extended(PROGRAM, prepare_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_extended_mixed_16367aeaf0b9a947.py", line 349, in run_extended
+    variants = prepare()
+               ^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_extended_mixed_16367aeaf0b9a947.py", line 2641, in prepare_extended
+    raise errors[index]
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_extended_mixed_16367aeaf0b9a947.py", line 2627, in compile_variant
+    compiled[index] = tilelang.compile(irs[index], target=target, pass_configs=compile_options[index]["pass_configs"])
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 162, in compile
+    return cached(
+           ^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cache/__init__.py", line 82, in cached
+    return cache.cached(
+           ^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cache/kernel_cache.py", line 428, in cached
+    kernel = JITKernel(
+             ^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 140, in __init__
+    adapter = self._compile_and_create_adapter(func, out_idx)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 253, in _compile_and_create_adapter
+    self.artifact = self._compile_artifact(tilelang_func, pass_configs, compile_metadata)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 294, in _compile_artifact
+    artifact = lower_with_context(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 165, in lower_with_context
+    return _lower_with_context_impl(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 190, in _lower_with_context_impl
+    codegen_mod = device_codegen(device_mod, context) if enable_device_compile else device_codegen_without_compile(device_mod, context)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 101, in device_codegen
+    return context.codegen_device(device_mod, compile_device=True)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/module.py", line 221, in codegen_device
+    return self.module.codegen_device(mod, self.target, compile_device=compile_device)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/module.py", line 126, in codegen_device
+    return self.get_device_codegen(target).lower(mod, target, compile_device=compile_device)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/device_codegen.py", line 44, in lower
+    return build_func(mod, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/device_codegen.py", line 21, in build
+    return run_codegen_with_instrumentation(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/instrumentation/session.py", line 261, in run_codegen_with_instrumentation
+    return session.run_codegen(CodegenEvent(name=name, mod=mod, target=target), call)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/instrumentation/session.py", line 110, in run_codegen
+    return wrapped()
+           ^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/device_codegen.py", line 25, in <lambda>
+    lambda: tvm.ffi.get_global_func(global_func_name)(mod, target),
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "python/tvm_ffi/cython/function.pxi", line 968, in tvm_ffi.core.Function.__call__
+  File "<unknown>", line 0, in tvm::codegen::BuildTileLangCUDA(tvm::IRModule, tvm::Target)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenTileLangCUDA::AddFunction(tvm::GlobalVar const&, tvm::tirx::PrimFunc const&)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenC::VisitStmt_(tvm::tirx::SeqStmtNode const*)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenC::VisitStmt_(tvm::tirx::SeqStmtNode const*)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenC::VisitStmt_(tvm::tirx::SeqStmtNode const*)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenTileLangCUDA::VisitStmt_(tvm::tirx::BufferStoreNode const*)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenC::PrintExpr[abi:cxx11](tvm::PrimExpr const&)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenTileLangCUDA::VisitExpr_(tvm::tirx::CastNode const*, std::ostream&)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenC::PrintExpr[abi:cxx11](tvm::PrimExpr const&)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenC::VisitExpr_(tvm::tirx::AndNode const*, std::ostream&)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenTileLangCUDA::PrintVecBinaryOp(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tvm::runtime::DataType, tvm::PrimExpr, tvm::PrimExpr, std::ostream&)
+  File "<unknown>", line 0, in tvm::codegen::CodeGenTileLangCUDA::PrintType(tvm::runtime::DataType, std::ostream&)
+  File "<unknown>", line 0, in tvm::runtime::detail::LogFatal::~LogFatal()
+tvm.error.InternalError: Cannot convert type boolx16 to CUDA type

@@ -1,0 +1,99 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+TILESMITH_STAGE=reference
+TILESMITH_STAGE=prepare_0
+TILESMITH_STAGE=prepare_1
+TILESMITH_STAGE=prepare_2
+TILESMITH_STAGE=prepare_3
+TILESMITH_STAGE=prepare_4
+TILESMITH_STAGE=prepare_5
+TILESMITH_STAGE=prepare_6
+TILESMITH_STAGE=prepare_7
+TILESMITH_STAGE=prepare_9
+TILESMITH_STAGE=prepare_8
+TILESMITH_STAGE=prepare_0
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:19  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:25  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:25  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py", line 1451, in <module>
+    test_kernel_0()
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py", line 1448, in test_kernel_0
+    _run_region([run_variant_0, run_variant_1, run_variant_2, run_variant_3, run_variant_4, run_variant_5, run_variant_6, run_variant_7, run_variant_8, run_variant_9], (a_storage, b_storage), ref, 3, 0.1, relative=True, variant_kinds=['schedule', 'schedule', 'stage', 'stage', 'stage', 'loop-kind', 'pass-config', 'swizzle', 'warp-policy', 'warp-policy'], reference_verify=lambda: _typed_region_reference_double(A, B, {'arguments': [], 'operations': [{'kind': 'gemm', 'result': 'v1', 'operands': [], 'attrs': {}, 'regions': []}, {'kind': 'index_add', 'result': 'v2', 'operands': ['v1'], 'attrs': {'axis': 'row', 'scale': 0.5}, 'regions': []}, {'kind': 'log2', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'cast', 'result': 'v4', 'operands': ['v3'], 'attrs': {'dtype': 'float16'}, 'regions': []}, {'kind': 'cast', 'result': 'v5', 'operands': ['v4'], 'attrs': {'dtype': 'float32'}, 'regions': []}, {'kind': 'to_tile', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v7', 'operands': ['v5'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v7'}, 64, 32, 'float16', [{'name': 'fn_0', 'body': {'arguments': ['arg0'], 'operations': [{'kind': 'for', 'result': 'v9', 'operands': ['arg0'], 'attrs': {'trip_count': 3, 'start': 1, 'step': 3}, 'regions': [{'arguments': ['v1'], 'operations': [{'kind': 'load_input', 'result': 'v2', 'operands': [], 'attrs': {'source': 'B', 'dtype': 'float16', 'row_offset': 1, 'col_offset': 3}, 'regions': []}, {'kind': 'abs', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'reduce_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {'axis': 1, 'reduction': 'min'}, 'regions': []}, {'kind': 'floor', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'sin', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v7', 'operands': ['v6'], 'attrs': {}, 'regions': []}, {'kind': 'add', 'result': 'v8', 'operands': ['v7', 'v1'], 'attrs': {}, 'regions': []}], 'yield_value': 'v8'}]}, {'kind': 'neg', 'result': 'v10', 'operands': ['v9'], 'attrs': {}, 'regions': []}, {'kind': 'store_tile', 'result': 'v11', 'operands': ['v10'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v12', 'operands': ['v10'], 'attrs': {}, 'regions': []}], 'yield_value': 'v12'}}]), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {'arguments': [], 'operations': [{'kind': 'gemm', 'result': 'v1', 'operands': [], 'attrs': {}, 'regions': []}, {'kind': 'index_add', 'result': 'v2', 'operands': ['v1'], 'attrs': {'axis': 'row', 'scale': 0.5}, 'regions': []}, {'kind': 'log2', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'cast', 'result': 'v4', 'operands': ['v3'], 'attrs': {'dtype': 'float16'}, 'regions': []}, {'kind': 'cast', 'result': 'v5', 'operands': ['v4'], 'attrs': {'dtype': 'float32'}, 'regions': []}, {'kind': 'to_tile', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v7', 'operands': ['v5'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v7'}, 64, 32, 'float16', [{'name': 'fn_0', 'body': {'arguments': ['arg0'], 'operations': [{'kind': 'for', 'result': 'v9', 'operands': ['arg0'], 'attrs': {'trip_count': 3, 'start': 1, 'step': 3}, 'regions': [{'arguments': ['v1'], 'operations': [{'kind': 'load_input', 'result': 'v2', 'operands': [], 'attrs': {'source': 'B', 'dtype': 'float16', 'row_offset': 1, 'col_offset': 3}, 'regions': []}, {'kind': 'abs', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'reduce_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {'axis': 1, 'reduction': 'min'}, 'regions': []}, {'kind': 'floor', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'sin', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v7', 'operands': ['v6'], 'attrs': {}, 'regions': []}, {'kind': 'add', 'result': 'v8', 'operands': ['v7', 'v1'], 'attrs': {}, 'regions': []}], 'yield_value': 'v8'}]}, {'kind': 'neg', 'result': 'v10', 'operands': ['v9'], 'attrs': {}, 'regions': []}, {'kind': 'store_tile', 'result': 'v11', 'operands': ['v10'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v12', 'operands': ['v10'], 'attrs': {}, 'regions': []}], 'yield_value': 'v12'}}]))
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py", line 262, in _run_region
+    raise errors[variant]
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py", line 246, in compile_variant
+    prepared[variant] = launches[variant]()
+                        ^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py", line 1418, in run_variant_0
+    return prepare_0(A, B)
+           ^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py", line 641, in prepare_0
+    kernel = typed_kernel_0()
+             ^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 539, in __call__
+    kernel = self.compile(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 454, in compile
+    kernel_result = compile(
+                    ^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 162, in compile
+    return cached(
+           ^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cache/__init__.py", line 82, in cached
+    return cache.cached(
+           ^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cache/kernel_cache.py", line 428, in cached
+    kernel = JITKernel(
+             ^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 140, in __init__
+    adapter = self._compile_and_create_adapter(func, out_idx)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 253, in _compile_and_create_adapter
+    self.artifact = self._compile_artifact(tilelang_func, pass_configs, compile_metadata)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 294, in _compile_artifact
+    artifact = lower_with_context(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 165, in lower_with_context
+    return _lower_with_context_impl(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 184, in _lower_with_context_impl
+    host_mod, device_mod, params, target, target_host = lower_to_host_device_ir(
+                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 136, in lower_to_host_device_ir
+    mod = context.lower(mod)
+          ^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/module.py", line 214, in lower
+    return self.module.lower(mod, self.target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/module.py", line 115, in lower
+    return self.get_pipeline(target).lower(mod, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/pass_pipeline/pipeline.py", line 31, in lower
+    return self._lower(mod, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cuda/pipeline.py", line 169, in CUDAPassPipelineBody
+    mod = CUDAPassPipelineBodyPrologue(mod, target)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cuda/pipeline.py", line 132, in CUDAPassPipelineBodyPrologue
+    mod = tilelang.transform.LayoutInference()(mod)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/3rdparty/tvm/python/tvm/ir/transform.py", line 171, in __call__
+    return _ffi_transform_api.RunPass(self, mod)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "python/tvm_ffi/cython/function.pxi", line 968, in tvm_ffi.core.Function.__call__
+  File "<unknown>", line 0, in tvm::transform::Pass::operator()(tvm::IRModule) const
+  File "<unknown>", line 0, in tvm::transform::Pass::operator()(tvm::IRModule, tvm::transform::PassContext const&) const
+  File "<unknown>", line 0, in tvm::tirx::transform::PrimFuncPassNode::operator()(tvm::IRModule, tvm::transform::PassContext const&) const
+  File "<unknown>", line 0, in tvm::tl::LayoutInferencer::Substitute(tvm::tirx::PrimFunc)
+  File "<unknown>", line 0, in tvm::tl::BufferUseDefCollector::Run()
+  File "/project/src/transform/layout_inference/layout_inference.cc", line 1523, in void tvm::tl::BufferUseDefCollector::InferInFreeMode(tvm::tl::LayoutMap&, const tvm::tl::LayoutMap&)
+tvm.error.InternalError: Check failed: (has_best) is false: no available layout found

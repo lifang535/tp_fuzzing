@@ -1,0 +1,20 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+[15:59:21] : Fatal: Cannot convert type boolx16 to CUDA type
+2026-09-26 15:59:18  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "extended_0_0", "option": "default", "result": "FAIL", "error": "Cannot convert type boolx16 to CUDA type"}
+2026-09-26 15:59:23  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:27  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+{"kernel": "extended_0_0", "option": "no_vector", "result": "PASS"}
+[15:59:29] : Fatal: Cannot convert type boolx16 to CUDA type
+2026-09-26 15:59:27  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "extended_0_0", "option": "no_async", "result": "FAIL", "error": "Cannot convert type boolx16 to CUDA type"}
+[15:59:32] : Fatal: Cannot convert type boolx16 to CUDA type
+2026-09-26 15:59:30  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "extended_0_1", "option": "default", "result": "FAIL", "error": "Cannot convert type boolx16 to CUDA type"}
+2026-09-26 15:59:32  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:59:36  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+{"kernel": "extended_0_1", "option": "no_vector", "result": "PASS"}
+[15:59:39] : Fatal: Cannot convert type boolx16 to CUDA type
+2026-09-26 15:59:37  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+{"kernel": "extended_0_1", "option": "no_async", "result": "FAIL", "error": "Cannot convert type boolx16 to CUDA type"}

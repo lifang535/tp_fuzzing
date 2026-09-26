@@ -1,0 +1,296 @@
+[
+  {
+    "server": 32906,
+    "round": 1,
+    "campaign": "2026.09.22-19.30_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "algebraic_identity": 2,
+      "dtype_mismatch": 10,
+      "layout_inference": 10,
+      "layout_mismatch": 5,
+      "nondeterminism": 2,
+      "oracle_unstable": 10,
+      "other": 2,
+      "ptx_async_boundary": 10,
+      "schedule_mismatch": 8,
+      "shared_memory_overflow": 10,
+      "tilelang_codegen_error": 7,
+      "timeout": 2,
+      "warp_partition": 10,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 32906,
+    "round": 1,
+    "campaign": "2026.09.22-19.30_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 1,
+      "layout_mismatch": 10,
+      "loop_kind_mismatch": 3,
+      "oracle_unstable": 10,
+      "other": 10,
+      "pass_config_mismatch": 8,
+      "precision_mismatch": 9,
+      "schedule_mismatch": 2,
+      "segfault": 10,
+      "shared_memory_overflow": 10,
+      "stage_mismatch": 4,
+      "timeout": 7,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 32906,
+    "round": 2,
+    "campaign": "2026.09.24-00.46_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 2,
+      "layout_inference": 10,
+      "layout_mismatch": 9,
+      "oracle_unstable": 10,
+      "other": 10,
+      "pass_config_mismatch": 1,
+      "ptx_async_boundary": 10,
+      "schedule_mismatch": 10,
+      "shared_memory_overflow": 10,
+      "tilelang_codegen_error": 10,
+      "timeout": 4,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 32906,
+    "round": 2,
+    "campaign": "2026.09.24-00.46_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 1,
+      "layout_mismatch": 10,
+      "oracle_unstable": 10,
+      "other": 10,
+      "pass_config_mismatch": 10,
+      "schedule_mismatch": 4,
+      "shared_memory_overflow": 10,
+      "timeout": 2,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 32906,
+    "round": 3,
+    "campaign": "2026.09.24-23.40_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 2,
+      "layout_inference": 22,
+      "layout_mismatch": 7,
+      "oracle_unstable": 106,
+      "other": 640,
+      "ptx_async_boundary": 52,
+      "schedule_mismatch": 13,
+      "shared_memory_overflow": 80,
+      "tilelang_codegen_error": 282,
+      "timeout": 6,
+      "wrong_result": 37
+    }
+  },
+  {
+    "server": 32906,
+    "round": 3,
+    "campaign": "2026.09.24-23.40_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 12,
+      "layout_mismatch": 17,
+      "oracle_unstable": 410,
+      "other": 2359,
+      "pass_config_mismatch": 13,
+      "schedule_mismatch": 4,
+      "shared_memory_overflow": 123,
+      "timeout": 3,
+      "wrong_result": 136
+    }
+  },
+  {
+    "server": 32906,
+    "round": 4,
+    "campaign": "2026.09.25-23.14_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "algebraic_identity": 2,
+      "layout_inference": 18,
+      "layout_mismatch": 1,
+      "oracle_unstable": 64,
+      "other": 18070,
+      "ptx_async_boundary": 30,
+      "schedule_mismatch": 2,
+      "segfault": 8,
+      "shared_memory_overflow": 38,
+      "tilelang_codegen_error": 175,
+      "timeout": 7,
+      "warp_partition": 21,
+      "wrong_result": 30
+    }
+  },
+  {
+    "server": 32906,
+    "round": 4,
+    "campaign": "2026.09.25-23.14_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 1,
+      "layout_mismatch": 3,
+      "oracle_unstable": 229,
+      "other": 14147,
+      "pass_config_mismatch": 4,
+      "precision_mismatch": 13,
+      "schedule_mismatch": 1,
+      "segfault": 77,
+      "shared_memory_overflow": 54,
+      "timeout": 3,
+      "triton_compile_error": 102,
+      "wrong_result": 73
+    }
+  },
+  {
+    "server": 41790,
+    "round": 1,
+    "campaign": "2026.09.23-10.04_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "algebraic_identity": 1,
+      "dtype_mismatch": 10,
+      "layout_inference": 6,
+      "layout_mismatch": 1,
+      "oracle_unstable": 10,
+      "other": 1,
+      "ptx_async_boundary": 10,
+      "schedule_mismatch": 3,
+      "shared_memory_overflow": 10,
+      "tilelang_codegen_error": 2,
+      "warp_partition": 10,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 41790,
+    "round": 1,
+    "campaign": "2026.09.23-10.04_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 10,
+      "layout_mismatch": 4,
+      "loop_kind_mismatch": 1,
+      "oracle_unstable": 10,
+      "other": 7,
+      "pass_config_mismatch": 4,
+      "precision_mismatch": 2,
+      "schedule_mismatch": 2,
+      "segfault": 10,
+      "shared_memory_overflow": 10,
+      "timeout": 1,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 41790,
+    "round": 2,
+    "campaign": "2026.09.24-00.45_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 6,
+      "layout_inference": 10,
+      "layout_mismatch": 3,
+      "oracle_unstable": 10,
+      "other": 10,
+      "ptx_async_boundary": 10,
+      "schedule_mismatch": 8,
+      "shared_memory_overflow": 10,
+      "tilelang_codegen_error": 10,
+      "timeout": 2,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 41790,
+    "round": 2,
+    "campaign": "2026.09.24-00.45_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 6,
+      "layout_mismatch": 10,
+      "oracle_unstable": 10,
+      "other": 10,
+      "pass_config_mismatch": 9,
+      "schedule_mismatch": 3,
+      "shared_memory_overflow": 10,
+      "timeout": 4,
+      "wrong_result": 10
+    }
+  },
+  {
+    "server": 41790,
+    "round": 3,
+    "campaign": "2026.09.24-23.39_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 6,
+      "layout_inference": 9,
+      "layout_mismatch": 7,
+      "oracle_unstable": 79,
+      "other": 398,
+      "ptx_async_boundary": 29,
+      "schedule_mismatch": 6,
+      "shared_memory_overflow": 55,
+      "tilelang_codegen_error": 180,
+      "timeout": 3,
+      "wrong_result": 33
+    }
+  },
+  {
+    "server": 41790,
+    "round": 3,
+    "campaign": "2026.09.24-23.39_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 4,
+      "layout_mismatch": 11,
+      "oracle_unstable": 262,
+      "other": 1517,
+      "pass_config_mismatch": 9,
+      "schedule_mismatch": 6,
+      "shared_memory_overflow": 72,
+      "timeout": 4,
+      "wrong_result": 95
+    }
+  },
+  {
+    "server": 41790,
+    "round": 4,
+    "campaign": "2026.09.25-23.10_tilelang_hard-shape_seed=42",
+    "saved_counts": {
+      "algebraic_identity": 1,
+      "atomic_mismatch": 1,
+      "gpu_oom": 1,
+      "layout_inference": 8,
+      "layout_mismatch": 4,
+      "oracle_unstable": 46,
+      "precision_mismatch": 1,
+      "ptx_async_boundary": 21,
+      "schedule_mismatch": 4,
+      "shared_memory_overflow": 40,
+      "stride_alignment": 1,
+      "tilelang_codegen_error": 135,
+      "timeout": 1,
+      "warp_partition": 8,
+      "wrong_result": 20
+    }
+  },
+  {
+    "server": 41790,
+    "round": 4,
+    "campaign": "2026.09.25-23.10_triton_hard-shape_seed=42",
+    "saved_counts": {
+      "gpu_oom": 2,
+      "layout_mismatch": 7,
+      "oracle_unstable": 161,
+      "pass_config_mismatch": 6,
+      "precision_mismatch": 13,
+      "schedule_mismatch": 2,
+      "shared_memory_overflow": 53,
+      "timeout": 1,
+      "triton_compile_error": 71,
+      "wrong_result": 67
+    }
+  }
+]

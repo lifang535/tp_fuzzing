@@ -1,0 +1,28 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:57:59  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:04  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 15:58:05  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:06  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+2026-09-26 15:58:09  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:145): TileLang completes to compile kernel `impl`
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/atomic_mismatch/failed_extended_indexed_memory_702e6b89a19c62c0.py", line 1592, in <module>
+    run_extended(PROGRAM, prepare_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/atomic_mismatch/failed_extended_indexed_memory_702e6b89a19c62c0.py", line 428, in run_extended
+    extended_check_atomic(memories[name], variant_expected_memory[name],
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/atomic_mismatch/failed_extended_indexed_memory_702e6b89a19c62c0.py", line 293, in extended_check_atomic
+    raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '
+RuntimeError: WRONG RESULT: atomic:mem2; max_abs=7.450580596923828e-09; index=2137; actual=0.08622797578573227; expected=0.08622798323631287

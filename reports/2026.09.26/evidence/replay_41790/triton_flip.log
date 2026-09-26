@@ -1,0 +1,55 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+Traceback (most recent call last):
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/triton/language/core.py", line 292, in __le__
+    return constexpr(self.value <= _unwrap_if_constexpr(other))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: '<=' not supported between instances of 'int' and 'NoneType'
+
+The above exception was the direct cause of the following exception:
+
+triton.compiler.errors.CompilationError: at 10:23:
+def flip(x, dim=None):
+    """
+    Flips a tensor `x` along the dimension `dim`.
+
+    :param x: the first input tensor
+    :type x: Block
+    :param dim: the dimension to flip along
+    :type dim: int
+    """
+    core.static_assert(-len(x.shape) <= dim and dim < len(x.shape))
+                       ^
+'<=' not supported between instances of 'int' and 'NoneType'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/triton_compile_error/failed_extended_control_calls_171987725a81b4e9.py", line 1491, in <module>
+    run_extended(PROGRAM, prepare_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/triton_compile_error/failed_extended_control_calls_171987725a81b4e9.py", line 349, in run_extended
+    variants = prepare()
+               ^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/triton_compile_error/failed_extended_control_calls_171987725a81b4e9.py", line 1424, in prepare_extended
+    compiled_0 = compile(ASTSource(extended_0_0, {'mem0': '*fp32', 'mem1': '*fp32', 'mem2': '*i32', 'mem3': '*i32', 'mem4': '*fp16', 'out_e98': '*fp16', 'out_e68': '*fp32', 'out_e69': '*i32', 'steps': 'i32', 'limit': 'i32'}), target=GPUTarget("cuda", arch, 32), options={'num_warps': 4, 'num_stages': 1, 'enable_fp_fusion': False})
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/triton/compiler/compiler.py", line 307, in compile
+    module = src.make_ir(target, options, codegen_fns, module_map, context)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/triton/compiler/compiler.py", line 80, in make_ir
+    return ast_to_ttir(self.fn, self, context=context, options=options, codegen_fns=codegen_fns,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+triton.compiler.errors.CompilationError: at 99:11:
+    e82 = (tl.full((), 2, tl.int32)).to(tl.int32)
+    e83 = (tl.full((), True, tl.int1)).to(tl.int1)
+    e84 = (tl.load(mem4 + bid * 36 + 16 + e82 * 1, (e83 & (e82 >= 0) & (e82 < 4)), other=0)).to(tl.float16)
+    e85 = (tl.full((), -0.5, tl.float16)).to(tl.float16)
+    e86 = ((e78 * e85)).to(tl.float16)
+    e87 = (tl.full((), 0.25, tl.float16)).to(tl.float16)
+    e88 = ((e81 * e87)).to(tl.float16)
+    e89 = (tl.full((), 0.0, tl.float16)).to(tl.float16)
+    e90 = ((e84 * e89)).to(tl.float16)
+    e91 = (tl.fma(e86, e88, e90)).to(tl.float16)
+    e92 = (tl.fma(e91, e88, e90)).to(tl.float16)
+    e93 = (tl.flip(e67)).to(tl.float16)
+           ^

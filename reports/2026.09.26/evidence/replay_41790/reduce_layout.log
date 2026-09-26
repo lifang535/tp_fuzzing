@@ -1,0 +1,158 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+TILESMITH_STAGE=layout:contiguous/offset
+TILESMITH_STAGE=reference
+TILESMITH_STAGE=prepare_0_0
+TILESMITH_STAGE=prepare_0_1
+TILESMITH_STAGE=prepare_0_2
+TILESMITH_STAGE=prepare_0_3
+TILESMITH_STAGE=prepare_0_4
+TILESMITH_STAGE=prepare_0_5
+TILESMITH_STAGE=prepare_0_0
+2026-09-26 16:00:13  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 16:00:13  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 16:00:13  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 16:00:13  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 16:00:13  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+2026-09-26 16:00:13  [TileLang:tilelang.jit.kernel:INFO] (kernel.py:137): TileLang begins to compile kernel `impl` with `out_idx=None`
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 2189, in <module>
+    test_kernel_0()
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 2162, in test_kernel_0
+    _run_layout_case([run_variant_0_0, run_variant_0_1, run_variant_0_2, run_variant_0_3, run_variant_0_4, run_variant_0_5], (a_storage, b_storage), ref, 3, 0.1, relative=True, layout_a='contiguous', layout_b='offset', alternate=False, variant_kinds=['schedule', 'schedule', 'loop-kind', 'pass-config', 'swizzle', 'warp-policy'], prepare_markers=['prepare_0_0', 'prepare_0_1', 'prepare_0_2', 'prepare_0_3', 'prepare_0_4', 'prepare_0_5'], reference_verify=lambda: _typed_region_reference_double(A, B, {'arguments': [], 'operations': [{'kind': 'gemm', 'result': 'v1', 'operands': [], 'attrs': {}, 'regions': []}, {'kind': 'ceil', 'result': 'v2', 'operands': ['v1'], 'attrs': {}, 'regions': []}, {'kind': 'reduce_tile', 'result': 'v3', 'operands': ['v2'], 'attrs': {'axis': 0, 'reduction': 'min'}, 'regions': []}, {'kind': 'scale', 'result': 'v4', 'operands': ['v3'], 'attrs': {'alpha': 9.173141204464626}, 'regions': []}, {'kind': 'log', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'row_sum', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'round', 'result': 'v7', 'operands': ['v4'], 'attrs': {'dtype': 'float32'}, 'regions': []}, {'kind': 'for', 'result': 'v12', 'operands': ['v2'], 'attrs': {'trip_count': 2, 'start': 2, 'step': 3}, 'regions': [{'arguments': ['v8'], 'operations': [{'kind': 'cast', 'result': 'v9', 'operands': ['v8'], 'attrs': {'dtype': 'float32'}, 'regions': []}, {'kind': 'to_tile', 'result': 'v10', 'operands': ['v8'], 'attrs': {}, 'regions': []}, {'kind': 'add', 'result': 'v11', 'operands': ['v10', 'v8'], 'attrs': {}, 'regions': []}], 'yield_value': 'v11'}]}, {'kind': 'to_tile', 'result': 'v13', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v14', 'operands': ['v13'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v14'}, 64, 256, 'float16', [{'name': 'fn_0', 'body': {'arguments': ['arg0'], 'operations': [{'kind': 'reduce_tile', 'result': 'v1', 'operands': ['arg0'], 'attrs': {'axis': 1, 'reduction': 'min'}, 'regions': []}, {'kind': 'round', 'result': 'v2', 'operands': ['v1'], 'attrs': {'dtype': 'float16'}, 'regions': []}, {'kind': 'if', 'result': 'v12', 'operands': ['arg0'], 'attrs': {'predicate': 'column', 'modulus': 4, 'parity': 2}, 'regions': [{'arguments': ['v3'], 'operations': [{'kind': 'cos', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'reduce_tile', 'result': 'v5', 'operands': ['v4'], 'attrs': {'axis': 0, 'reduction': 'min'}, 'regions': []}, {'kind': 'cos', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'row_min', 'result': 'v7', 'operands': ['v6'], 'attrs': {}, 'regions': []}, {'kind': 'floor', 'result': 'v8', 'operands': ['v7'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v9', 'operands': ['v5'], 'attrs': {}, 'regions': []}], 'yield_value': 'v9'}, {'arguments': ['v10'], 'operations': [{'kind': 'to_tile', 'result': 'v11', 'operands': ['v10'], 'attrs': {}, 'regions': []}], 'yield_value': 'v11'}]}, {'kind': 'to_tile', 'result': 'v13', 'operands': ['v12'], 'attrs': {}, 'regions': []}], 'yield_value': 'v13'}}]), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {'arguments': [], 'operations': [{'kind': 'gemm', 'result': 'v1', 'operands': [], 'attrs': {}, 'regions': []}, {'kind': 'ceil', 'result': 'v2', 'operands': ['v1'], 'attrs': {}, 'regions': []}, {'kind': 'reduce_tile', 'result': 'v3', 'operands': ['v2'], 'attrs': {'axis': 0, 'reduction': 'min'}, 'regions': []}, {'kind': 'scale', 'result': 'v4', 'operands': ['v3'], 'attrs': {'alpha': 9.173141204464626}, 'regions': []}, {'kind': 'log', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'row_sum', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'round', 'result': 'v7', 'operands': ['v4'], 'attrs': {'dtype': 'float32'}, 'regions': []}, {'kind': 'for', 'result': 'v12', 'operands': ['v2'], 'attrs': {'trip_count': 2, 'start': 2, 'step': 3}, 'regions': [{'arguments': ['v8'], 'operations': [{'kind': 'cast', 'result': 'v9', 'operands': ['v8'], 'attrs': {'dtype': 'float32'}, 'regions': []}, {'kind': 'to_tile', 'result': 'v10', 'operands': ['v8'], 'attrs': {}, 'regions': []}, {'kind': 'add', 'result': 'v11', 'operands': ['v10', 'v8'], 'attrs': {}, 'regions': []}], 'yield_value': 'v11'}]}, {'kind': 'to_tile', 'result': 'v13', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v14', 'operands': ['v13'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v14'}, 64, 256, 'float16', [{'name': 'fn_0', 'body': {'arguments': ['arg0'], 'operations': [{'kind': 'reduce_tile', 'result': 'v1', 'operands': ['arg0'], 'attrs': {'axis': 1, 'reduction': 'min'}, 'regions': []}, {'kind': 'round', 'result': 'v2', 'operands': ['v1'], 'attrs': {'dtype': 'float16'}, 'regions': []}, {'kind': 'if', 'result': 'v12', 'operands': ['arg0'], 'attrs': {'predicate': 'column', 'modulus': 4, 'parity': 2}, 'regions': [{'arguments': ['v3'], 'operations': [{'kind': 'cos', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'reduce_tile', 'result': 'v5', 'operands': ['v4'], 'attrs': {'axis': 0, 'reduction': 'min'}, 'regions': []}, {'kind': 'cos', 'result': 'v6', 'operands': ['v5'], 'attrs': {}, 'regions': []}, {'kind': 'row_min', 'result': 'v7', 'operands': ['v6'], 'attrs': {}, 'regions': []}, {'kind': 'floor', 'result': 'v8', 'operands': ['v7'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v9', 'operands': ['v5'], 'attrs': {}, 'regions': []}], 'yield_value': 'v9'}, {'arguments': ['v10'], 'operations': [{'kind': 'to_tile', 'result': 'v11', 'operands': ['v10'], 'attrs': {}, 'regions': []}], 'yield_value': 'v11'}]}, {'kind': 'to_tile', 'result': 'v13', 'operands': ['v12'], 'attrs': {}, 'regions': []}], 'yield_value': 'v13'}}]))
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 311, in _run_layout_case
+    return _run_region(launches, inputs, reference, repeats, tolerance, relative=relative, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 262, in _run_region
+    raise errors[variant]
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 246, in compile_variant
+    prepared[variant] = launches[variant]()
+                        ^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 2144, in run_variant_0_0
+    return prepare_0(a_storage, b_storage)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py", line 700, in prepare_0
+    kernel = typed_kernel_0()
+             ^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 539, in __call__
+    kernel = self.compile(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 454, in compile
+    kernel_result = compile(
+                    ^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/__init__.py", line 162, in compile
+    return cached(
+           ^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cache/__init__.py", line 82, in cached
+    return cache.cached(
+           ^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cache/kernel_cache.py", line 428, in cached
+    kernel = JITKernel(
+             ^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 140, in __init__
+    adapter = self._compile_and_create_adapter(func, out_idx)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 253, in _compile_and_create_adapter
+    self.artifact = self._compile_artifact(tilelang_func, pass_configs, compile_metadata)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/jit/kernel.py", line 294, in _compile_artifact
+    artifact = lower_with_context(
+               ^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 165, in lower_with_context
+    return _lower_with_context_impl(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 184, in _lower_with_context_impl
+    host_mod, device_mod, params, target, target_host = lower_to_host_device_ir(
+                                                        ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/engine/lower.py", line 136, in lower_to_host_device_ir
+    mod = context.lower(mod)
+          ^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/module.py", line 214, in lower
+    return self.module.lower(mod, self.target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/module.py", line 115, in lower
+    return self.get_pipeline(target).lower(mod, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/backend/pass_pipeline/pipeline.py", line 31, in lower
+    return self._lower(mod, target)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cuda/pipeline.py", line 169, in CUDAPassPipelineBody
+    mod = CUDAPassPipelineBodyPrologue(mod, target)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/cuda/pipeline.py", line 140, in CUDAPassPipelineBodyPrologue
+    mod = tilelang.transform.LowerTileOp()(mod)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/tilelang/3rdparty/tvm/python/tvm/ir/transform.py", line 171, in __call__
+    return _ffi_transform_api.RunPass(self, mod)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "python/tvm_ffi/cython/function.pxi", line 968, in tvm_ffi.core.Function.__call__
+  File "<unknown>", line 0, in tvm::transform::Pass::operator()(tvm::IRModule) const
+  File "<unknown>", line 0, in tvm::transform::Pass::operator()(tvm::IRModule, tvm::transform::PassContext const&) const
+  File "<unknown>", line 0, in tvm::tirx::transform::PrimFuncPassNode::operator()(tvm::IRModule, tvm::transform::PassContext const&) const
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::Substitute(tvm::tirx::PrimFunc)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#13}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::SBlockRealizeNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#12}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::SBlockNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::SBlockNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::SBlockNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#2}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#2}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#2}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#2}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#2}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::AttrStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#13}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::SBlockRealizeNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#12}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::SBlockNode const*)
+  File "<unknown>", line 0, in tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::SBlockNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::SBlockNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#9}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in non-virtual thunk to tvm::arith::IRMutatorWithAnalyzer::VisitStmt_(tvm::tirx::SeqStmtNode const*)
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt_(tvm::tirx::SeqStmtNode const*)
+  File "<unknown>", line 0, in tvm::ffi::ObjectPtr<tvm::ffi::Object> tvm::ffi::Array<tvm::tirx::Stmt, void>::MapHelper<tvm::tirx::StmtMutator::Internal::Mutate(tvm::tirx::StmtMutator*, tvm::ffi::Array<tvm::tirx::Stmt, void> const&)::{lambda(tvm::tirx::Stmt const&)#1}, tvm::tirx::Stmt>(tvm::ffi::ObjectPtr<tvm::ffi::Object>, tvm::tirx::StmtMutator::Internal::Mutate(tvm::tirx::StmtMutator*, tvm::ffi::Array<tvm::tirx::Stmt, void> const&)::{lambda(tvm::tirx::Stmt const&)#1})
+  File "<unknown>", line 0, in tvm::tirx::StmtMutator::VisitStmt(tvm::tirx::Stmt const&)
+  File "<unknown>", line 0, in tvm::NodeFunctor<tvm::tirx::Stmt (tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)>::operator()(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*) const
+  File "<unknown>", line 0, in tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>::InitVTable()::{lambda(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)#10}::_FUN(tvm::ffi::ObjectRef const&, tvm::tirx::StmtFunctor<tvm::tirx::Stmt (tvm::tirx::Stmt const&)>*)
+  File "<unknown>", line 0, in tvm::tl::LowerTileOpPass::VisitStmt_(tvm::tirx::EvaluateNode const*)
+  File "<unknown>", line 0, in tvm::tl::ReduceOpNode::Lower(tvm::tl::LowerArgs const&, tvm::arith::Analyzer*) const
+  File "<unknown>", line 0, in tvm::tl::backend::ReduceLowerer<tvm::tl::cuda::Reduce>::Lower(tvm::tl::ReduceOpNode const&, tvm::tl::LowerArgs const&, tvm::arith::Analyzer*)
+  File "<unknown>", line 0, in tvm::tl::backend::reduce::MakeReduceOwnershipPlan(tvm::ffi::Array<tvm::PrimExpr, void> const&, tvm::PrimExpr const&, tvm::ffi::Array<tvm::tirx::IterVar, void> const&, tvm::tirx::Var const&, tvm::arith::Analyzer*)
+  File "<unknown>", line 0, in tvm::tl::backend::reduce::BuildLocalReduceIterator(tvm::PrimExpr const&, tvm::ffi::Array<tvm::tirx::IterVar, void> const&, tvm::tirx::Var const&, std::vector<tvm::tl::backend::reduce::ThreadReduceStep, std::allocator<tvm::tl::backend::reduce::ThreadReduceStep> > const&, tvm::arith::Analyzer*)
+  File "/project/src/backend/common/op/reduce.h", line 534, in void tvm::tl::backend::reduce::CheckThreadOwnedStepsProjectable(const tvm::PrimExpr&, const tvm::tirx::Var&, const std::vector<ThreadReduceStep>&, tvm::arith::Analyzer*)
+tvm.error.InternalError: Check failed: (analyzer->CanProveEqual(projected_index, simplified_index)) is false: ReduceOp cannot lower a layout where a source index depends on a thread-owned reduce segment: src_index=rv % 32 // 16 * 32 + i % 64 // 8 * 4 + rv % 16 // 8 * 2 + i % 2, projected_src_index=(rv - rv % 8) % 32 // 16 * 32 + i % 64 // 8 * 4 + (rv - rv % 8) % 16 // 8 * 2 + i % 2, reduce_var=rv, projected_reduce_var=rv - rv // 32 % 2 * 32 - T.FloorDiv(rv, 1) % 8

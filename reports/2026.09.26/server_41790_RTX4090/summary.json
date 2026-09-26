@@ -1,0 +1,265 @@
+{
+  "server_port": 41790,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "campaigns": [
+    {
+      "server": 41790,
+      "campaign": "2026.09.25-23.10_tilelang_hard-shape_seed=42",
+      "summary": {
+        "backend": "tilelang",
+        "environment": {
+          "tilelang": "0.1.14",
+          "triton": "3.8.0",
+          "torch": "2.4.0+cu124",
+          "python": "3.11.16"
+        },
+        "target_versions": {
+          "tilelang": "0.1.14",
+          "triton": "3.8.0"
+        },
+        "input_seed": 0,
+        "compile_only": false,
+        "save_artifacts": false,
+        "programs_compiled": 2149,
+        "programs_passed": 2009,
+        "coverage_probe_prob": 0.2,
+        "dtype_mutate_prob": 0.25,
+        "max_same_root_cause": 0,
+        "max_oracle_unstable_saved": 0,
+        "generation_config": {
+          "extended_prob": 0.25,
+          "extended_configuration_pair": true,
+          "extended_config_depth": 1,
+          "extended_fast_math_pair": false,
+          "extended_precision_pair": true,
+          "extended_identity_pair": true,
+          "extended_observation_pair": true,
+          "random_config_count": 2,
+          "instance_grid": true,
+          "extended_atomic_prob": 0.25,
+          "extended_fma_prob": 0.3,
+          "extended_shape_op_prob": 0.3,
+          "extended_int8_prob": 0.3,
+          "region_int8_prob": 0.15,
+          "region_pass_config": true,
+          "region_swizzle_pair": true,
+          "region_gemm_prob": 0.5,
+          "region_typed_prob": 0.35,
+          "region_scratch_max_bytes": 67108864,
+          "local_mutate_prob": 0.35,
+          "latest_value_prob": 0.6,
+          "function_min_count": 1,
+          "function_max_count": 2,
+          "function_call_prob": 0.05,
+          "region_input_seed_count": 2,
+          "region_repeat_count": 3,
+          "region_schedule_pair": true,
+          "region_layout_prob": 0.35,
+          "uncovered_boost": 50.0
+        },
+        "structural_features_attempted": 8976,
+        "structural_features_passed": 8481,
+        "structural_features_compiled": 8700,
+        "compiler_ir_features": 41,
+        "total_tested": 2301,
+        "oracle_unstable": 46,
+        "bugs_total": 246,
+        "bugs_unique": 14,
+        "root_causes": {
+          "tilelang_codegen_error": 135,
+          "wrong_result": 20,
+          "shared_memory_overflow": 40,
+          "layout_inference": 8,
+          "ptx_async_boundary": 21,
+          "schedule_mismatch": 4,
+          "warp_partition": 8,
+          "layout_mismatch": 4,
+          "gpu_oom": 1,
+          "stride_alignment": 1,
+          "algebraic_identity": 1,
+          "timeout": 1,
+          "atomic_mismatch": 1,
+          "precision_mismatch": 1
+        },
+        "root_cause_locations": {
+          "tilelang_codegen_error": {
+            "device_compile:tilelang_0": 61,
+            "tvm.error": 74
+          },
+          "wrong_result": {
+            "": 18,
+            "execute:tilelang_2": 1,
+            "execute:tilelang_0": 1
+          },
+          "shared_memory_overflow": {
+            "tvm.error": 40
+          },
+          "layout_inference": {
+            "tvm.error": 8
+          },
+          "ptx_async_boundary": {
+            "tvm.error": 21
+          },
+          "schedule_mismatch": {
+            "schedule invariance": 4
+          },
+          "warp_partition": {
+            "tvm.error": 8
+          },
+          "layout_mismatch": {
+            "layout invariance": 4
+          },
+          "gpu_oom": {
+            "": 1
+          },
+          "stride_alignment": {
+            "": 1
+          },
+          "algebraic_identity": {
+            "execute:tilelang_8_ident": 1
+          },
+          "timeout": {
+            "prepare_0_6": 1
+          },
+          "atomic_mismatch": {
+            "execute:tilelang_0": 1
+          },
+          "precision_mismatch": {
+            "execute:tilelang_8_prec": 1
+          }
+        }
+      }
+    },
+    {
+      "server": 41790,
+      "campaign": "2026.09.25-23.10_triton_hard-shape_seed=42",
+      "summary": {
+        "backend": "triton",
+        "environment": {
+          "tilelang": "0.1.14",
+          "triton": "3.8.0",
+          "torch": "2.4.0+cu124",
+          "python": "3.11.16"
+        },
+        "target_versions": {
+          "tilelang": "0.1.14",
+          "triton": "3.8.0"
+        },
+        "input_seed": 0,
+        "compile_only": false,
+        "save_artifacts": false,
+        "programs_compiled": 7219,
+        "programs_passed": 6908,
+        "coverage_probe_prob": 0.2,
+        "dtype_mutate_prob": 0.25,
+        "max_same_root_cause": 0,
+        "max_oracle_unstable_saved": 0,
+        "generation_config": {
+          "extended_prob": 0.25,
+          "extended_configuration_pair": true,
+          "extended_config_depth": 1,
+          "extended_fast_math_pair": false,
+          "extended_precision_pair": true,
+          "extended_identity_pair": true,
+          "extended_observation_pair": true,
+          "random_config_count": 2,
+          "instance_grid": true,
+          "extended_atomic_prob": 0.25,
+          "extended_fma_prob": 0.3,
+          "extended_shape_op_prob": 0.3,
+          "extended_int8_prob": 0.3,
+          "region_int8_prob": 0.15,
+          "region_pass_config": true,
+          "region_swizzle_pair": true,
+          "region_gemm_prob": 0.5,
+          "region_typed_prob": 0.35,
+          "region_scratch_max_bytes": 67108864,
+          "local_mutate_prob": 0.35,
+          "latest_value_prob": 0.6,
+          "function_min_count": 1,
+          "function_max_count": 2,
+          "function_call_prob": 0.05,
+          "region_input_seed_count": 2,
+          "region_repeat_count": 3,
+          "region_schedule_pair": true,
+          "region_layout_prob": 0.35,
+          "uncovered_boost": 50.0
+        },
+        "structural_features_attempted": 11783,
+        "structural_features_passed": 11520,
+        "structural_features_compiled": 11597,
+        "compiler_ir_features": 219,
+        "total_tested": 7291,
+        "oracle_unstable": 161,
+        "bugs_total": 222,
+        "bugs_unique": 9,
+        "root_causes": {
+          "precision_mismatch": 13,
+          "triton_compile_error": 71,
+          "shared_memory_overflow": 53,
+          "wrong_result": 67,
+          "layout_mismatch": 7,
+          "pass_config_mismatch": 6,
+          "gpu_oom": 2,
+          "schedule_mismatch": 2,
+          "timeout": 1
+        },
+        "root_cause_locations": {
+          "precision_mismatch": {
+            "execute:triton_8_prec": 13
+          },
+          "triton_compile_error": {
+            "compile:triton_0": 71
+          },
+          "shared_memory_overflow": {
+            "": 53
+          },
+          "wrong_result": {
+            "": 67
+          },
+          "layout_mismatch": {
+            "layout invariance": 7
+          },
+          "pass_config_mismatch": {
+            "pass-config invariance": 6
+          },
+          "gpu_oom": {
+            "": 2
+          },
+          "schedule_mismatch": {
+            "schedule invariance": 2
+          },
+          "timeout": {
+            "execute_variant_2": 1
+          }
+        }
+      }
+    }
+  ],
+  "decisions": {
+    "unconfirmed_candidate": 134,
+    "fuzzer_checker_defect": 1,
+    "resource_or_invalid_configuration": 106,
+    "oracle_unstable": 207,
+    "confirmed_signature": 227
+  },
+  "saved_category_counts": {
+    "algebraic_identity": 1,
+    "atomic_mismatch": 1,
+    "gpu_oom": 3,
+    "layout_inference": 8,
+    "layout_mismatch": 11,
+    "oracle_unstable": 207,
+    "precision_mismatch": 14,
+    "ptx_async_boundary": 21,
+    "schedule_mismatch": 6,
+    "shared_memory_overflow": 93,
+    "stride_alignment": 1,
+    "tilelang_codegen_error": 135,
+    "timeout": 2,
+    "warp_partition": 8,
+    "wrong_result": 87,
+    "pass_config_mismatch": 6,
+    "triton_compile_error": 71
+  }
+}

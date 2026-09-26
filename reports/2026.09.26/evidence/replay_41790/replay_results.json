@@ -1,0 +1,86 @@
+[
+  {
+    "key": "algebraic_identity_tilelang",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/algebraic_identity/failed_extended_control_calls_4222ca02da8ad54a.py",
+    "exit": 1,
+    "seconds": 48.88,
+    "tail": "ference_programs=REFERENCE_PROGRAMS)\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/algebraic_identity/failed_extended_control_calls_4222ca02da8ad54a.py\", line 407, in run_extended\n    extended_check(actual, variant_expected[name],\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/algebraic_identity/failed_extended_control_calls_4222ca02da8ad54a.py\", line 262, in extended_check\n    raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '\nRuntimeError: WRONG RESULT: identity:tilelang_8_ident:e74:seed=0:steps=0:limit=1; max_abs=0.00025522708892822266; index=16; actual=0.00025522708892822266; expected=0.0\n"
+  },
+  {
+    "key": "atomic_mismatch_tilelang",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/atomic_mismatch/failed_extended_indexed_memory_702e6b89a19c62c0.py",
+    "exit": 1,
+    "seconds": 18.07,
+    "tail": "reference_programs=REFERENCE_PROGRAMS)\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/atomic_mismatch/failed_extended_indexed_memory_702e6b89a19c62c0.py\", line 428, in run_extended\n    extended_check_atomic(memories[name], variant_expected_memory[name],\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/atomic_mismatch/failed_extended_indexed_memory_702e6b89a19c62c0.py\", line 293, in extended_check_atomic\n    raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '\nRuntimeError: WRONG RESULT: atomic:mem2; max_abs=7.450580596923828e-09; index=2137; actual=0.08622797578573227; expected=0.08622798323631287\n"
+  },
+  {
+    "key": "layout_inference",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/layout_inference/failed_calls_main(f0)__f0()_9bd39f94f1faff77.py",
+    "exit": 1,
+    "seconds": 15.73,
+    "tail": ".core.Function.__call__\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule) const\n  File \"<unknown>\", line 0, in tvm::transform::Pass::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tirx::transform::PrimFuncPassNode::operator()(tvm::IRModule, tvm::transform::PassContext const&) const\n  File \"<unknown>\", line 0, in tvm::tl::LayoutInferencer::Substitute(tvm::tirx::PrimFunc)\n  File \"<unknown>\", line 0, in tvm::tl::BufferUseDefCollector::Run()\n  File \"/project/src/transform/layout_inference/layout_inference.cc\", line 1523, in void tvm::tl::BufferUseDefCollector::InferInFreeMode(tvm::tl::LayoutMap&, const tvm::tl::LayoutMap&)\ntvm.error.InternalError: Check failed: (has_best) is false: no available layout found\n\n"
+  },
+  {
+    "key": "precision_mismatch_tilelang",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/precision_mismatch/failed_extended_shape_matmul_332ba2d05b298023.py",
+    "exit": 1,
+    "seconds": 30.0,
+    "tail": "re_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/precision_mismatch/failed_extended_shape_matmul_332ba2d05b298023.py\", line 407, in run_extended\n    extended_check(actual, variant_expected[name],\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/precision_mismatch/failed_extended_shape_matmul_332ba2d05b298023.py\", line 262, in extended_check\n    raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '\nRuntimeError: WRONG RESULT: precision:tilelang_8_prec:e28:seed=0:steps=0:limit=1; max_abs=0.015625; index=36; actual=-1.1484375; expected=-1.1640625\n"
+  },
+  {
+    "key": "cp_async",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/ptx_async_boundary/failed_calls_main(f1)__f0()__f1(f0)_3abfb79fb0216843.py",
+    "exit": 1,
+    "seconds": 20.19,
+    "tail": "se: T.ptx_cp_async(T.address_of(As[T.shift_right(T.bitwise_and(thread_binding, 15), 3) * 4096 + i * 1024 + T.shift_right(thread_binding, 4) * 64 + T.bitwise_and(T.shift_right(T.bitwise_and(thread_binding, 127), 6) + T.shift_right(T.bitwise_and(thread_binding, 7), 2), 1) * 32 + T.bitwise_and(T.shift_right(T.bitwise_and(thread_binding, 63), 5) + T.shift_right(T.bitwise_and(thread_binding, 3), 1), 1) * 16 + T.bitwise_and(T.shift_right(T.bitwise_and(thread_binding, 31), 4) + T.bitwise_and(thread_binding, 1), 1) * 8 + vec]), T.address_of(A[i * 146512 + T.shift_right(thread_binding, 4) * 9157 + T.bitwise_and(thread_binding, 15) * 8 + vec]), 1, i * 16 + T.shift_right(thread_binding, 4) < 1 and i * 16 + T.shift_right(thread_binding, 4) < 1) requires a final PTX byte width in {4, 8, 16}, but got 2\n"
+  },
+  {
+    "key": "schedule_mismatch_tilelang",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/schedule_mismatch/failed_calls_main(f0)__f0()_1250a82975ace5db.py",
+    "exit": 1,
+    "seconds": 19.6,
+    "tail": "relative=relative, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/schedule_mismatch/failed_calls_main(f0)__f0()_1250a82975ace5db.py\", line 286, in _run_region\n    _region_check(actual, baseline, relative, tolerance,\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/schedule_mismatch/failed_calls_main(f0)__f0()_1250a82975ace5db.py\", line 125, in _region_check\n    raise RuntimeError(f'WRONG RESULT: {label}: error={error}, tolerance={tolerance}')\nRuntimeError: WRONG RESULT: schedule invariance: error=1.602988783882841, tolerance=0.1\n"
+  },
+  {
+    "key": "bool_vector",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_extended_mixed_16367aeaf0b9a947.py",
+    "exit": 1,
+    "seconds": 26.56,
+    "tail": "ne 0, in tvm::codegen::CodeGenTileLangCUDA::VisitExpr_(tvm::tirx::CastNode const*, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::PrintExpr[abi:cxx11](tvm::PrimExpr const&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenC::VisitExpr_(tvm::tirx::AndNode const*, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::PrintVecBinaryOp(std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> > const&, tvm::runtime::DataType, tvm::PrimExpr, tvm::PrimExpr, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::codegen::CodeGenTileLangCUDA::PrintType(tvm::runtime::DataType, std::ostream&)\n  File \"<unknown>\", line 0, in tvm::runtime::detail::LogFatal::~LogFatal()\ntvm.error.InternalError: Cannot convert type boolx16 to CUDA type\n"
+  },
+  {
+    "key": "reduce_layout",
+    "source": "results/2026.09.25-23.10_tilelang_hard-shape_seed=42/failed/tilelang_codegen_error/failed_calls_main(f0)__f0()_b77d283a58fb4bb4.py",
+    "exit": 1,
+    "seconds": 21.89,
+    "tail": "Step, std::allocator<tvm::tl::backend::reduce::ThreadReduceStep> > const&, tvm::arith::Analyzer*)\n  File \"/project/src/backend/common/op/reduce.h\", line 534, in void tvm::tl::backend::reduce::CheckThreadOwnedStepsProjectable(const tvm::PrimExpr&, const tvm::tirx::Var&, const std::vector<ThreadReduceStep>&, tvm::arith::Analyzer*)\ntvm.error.InternalError: Check failed: (analyzer->CanProveEqual(projected_index, simplified_index)) is false: ReduceOp cannot lower a layout where a source index depends on a thread-owned reduce segment: src_index=rv % 32 // 16 * 32 + i % 64 // 8 * 4 + rv % 16 // 8 * 2 + i % 2, projected_src_index=(rv - rv % 8) % 32 // 16 * 32 + i % 64 // 8 * 4 + (rv - rv % 8) % 16 // 8 * 2 + i % 2, reduce_var=rv, projected_reduce_var=rv - rv // 32 % 2 * 32 - T.FloorDiv(rv, 1) % 8\n"
+  },
+  {
+    "key": "pass_config_mismatch_triton",
+    "source": "results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py",
+    "exit": 1,
+    "seconds": 6.71,
+    "tail": "0.5}, 'regions': []}, {'kind': 'scale', 'result': 'v3', 'operands': ['v2'], 'attrs': {'alpha': 2.4975796376528145}, 'regions': []}, {'kind': 'to_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v5', 'operands': ['v3', 'arg0', 'arg1'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v5'}}]))\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py\", line 315, in _run_layout_case\n    raise RuntimeError(f'layout invariance: {layout_a}/{layout_b}: {error}') from error\nRuntimeError: layout invariance: offset/contiguous: WRONG RESULT: pass-config invariance: error=0.0078125, tolerance=0.001\n"
+  },
+  {
+    "key": "precision_mismatch_triton",
+    "source": "results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/precision_mismatch/failed_extended_shape_matmul_a10067f5d3a5584b.py",
+    "exit": 1,
+    "seconds": 7.52,
+    "tail": "d(PROGRAM, prepare_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/precision_mismatch/failed_extended_shape_matmul_a10067f5d3a5584b.py\", line 407, in run_extended\n    extended_check(actual, variant_expected[name],\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/precision_mismatch/failed_extended_shape_matmul_a10067f5d3a5584b.py\", line 262, in extended_check\n    raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '\nRuntimeError: WRONG RESULT: precision:triton_8_prec:e32:seed=0:steps=0:limit=1; max_abs=17.25; index=82; actual=-463.25; expected=-480.5\n"
+  },
+  {
+    "key": "schedule_mismatch_triton",
+    "source": "results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/schedule_mismatch/failed_calls_main(f1)__f0()__f1(f0)_2d3dec475b8a64c7.py",
+    "exit": 1,
+    "seconds": 5.27,
+    "tail": "tive, **kwargs)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/schedule_mismatch/failed_calls_main(f1)__f0()__f1(f0)_2d3dec475b8a64c7.py\", line 286, in _run_region\n    _region_check(actual, baseline, relative, tolerance,\n  File \"/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/schedule_mismatch/failed_calls_main(f1)__f0()__f1(f0)_2d3dec475b8a64c7.py\", line 125, in _region_check\n    raise RuntimeError(f'WRONG RESULT: {label}: error={error}, tolerance={tolerance}')\nRuntimeError: WRONG RESULT: schedule invariance: error=17.295544137692904, tolerance=0.1\n"
+  },
+  {
+    "key": "triton_flip",
+    "source": "results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/triton_compile_error/failed_extended_control_calls_171987725a81b4e9.py",
+    "exit": 1,
+    "seconds": 3.72,
+    "tail": "fns,\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\ntriton.compiler.errors.CompilationError: at 99:11:\n    e82 = (tl.full((), 2, tl.int32)).to(tl.int32)\n    e83 = (tl.full((), True, tl.int1)).to(tl.int1)\n    e84 = (tl.load(mem4 + bid * 36 + 16 + e82 * 1, (e83 & (e82 >= 0) & (e82 < 4)), other=0)).to(tl.float16)\n    e85 = (tl.full((), -0.5, tl.float16)).to(tl.float16)\n    e86 = ((e78 * e85)).to(tl.float16)\n    e87 = (tl.full((), 0.25, tl.float16)).to(tl.float16)\n    e88 = ((e81 * e87)).to(tl.float16)\n    e89 = (tl.full((), 0.0, tl.float16)).to(tl.float16)\n    e90 = ((e84 * e89)).to(tl.float16)\n    e91 = (tl.fma(e86, e88, e90)).to(tl.float16)\n    e92 = (tl.fma(e91, e88, e90)).to(tl.float16)\n    e93 = (tl.flip(e67)).to(tl.float16)\n           ^\n"
+  }
+]

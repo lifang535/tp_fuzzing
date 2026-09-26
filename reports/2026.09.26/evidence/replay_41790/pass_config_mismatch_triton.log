@@ -1,0 +1,37 @@
+/root/autodl-tmp/conda/envs/tp_fuzzing_latest/lib/python3.11/site-packages/torch/cuda/__init__.py:58: FutureWarning: The pynvml package is deprecated. Please install nvidia-ml-py instead. If you did not install pynvml directly, please report this to the maintainers of the package that installed pynvml for you.
+  import pynvml  # type: ignore[import]
+TILESMITH_STAGE=layout:broadcast_cols/contiguous
+TILESMITH_STAGE=reference
+TILESMITH_STAGE=prepare_0_0
+TILESMITH_STAGE=prepare_0_1
+TILESMITH_STAGE=prepare_0_2
+TILESMITH_STAGE=execute_variant_0
+TILESMITH_STAGE=execute_variant_1
+TILESMITH_STAGE=execute_variant_2
+TILESMITH_STAGE=layout:offset/contiguous
+TILESMITH_STAGE=reference
+TILESMITH_STAGE=prepare_1_0
+TILESMITH_STAGE=prepare_1_1
+TILESMITH_STAGE=prepare_1_2
+TILESMITH_STAGE=execute_variant_0
+TILESMITH_STAGE=execute_variant_1
+TILESMITH_STAGE=execute_variant_2
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py", line 313, in _run_layout_case
+    _run_region(launches, inputs, reference, repeats, tolerance, relative=relative, **kwargs)
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py", line 286, in _run_region
+    _region_check(actual, baseline, relative, tolerance,
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py", line 125, in _region_check
+    raise RuntimeError(f'WRONG RESULT: {label}: error={error}, tolerance={tolerance}')
+RuntimeError: WRONG RESULT: pass-config invariance: error=0.0078125, tolerance=0.001
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py", line 855, in <module>
+    test_kernel_0()
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py", line 852, in test_kernel_0
+    _run_layout_case([run_variant_1_0, run_variant_1_1, run_variant_1_2], (a_storage, b_storage), ref, 3, 0.001, relative=False, layout_a='offset', layout_b='contiguous', alternate=True, variant_kinds=['schedule', 'schedule', 'pass-config'], prepare_markers=['prepare_1_0', 'prepare_1_1', 'prepare_1_2'], reference_verify=lambda: _typed_region_reference_double(A, B, {'arguments': [], 'operations': [{'kind': 'load', 'result': 'v1', 'operands': [], 'attrs': {}, 'regions': []}, {'kind': 'row_min', 'result': 'v2', 'operands': ['v1'], 'attrs': {}, 'regions': []}, {'kind': 'where', 'result': 'v3', 'operands': ['v1', 'v1', 'v1'], 'attrs': {}, 'regions': []}, {'kind': 'store_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v5', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v6', 'operands': ['v5', 'v5'], 'attrs': {'callee': 'fn_1'}, 'regions': []}], 'yield_value': 'v6'}, 256, 32, 'float16', [{'name': 'fn_0', 'body': {'arguments': ['arg0', 'arg1', 'arg2'], 'operations': [{'kind': 'maximum', 'result': 'v1', 'operands': ['arg0', 'arg2'], 'attrs': {}, 'regions': []}, {'kind': 'for', 'result': 'v7', 'operands': ['arg0'], 'attrs': {'trip_count': 1, 'start': 1, 'step': 2}, 'regions': [{'arguments': ['v2'], 'operations': [{'kind': 'floor', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'rsqrt', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'add', 'result': 'v6', 'operands': ['v5', 'v2'], 'attrs': {}, 'regions': []}], 'yield_value': 'v6'}]}, {'kind': 'to_tile', 'result': 'v8', 'operands': ['v7'], 'attrs': {}, 'regions': []}], 'yield_value': 'v8'}}, {'name': 'fn_1', 'body': {'arguments': ['arg0', 'arg1'], 'operations': [{'kind': 'ceil', 'result': 'v1', 'operands': ['arg1'], 'attrs': {}, 'regions': []}, {'kind': 'index_add', 'result': 'v2', 'operands': ['arg1'], 'attrs': {'axis': 'row', 'scale': 0.5}, 'regions': []}, {'kind': 'scale', 'result': 'v3', 'operands': ['v2'], 'attrs': {'alpha': 2.4975796376528145}, 'regions': []}, {'kind': 'to_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v5', 'operands': ['v3', 'arg0', 'arg1'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v5'}}]), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {'arguments': [], 'operations': [{'kind': 'load', 'result': 'v1', 'operands': [], 'attrs': {}, 'regions': []}, {'kind': 'row_min', 'result': 'v2', 'operands': ['v1'], 'attrs': {}, 'regions': []}, {'kind': 'where', 'result': 'v3', 'operands': ['v1', 'v1', 'v1'], 'attrs': {}, 'regions': []}, {'kind': 'store_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v5', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v6', 'operands': ['v5', 'v5'], 'attrs': {'callee': 'fn_1'}, 'regions': []}], 'yield_value': 'v6'}, 256, 32, 'float16', [{'name': 'fn_0', 'body': {'arguments': ['arg0', 'arg1', 'arg2'], 'operations': [{'kind': 'maximum', 'result': 'v1', 'operands': ['arg0', 'arg2'], 'attrs': {}, 'regions': []}, {'kind': 'for', 'result': 'v7', 'operands': ['arg0'], 'attrs': {'trip_count': 1, 'start': 1, 'step': 2}, 'regions': [{'arguments': ['v2'], 'operations': [{'kind': 'floor', 'result': 'v3', 'operands': ['v2'], 'attrs': {}, 'regions': []}, {'kind': 'rsqrt', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'to_tile', 'result': 'v5', 'operands': ['v4'], 'attrs': {}, 'regions': []}, {'kind': 'add', 'result': 'v6', 'operands': ['v5', 'v2'], 'attrs': {}, 'regions': []}], 'yield_value': 'v6'}]}, {'kind': 'to_tile', 'result': 'v8', 'operands': ['v7'], 'attrs': {}, 'regions': []}], 'yield_value': 'v8'}}, {'name': 'fn_1', 'body': {'arguments': ['arg0', 'arg1'], 'operations': [{'kind': 'ceil', 'result': 'v1', 'operands': ['arg1'], 'attrs': {}, 'regions': []}, {'kind': 'index_add', 'result': 'v2', 'operands': ['arg1'], 'attrs': {'axis': 'row', 'scale': 0.5}, 'regions': []}, {'kind': 'scale', 'result': 'v3', 'operands': ['v2'], 'attrs': {'alpha': 2.4975796376528145}, 'regions': []}, {'kind': 'to_tile', 'result': 'v4', 'operands': ['v3'], 'attrs': {}, 'regions': []}, {'kind': 'call', 'result': 'v5', 'operands': ['v3', 'arg0', 'arg1'], 'attrs': {'callee': 'fn_0'}, 'regions': []}], 'yield_value': 'v5'}}]))
+  File "/root/autodl-tmp/project/tile_program_fuzzing/tp_fuzzing/results/2026.09.25-23.10_triton_hard-shape_seed=42/failed/pass_config_mismatch/failed_calls_main(f1)__f0()__f1(f0)_4a5c3d034d8d8bb7.py", line 315, in _run_layout_case
+    raise RuntimeError(f'layout invariance: {layout_a}/{layout_b}: {error}') from error
+RuntimeError: layout invariance: offset/contiguous: WRONG RESULT: pass-config invariance: error=0.0078125, tolerance=0.001
