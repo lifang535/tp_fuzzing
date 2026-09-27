@@ -41,7 +41,13 @@ tests/                            单元测试、离线编译及 GPU smoke
 
 ## 运行方式
 
-在项目目录运行；依赖版本见 [requirements.txt](requirements.txt)。生成源码和 CPU 单元测试不要求可用的 GPU，执行生成的 kernel 需要对应 DSL 和 CUDA 环境。
+在项目目录运行。本分支针对 **TileLang 0.1.14**、**Triton 3.8.0** 和 **PyTorch 2.4.0+cu124**；两台已审计服务器的 `tp_fuzzing_latest` 环境使用 Python 3.11。仓库中的 [requirements.txt](requirements.txt) 仍固定*旧版* TileLang 0.1.11 / Triton 3.0.0，不能原样用于复现本分支实验。安装带 `+cu124` 的 PyTorch wheel 还需使用对应的 PyTorch CUDA wheel 索引，不能只依赖普通 PyPI 镜像。运行前检查当前环境：
+
+```bash
+python -c "import sys; from importlib.metadata import version; print(sys.version.split()[0], {name: version(name) for name in ('torch', 'tilelang', 'triton')})"
+```
+
+Fuzzer 会把实际安装版本记录在 campaign 的 `summary.json`，恢复时若环境发生变化也会提示。生成源码和 CPU 单元测试不要求可用的 GPU；执行 kernel 需要对应 DSL 和 CUDA 环境。
 
 ```bash
 # 查看参数 / 原生操作契约
@@ -65,9 +71,14 @@ python main.py --backend triton --compile-only -n 10
 
 # 恢复当前格式的 campaign；沿用原 backend、seed、形状模式及生成参数
 python main.py --backend triton --seed 42 --resume results/<campaign目录> -n 100
+
+# 不长期保存 Extended 编译证据；结果记录仍会保存
+python main.py --backend triton --seed 42 -n 100 --no-save-artifacts
 ```
 
 `-n` 是本次新增执行数量，去重跳过的候选不计数。`--input-seed` 控制测试输入；`--seed` 控制生成与变异。`--easy-shape` 使用 2 的幂尺寸，小于 tile 的尺寸仍然需要边界掩码。
+
+内置两种后端共用 IR 和 campaign 主循环，TileLang 与 Triton 的可用配置、lowering、启动方式和诊断规则由 `src/backends/` 中各自的实现决定。扩展其他 DSL 需实现并注册 `src/backends/base.py` 中的接口，再以 `--backend-plugin MODULE` 加载注册模块；参见[工作流说明](src/workflow/README.cn.md)。如果还要加入新的 IR 格式，则需同时扩展生成、序列化和反馈。
 
 ## 路线与概率
 
@@ -147,7 +158,7 @@ MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Exten
 | 累加器宽度扫掠 | 开（`--no-extended-precision` 关闭） | 每个基础配置的 fp16 累加副本（tilelang `T.gemm` fp16 fragment、triton `tl.dot` fp16 累加），解释器按每 k=16 的 MMA 舍入建模；triton 另加 ieee→tf32 输入精度变体 | `precision_mismatch` |
 | 代数恒等式扫掠 | 开（`--no-extended-identities` 关闭） | 无 matmul 程序中 `mul(x, add/sub(y, z))` 改写为分配律形式，按变换后程序单独计算期望 | `algebraic_identity` |
 
-tilelang 的 `opt_level` 无法穿透 `tilelang.compile`（所有 s_tir pass 声明 `opt_level=0`），因此 RC2 pass 管线差异用已核实的 `pass_configs` 键实现；`tl.enable_fast_math` 会改变数值，默认关闭。随机采样池（`src/backends/common/knobs.py`）只含在本机 tilelang 0.1.11 中核实过消费者的键（排除竞态、去掉安全合法化、Hopper-only 和 debug 键），且采样是（程序签名, seed）的纯函数——证据读取和超时缩放会重新推导同一变体列表。
+tilelang 的 `opt_level` 无法穿透 `tilelang.compile`（所有 s_tir pass 声明 `opt_level=0`），因此 RC2 pass 管线差异用已核实的 `pass_configs` 键实现；`tl.enable_fast_math` 会改变数值，默认关闭。随机采样池（`src/backends/common/knobs.py`）只含针对目标 TileLang 0.1.14 重新核实过消费者的键（排除竞态、去掉安全合法化、Hopper-only 和 debug 键），且采样是（程序签名, seed）的纯函数——证据读取和超时缩放会重新推导同一变体列表。
 
 每个失败报告的定位信息保存在 summary.json 的新键 `root_cause_locations`（`root_cause → 位置 → 次数`）中：位置依次取不变性标签本身、崩溃前最后一个 `TILESMITH_STAGE` 标记、TVM pass 名或报错源文件。`root_causes` 键保持 `{str: int}` 形状不变，`failed/` 目录命名不变。
 
@@ -159,12 +170,14 @@ tilelang 的 `opt_level` 无法穿透 `tilelang.compile`（所有 s_tir pass 声
 
 结构反馈记录操作、数据依赖、嵌套、类型、布局和调度等特征。尝试、成功执行和编译特征分别统计；它不是编译器分支覆盖率。错误分类用于分组，`wrong_result` 仍需排查数值容差和参考语义，不能直接当作已确认的编译器 bug。
 
+**如何判读失败：**`failed/<root_cause>/` 是自动症状标签，不是已确认的 DSL 缺陷。统计独立 bug 前，应在记录的环境中重跑代表性的 `.py`，检查相邻 `.json`，并把生成的 kernel 与参考实现、检查器分离验证。即使可重复出现 `WRONG RESULT`，也可能是 oracle 或容差错误：已有一例确认的 `atomic_mismatch` 误报，是把原子操作专用的严格比较错误地应用到普通 store 写入的缓冲区。磁盘耗尽、资源限制及不支持的配置也需单列。[9 月 26 日审计](reports/2026.09.26/REPORT.md)仅针对当时的第四轮实验，保守确认 **4 类缺陷机制**（TileLang 3 类、Triton 1 类）；534 条同签名保存记录不是 534 个独立 bug。这个日期明确的审计结论不能自动用于后续 campaign。
+
 ```text
 results/<时间>_<backend>_<形状模式>_seed=<seed>/
   passed/                         成功执行的 .json IR 和 .py
   compiled/                       compile-only 结果，不能等同成功执行
   failed/<root_cause>/             失败报告和独立复现脚本
-  artifacts/                      Extended 编译证据
+  artifacts/                      Extended 编译证据（--no-save-artifacts 时不保留）
   summary.json                    计数与生成配置（含 root_cause_locations 定位统计）
   structural_feedback.json        反馈计数
   seed_pool.json                  可变异的程序种子

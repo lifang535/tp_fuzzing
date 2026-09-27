@@ -31,7 +31,13 @@ TileKernel is a parameter object attached to a RegionProgram. Region operations 
 
 ## Usage
 
-Run from this directory. See [requirements.txt](requirements.txt) for dependency versions. Source generation and CPU unit tests do not require an available GPU; running kernels requires CUDA and the selected DSL.
+Run from this directory. This branch targets **TileLang 0.1.14**, **Triton 3.8.0** and **PyTorch 2.4.0+cu124** (Python 3.11 in the two audited `tp_fuzzing_latest` server environments). The checked-in [requirements.txt](requirements.txt) still pins the *older* TileLang 0.1.11 / Triton 3.0.0 pair; do not use it unchanged to reproduce experiments on this branch. The `+cu124` PyTorch wheel also needs the appropriate PyTorch CUDA wheel index rather than a generic PyPI mirror. Check the active environment before running:
+
+```bash
+python -c "import sys; from importlib.metadata import version; print(sys.version.split()[0], {name: version(name) for name in ('torch', 'tilelang', 'triton')})"
+```
+
+The fuzzer records installed versions in each campaign's `summary.json` and warns on a changed environment when resuming. Source generation and CPU unit tests do not require an available GPU; executing kernels requires CUDA and the selected DSL.
 
 ```bash
 python main.py --help
@@ -50,9 +56,14 @@ python main.py --backend triton --compile-only -n 10
 
 # Keep the original backend, seed, shape mode and generation settings
 python main.py --backend triton --seed 42 --resume results/<campaign-directory> -n 100
+
+# Avoid retaining large Extended compilation artifacts; results are still saved
+python main.py --backend triton --seed 42 -n 100 --no-save-artifacts
 ```
 
 `-n` counts newly executed tests, excluding deduplicated candidates. `--seed` controls generation/mutation; `--input-seed` controls tensor inputs. `--easy-shape` samples powers of two; sizes below a tile still exercise boundary handling.
+
+Both built-in backends use the shared IR and campaign loop. TileLang and Triton differ in accepted configurations, lowering, launch conventions and diagnostic rules under `src/backends/`. To add another DSL, implement and register the interface in `src/backends/base.py`, then load its registration module with `--backend-plugin MODULE`; see the [workflow guide](src/workflow/README.en.md). Supporting a new IR format additionally requires generation, serialization and feedback work.
 
 ## Selection and configuration
 
@@ -130,7 +141,7 @@ Following MLIRSmith's "one program × many configuration reuses, uncovered-featu
 | Accumulator-width sweep | On (disabled by `--no-extended-precision`) | An fp16-accumulation copy of each base configuration (tilelang `T.gemm` fp16 fragment, triton `tl.dot` fp16 accumulator); the interpreter models MMA rounding per k=16; triton additionally gets an ieee→tf32 input-precision variant | `precision_mismatch` |
 | Algebraic-identity sweep | On (disabled by `--no-extended-identities`) | In matmul-less programs, `mul(x, add/sub(y, z))` is rewritten into distributive form; expectations are computed on the transformed program | `algebraic_identity` |
 
-tilelang's `opt_level` cannot penetrate `tilelang.compile` (all s_tir passes declare `opt_level=0`), so the RC2 pass-pipeline difference uses the verified `pass_configs` keys; `tl.enable_fast_math` changes numerics and stays off by default. The random-sampling pool (`src/backends/common/knobs.py`) only contains keys with verified consumers in the installed tilelang 0.1.11 (race-prone, safety-legalization-removal, Hopper-only and debug keys are excluded), and sampling is a pure function of (program signature, seed) so evidence reads and timeout scaling re-derive the same variant list.
+tilelang's `opt_level` cannot penetrate `tilelang.compile` (all s_tir passes declare `opt_level=0`), so the RC2 pass-pipeline difference uses the verified `pass_configs` keys; `tl.enable_fast_math` changes numerics and stays off by default. The random-sampling pool (`src/backends/common/knobs.py`) only contains keys with consumers re-checked for the target TileLang 0.1.14 (race-prone, safety-legalization-removal, Hopper-only and debug keys are excluded), and sampling is a pure function of (program signature, seed) so evidence reads and timeout scaling re-derive the same variant list.
 
 Per-report localization is stored in summary.json's new `root_cause_locations` key (`root_cause → location → count`): locations come from the invariance label itself, the last `TILESMITH_STAGE` marker before a crash, a TVM pass name, or the reporting source file. The `root_causes` key keeps its `{str: int}` shape and `failed/` directory naming is unchanged.
 
@@ -140,7 +151,9 @@ Feedback counts IR operations, dependencies, nesting, types, layouts and schedul
 
 ## Results and compatibility
 
-Campaigns store `passed/`, `compiled/`, `failed/<root_cause>/`, Extended `artifacts/`, and summary, feedback, seed, dimension and RNG state files. Interrupted cases may also have `pending_program.pkl`. Passing and failing records include standalone Python reproducers. Region filenames use call structure plus a full-IR hash; Extended uses family plus hash. Compilation-only results are distinct from successfully executed results. summary.json additionally records `root_cause_locations` (`root_cause → location → count`) for fine-grained triage.
+Campaigns store `passed/`, `compiled/`, `failed/<root_cause>/`, and summary, feedback, seed, dimension and RNG state files. Extended `artifacts/` are retained by default; `--no-save-artifacts` removes temporary compilation evidence after each test while retaining the result records. Interrupted cases may also have `pending_program.pkl`. Passing and failing records include standalone Python reproducers. Region filenames use call structure plus a full-IR hash; Extended uses family plus hash. Compilation-only results are distinct from successfully executed results. summary.json additionally records `root_cause_locations` (`root_cause → location → count`) for fine-grained triage.
+
+**Interpreting failures:** `failed/<root_cause>/` is an automated symptom label, not a confirmed DSL defect. Re-run representative `.py` reproducers in the recorded environment, inspect the adjacent `.json`, and isolate the generated kernel from the reference/checker before counting distinct bugs. Even a reproducible `WRONG RESULT` can come from the oracle or its tolerance: a confirmed `atomic_mismatch` false positive applied atomic-specific comparison to a buffer written by an ordinary store. Disk exhaustion, resource limits and unsupported configurations also need separate treatment. The [September 26 audit](reports/2026.09.26/REPORT.md) conservatively confirmed **four defect mechanisms** for its audited fourth-round campaigns (three TileLang, one Triton); its 534 saved matching records are not 534 independent bugs. That audit is a dated result, not an automatic classification of later campaigns.
 
 Region v1–v4 and Extended JSON records remain readable. Unused `legacy: null` and spec `alpha` fields in saved native records are normalized away. Nonempty legacy wrappers and historical single_op/pipeline/dynamic records are rejected; start a new campaign for those formats. Existing result/report directories and standalone reproducers are untouched.
 
