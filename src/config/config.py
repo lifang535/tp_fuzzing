@@ -72,6 +72,10 @@ class Config:
     # Extended exploration IR: disabled by default in the library;
     # the CLI opts new campaigns into a 25% mixture.
     extended_prob: float = 0.0
+    # In the integrated campaign, choose a target-specific derivative of an
+    # already passing common Extended case. Disabled for library callers.
+    dsl_extend_prob: float = 0.0
+    dsl_seed_pool_max: int = 128
     # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong
     # to the separate extend-from-passed stage.
     extended_common_only: bool = True

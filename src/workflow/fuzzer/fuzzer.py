@@ -72,6 +72,13 @@ class TileSmith:
         self.root_cause_locations: dict = {}
         self._historical_bugs_total = 0
         self._historical_bugs_unique = 0
+        if not 0 <= config.dsl_extend_prob <= 1 or config.dsl_seed_pool_max < 1:
+            raise ValueError('DSL extension probability must be in [0, 1] and pool size positive')
+        if config.dsl_extend_prob and config.compile_only:
+            raise ValueError('DSL extension requires execution mode')
+        from .dsl_stage import DSLStage
+        self.dsl_stage = DSLStage(config, self.backend, self.generator.grids)
+        self._current_extension = None
 
         if resume_dir:
             # Resume mode: use the specified directory
@@ -87,6 +94,7 @@ class TileSmith:
             self._restore_rng_state()
             self._restore_dim_pool()
             self._restore_seed_pool()
+            self._restore_dsl_stage()
             self.feedback.restore(self.output_dir / "structural_feedback.json")
         else:
             # New run: create fresh directory
@@ -208,13 +216,19 @@ class TileSmith:
         if pending_path.exists():
             try:
                 with open(pending_path, "rb") as pf:
-                    pending_i, program = pickle.load(pf)
+                    pending = pickle.load(pf)
+                if len(pending) == 2:
+                    pending_i, program = pending
+                    pending_extension = None
+                else:
+                    pending_i, program, pending_extension = pending
                 # Normalize previous native specs and validate the executable IR.
                 program = self._dict_to_program(self._program_to_dict(program))
             except Exception as error:
                 raise ValueError(f'Cannot resume pending program {pending_path}: {error}') from error
             self._resume_pending_i = pending_i
             self._resume_pending_program = program
+            self._resume_pending_extension = pending_extension
             print(f"[resume] Restored pending program [{pending_i}] (interrupted test will be re-run)")
 
     def _save_dim_pool(self):
@@ -249,9 +263,21 @@ class TileSmith:
             with open(pool_path) as f:
                 entries = json.load(f)
             self.seed_pool = [self._dict_to_program(d) for d in entries]
+            if self.config.dsl_extend_prob:
+                from src.ir.extended import ExtendedProgram
+                from src.workflow.generator.dsl_extend import is_common_seed
+                self.seed_pool = [p for p in self.seed_pool
+                                  if not isinstance(p, ExtendedProgram) or is_common_seed(p)]
             print(f"[resume] Restored seed_pool with {len(self.seed_pool)} entries")
         except Exception as error:
             raise ValueError(f'Cannot resume seed pool {pool_path}: {error}') from error
+
+    def _restore_dsl_stage(self):
+        path = self.output_dir / 'dsl_stage.json'
+        if path.exists() and self.config.dsl_extend_prob:
+            self.dsl_stage.restore(json.loads(path.read_text()))
+            print(f'[resume] Restored {len(self.dsl_stage.sources)} DSL source seeds; '
+                  'each will be revalidated before reuse')
 
     def _program_to_dict(self, program) -> dict:
         from src.ir.serialization import program_to_dict
@@ -350,9 +376,11 @@ class TileSmith:
 
         try:
             while new_tested < num_iterations:
+                self._current_extension = None
                 if _pending_program is not None:
                     # Resume the interrupted program directly (already past dedup).
                     program = _pending_program
+                    self._current_extension = getattr(self, '_resume_pending_extension', None)
                     i = _pending_i
                     self.tested_configs.add(self._make_sig(program))
                     self.stats.total_generated += 1
@@ -384,13 +412,20 @@ class TileSmith:
                 self.stats.total_tested += 1
                 new_tested += 1
 
-                novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only)
-                compiler_novelty = self.feedback.observe_compilation(
-                    program, self.oracle.last_compilation, self.oracle.compilation_complete)
+                # Target-only operations have their own coverage accounting;
+                # they must not steer the common-IR generator's feedback.
+                if self._current_extension:
+                    novelty = compiler_novelty = False
+                else:
+                    novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only)
+                    compiler_novelty = self.feedback.observe_compilation(
+                        program, self.oracle.last_compilation, self.oracle.compilation_complete)
                 if self.oracle.compilation_complete:
                     self.stats.programs_compiled += 1
                 if bug is None and not self.config.compile_only:
                     self.stats.programs_passed += 1
+                if self._current_extension:
+                    self.dsl_stage.record(self._current_extension['extension_op'], bug is None)
                 if bug:
                     if bug.root_cause == 'oracle_unstable':
                         # The numeric check was skipped: no implementation could
@@ -426,11 +461,15 @@ class TileSmith:
                         marker = 'NEW' if seen == 0 else ('saved' if saved else 'dup')
                         print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}")
                 else:
-                    self._save_passed(program, i)
-                    if (self.config.structural_feedback and (novelty or compiler_novelty)) or random.random() < self.config.seed_add_prob:
-                        self.seed_pool.append(program)
-                        if len(self.seed_pool) > self.config.seed_pool_max:
-                            self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
+                    passed_path = self._save_passed(program, i)
+                    if not self._current_extension:
+                        if self.config.dsl_extend_prob and not self.config.compile_only:
+                            self.dsl_stage.add(program, passed_path)
+                        if ((self.config.structural_feedback and (novelty or compiler_novelty))
+                                or random.random() < self.config.seed_add_prob):
+                            self.seed_pool.append(program)
+                            if len(self.seed_pool) > self.config.seed_pool_max:
+                                self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
                     if verbose:
                         status = 'COMPILED' if self.config.compile_only else 'PASSED'
                         print(f"[{i}] [{status}] {self._kind_label(program)}")
@@ -465,6 +504,7 @@ class TileSmith:
                 "max_oracle_unstable_saved": self.config.max_oracle_unstable_saved,
                 "generation_config": {
                     "extended_prob": self.config.extended_prob,
+                    "dsl_extend_prob": self.config.dsl_extend_prob,
                     "extended_common_only": self.config.extended_common_only,
                     "extended_configuration_pair": self.config.extended_configuration_pair,
                     "extended_config_depth": self.config.extended_config_depth,
@@ -505,6 +545,10 @@ class TileSmith:
                 "bugs_unique": bugs_unique,
                 "root_causes": self.known_root_causes,
                 "root_cause_locations": {cause: dict(counts) for cause, counts in self.root_cause_locations.items()},
+                "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
+                                  "source_pool": len(self.dsl_stage.sources),
+                                  "baseline_rejected": self.dsl_stage.baseline_rejected,
+                                  "invalid_extension": self.dsl_stage.invalid_extension},
             }
             with open(self.output_dir / "summary.json", "w") as f:
                 json.dump(summary, f, indent=2)
@@ -522,13 +566,15 @@ class TileSmith:
             # _inflight_program is non-None only when interrupt happened inside oracle.test()
             if _inflight_program is not None:
                 with open(pending_path, "wb") as f:
-                    pickle.dump((_inflight_i, _inflight_program), f)
+                    pickle.dump((_inflight_i, _inflight_program, self._current_extension), f)
             elif pending_path.exists():
                 pending_path.unlink()
 
             self.feedback.save(self.output_dir / "structural_feedback.json")
             self._save_dim_pool()
             self._save_seed_pool()
+            if self.config.dsl_extend_prob:
+                (self.output_dir / 'dsl_stage.json').write_text(json.dumps(self.dsl_stage.snapshot()))
 
         if verbose:
             print()
@@ -552,6 +598,12 @@ class TileSmith:
         return TileSmith._make_sig(program_from_dict(data))
 
     def _generate_test_case(self):
+        if (self.config.dsl_extend_prob and self.dsl_stage.sources
+                and random.random() < self.config.dsl_extend_prob):
+            derivative = self.dsl_stage.generate(self.oracle)
+            if derivative is not None:
+                program, self._current_extension = derivative
+                return program
         if not self.seed_pool:
             return self.generator.generate()
         strategy = random.choices(
@@ -595,8 +647,11 @@ class TileSmith:
         failed_dir.mkdir(parents=True, exist_ok=True)
 
         name = f"failed_{kind_label}"
+        report = bug.to_dict()
+        if self._current_extension:
+            report.update(self._current_extension)
         with open(failed_dir / f"{name}.json", "w") as f:
-            json.dump(bug.to_dict(), f, indent=2)
+            json.dump(report, f, indent=2)
         with open(failed_dir / f"{name}.py", "w") as f:
             f.write(bug.generated_code)
 
@@ -616,8 +671,11 @@ class TileSmith:
         meta = self._program_to_dict(program)
         meta["input_seed"] = self.config.input_seed
         meta['validation_mode'] = 'compile_only' if self.config.compile_only else 'execute'
+        if self._current_extension:
+            meta.update(self._current_extension)
 
         with open(passed_dir / f"{name}.json", "w") as f:
             json.dump(meta, f, indent=2)
         with open(passed_dir / f"{name}.py", "w") as f:
             f.write(code)
+        return passed_dir / f"{name}.json"

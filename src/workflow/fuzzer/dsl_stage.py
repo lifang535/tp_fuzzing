@@ -1,0 +1,95 @@
+"""Coverage-guided DSL derivatives of passing common Extended programs."""
+
+from collections import Counter
+import hashlib
+import json
+import random
+
+from src.ir.serialization import program_from_dict
+from src.workflow.generator.dsl_extend import DSL_OPS, eligible_ops, extend_passed
+
+
+class DSLStage:
+    def __init__(self, config, backend, grids=None):
+        self.config, self.backend, self.grids = config, backend, grids
+        self.sources = []  # (program, saved source path, verified, source digest)
+        self.tried = set()  # source digest and op pairs already derived
+        self.counts = Counter()
+        self.baseline_rejected = 0
+        self.invalid_extension = 0
+        self._seen = 0
+
+    def add(self, program, source_file, verified=True):
+        if not eligible_ops(program, self.backend):
+            return False
+        self._seen += 1
+        digest = hashlib.sha256(json.dumps(program.to_dict(), sort_keys=True).encode()).hexdigest()
+        entry = (program, str(source_file), verified, digest)
+        if len(self.sources) < self.config.dsl_seed_pool_max:
+            self.sources.append(entry)
+        else:
+            # Rotate a bounded pool so newly passing structures keep entering.
+            slot = random.randrange(len(self.sources))
+            old_digest = self.sources[slot][3]
+            self.tried = {pair for pair in self.tried if pair[0] != old_digest}
+            self.sources[slot] = entry
+        return True
+
+    def generate(self, oracle):
+        """Return a derivative and lineage; a restored baseline is rechecked."""
+        for _ in range(max(1, len(self.sources) * 2)):
+            candidates = {op: [] for op in DSL_OPS[self.backend]}
+            for index, (parent, _, _, digest) in enumerate(self.sources):
+                for op in eligible_ops(parent, self.backend):
+                    if (digest, op) not in self.tried:
+                        candidates[op].append(index)
+            available = [op for op, indices in candidates.items() if indices]
+            if not available:
+                return None
+            least = min(self.counts[op + ':attempted'] for op in available)
+            op = random.choice([op for op in available if self.counts[op + ':attempted'] == least])
+            index = random.choice(candidates[op])
+            parent, source_file, verified, digest = self.sources[index]
+            if not verified:
+                if oracle.test(parent) is not None:
+                    self.baseline_rejected += 1
+                    self.sources.pop(index)
+                    self.tried = {pair for pair in self.tried if pair[0] != digest}
+                    continue
+                self.sources[index] = (parent, source_file, True, digest)
+            self.counts[op + ':attempted'] += 1
+            self.tried.add((digest, op))
+            try:
+                child = extend_passed(parent, self.backend, op, self.config, self.grids)
+            except ValueError:
+                self.invalid_extension += 1
+                continue
+            return child, {'extension_op': op, 'source_file': source_file,
+                           'source_sha256': digest, 'baseline_revalidated': True}
+        return None
+
+    def record(self, op, passed):
+        self.counts[op + (':passed' if passed else ':failed')] += 1
+
+    def snapshot(self):
+        return {'backend': self.backend, 'counts': dict(self.counts),
+                'baseline_rejected': self.baseline_rejected,
+                'invalid_extension': self.invalid_extension, 'seen': self._seen,
+                'tried': [list(pair) for pair in sorted(self.tried)],
+                'sources': [{'program': program.to_dict(), 'source_file': path}
+                            for program, path, _, _ in self.sources]}
+
+    def restore(self, state):
+        if state.get('backend') != self.backend:
+            raise ValueError('DSL stage backend mismatch')
+        self.counts = Counter(state.get('counts', {}))
+        self.baseline_rejected = state.get('baseline_rejected', 0)
+        self.invalid_extension = state.get('invalid_extension', 0)
+        for entry in state.get('sources', [])[:self.config.dsl_seed_pool_max]:
+            program = program_from_dict(entry['program'])
+            if eligible_ops(program, self.backend):
+                digest = hashlib.sha256(json.dumps(program.to_dict(), sort_keys=True).encode()).hexdigest()
+                self.sources.append((program, entry['source_file'], False, digest))
+        digests = {entry[3] for entry in self.sources}
+        self.tried = {(digest, op) for digest, op in state.get('tried', []) if digest in digests}
+        self._seen = max(state.get('seen', 0), len(self.sources))

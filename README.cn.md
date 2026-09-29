@@ -142,10 +142,14 @@ Extended 使用单独的 IR 和生成器，提供 `arithmetic`、`indexed_memory
 
 新 campaign 的 Extended 生成默认只产生两种 DSL 共用的 IR 结构：Triton 专属的 `join/split/interleave` 和流水化 `for` 不再混入共用种子；两后端的 `mixed` 骨架也采用相同的结构。`--legacy-extended-mix` 可恢复旧生成行为，以便继续原先的实验设置。这里的“共用”指同一 IR 的语义和结构，不表示两种编译器生成相同代码。
 
+现在 `main.py` 可在同一实验中交替执行两条路线。新实验的 `--dsl-extend-prob` 默认为 0.35：存在执行通过的共用 Extended 样例后，每次生成有 35% 的概率从有界种子池派生目标 DSL 操作；其余仍走原本的 Region/Extended 生成路线（该路线的 `--extended-prob` 默认 0.25）。扩展池为空或“样例×操作”组合耗尽时继续生成共用程序。调度优先选择尝试次数最少的目标操作，且同一输入样例的同一操作只派生一次。专属扩展结果不会回流到共用生成池或其反馈；`summary.json` 中的 `dsl_extension.by_op` 单独统计操作覆盖。`dsl_stage.json` 用于正常中断后的恢复，恢复的共用样例复用前会重新验证。指定 `--dsl-extend-prob 0` 可关闭一体化阶段。
+
 ```bash
 # 第一阶段：生成、实例化并执行共用 Extended IR；仅通过的样例进入 passed/
 python main.py --backend triton --extended-prob 1 -n 10000
-
+# 一体化运行：持续生成共用 IR，并按概率从通过样例派生目标 DSL 操作
+python main.py --backend triton --extended-prob 0.5 --dsl-extend-prob 0.4 -n 10000
+# 也可以单独对既有 passed/ 结果运行 extend
 # 第二阶段：读取第一阶段的 passed/*.json，定向测试目标 DSL 的操作
 python extend.py --backend triton --passed-dir results/<campaign>/passed -n 10000
 python extend.py --backend tilelang --passed-dir results/<campaign>/passed -n 10000

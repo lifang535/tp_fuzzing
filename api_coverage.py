@@ -63,10 +63,13 @@ def campaign_passes(paths, backend):
     passed = Counter()
     for path in paths:
         data = json.loads(Path(path).read_text())
-        if data.get('backend') != backend or not isinstance(data.get('by_op'), dict):
+        by_op = data.get('by_op')
+        if not isinstance(by_op, dict):
+            by_op = data.get('dsl_extension', {}).get('by_op')
+        if data.get('backend') != backend or not isinstance(by_op, dict):
             raise ValueError(f'{path} is not a {backend} extension summary')
         for op in DSL_OPS[backend]:
-            passed[op] += data['by_op'].get(op + ':passed', 0)
+            passed[op] += by_op.get(op + ':passed', 0)
     return passed
 
 
@@ -111,7 +114,7 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--backend', required=True, choices=tuple(DSL_OPS))
     parser.add_argument('--summary', type=Path, action='append', default=[],
-                        help='summary.json from an executed extend campaign; repeatable')
+                        help='summary.json from a standalone or integrated extend campaign; repeatable')
     parser.add_argument('--passed-code-dir', type=Path, action='append', default=[],
                         help='passed/ directory with successful .py reproducers; repeatable')
     parser.add_argument('--output', type=Path, help='Write JSON inventory here')

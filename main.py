@@ -46,6 +46,9 @@ def main():
                         help='Probability of type/shape/memory operations in fresh regions; 0 generates v3')
     parser.add_argument('--extended-prob', type=float, default=None,
                         help='Fresh typed exploration programs: default 0.25 (0 when resuming an old campaign)')
+    parser.add_argument('--dsl-extend-prob', type=float, default=None,
+                        help='Probability of deriving a target-DSL test from a passing common Extended case; '
+                             'default 0.35 for new campaigns, 0 for old campaigns on resume')
     parser.add_argument('--legacy-extended-mix', action='store_true',
                         help='Restore the historical Extended generator that mixes DSL-specific shape operations into fresh cases')
     parser.add_argument('--compile-only', action='store_true',
@@ -165,6 +168,13 @@ def main():
             args.legacy_extended_mix = not saved_generation.get('extended_common_only', False)
     if args.extended_prob is None:
         args.extended_prob = saved_generation.get('extended_prob', 0.0) if args.resume else 0.25
+    if args.dsl_extend_prob is None:
+        args.dsl_extend_prob = (saved_generation.get('dsl_extend_prob', 0.0) if args.resume
+                                else 0.0 if args.compile_only or args.extended_prob == 0 else 0.35)
+    if not 0 <= args.dsl_extend_prob <= 1:
+        parser.error('--dsl-extend-prob must be between 0 and 1')
+    if args.compile_only and args.dsl_extend_prob:
+        parser.error('--dsl-extend-prob requires execution mode')
     if not 0 <= args.extended_prob <= 1:
         parser.error('--extended-prob must be between 0 and 1')
     if args.compile_only:
@@ -224,6 +234,7 @@ def main():
         region_gemm_prob=args.gemm_prob,
         region_typed_prob=args.typed_op_prob,
         extended_prob=args.extended_prob,
+        dsl_extend_prob=args.dsl_extend_prob,
         extended_common_only=not args.legacy_extended_mix,
         extended_configuration_pair=not args.no_extended_configurations,
         extended_config_depth=0 if args.no_extended_configurations else args.extended_config_depth,

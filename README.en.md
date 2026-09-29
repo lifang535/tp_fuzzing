@@ -123,10 +123,13 @@ Extended has its own IR and six generation families: arithmetic, indexed_memory,
 
 ### Shared seeds and target-specific extension
 
-Fresh Extended campaigns now generate only shared IR structure. Triton-only `join/split/interleave` and pipelined `for` are reserved for the extension stage; `mixed` uses the same structure on both backends. `--legacy-extended-mix` restores the historical mixed generator for older experiment settings.
+Fresh Extended campaigns generate only shared IR structure. Triton-only `join/split/interleave` and pipelined `for` are reserved for the extension stage; `mixed` uses the same structure on both backends. `--legacy-extended-mix` restores the historical mixed generator for older experiment settings. In a new `main.py` campaign, `--dsl-extend-prob` defaults to 0.35: after at least one common Extended program passes execution, each new case has that probability of deriving a target-specific program from the bounded passing-source pool. Otherwise the normal Region/Extended generator runs (`--extended-prob` defaults to 0.25 within that route). The scheduler tries operations with the fewest attempts first and avoids repeating a source/operation pair; exhausted pools fall back to common generation. Only common passing programs enter the mutation and extension pools, so target-specific results cannot change common-IR generation feedback. `--dsl-extend-prob 0` disables the integrated stage. The campaign summary records `dsl_extension.by_op`, and `dsl_stage.json` saves the pool for graceful resume; restored baselines are revalidated before reuse.
 
 ```bash
 python main.py --backend triton --extended-prob 1 -n 10000
+# Integrated common generation and target-specific derivatives:
+python main.py --backend triton --extended-prob 0.5 --dsl-extend-prob 0.4 -n 10000
+# Standalone extension of an existing passed/ corpus remains available:
 python extend.py --backend triton --passed-dir results/<campaign>/passed -n 10000
 python extend.py --backend tilelang --passed-dir results/<campaign>/passed -n 10000
 ```
