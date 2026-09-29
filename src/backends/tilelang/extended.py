@@ -1,6 +1,7 @@
 """TileLang exploration lowering, with explicit fragments and GEMM staging."""
-from src.ir.extended import analyze, walk
+from src.ir.extended import analyze, walk, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
 from src.workflow.generator.identities import extended_variant_label
+from .ops import elementwise_expr
 
 
 class ExtendedLowering:
@@ -62,13 +63,14 @@ class ExtendedLowering:
                     # Scoped type lookup is resolved by the unique SSA names.
                     ty = next(t for (scope, name), t in self.types.items() if name == arg)
                     self.add(indent, f'{out}_{label}_shared = T.alloc_shared({ty.shape!r}, "{ty.dtype}")')
-            elif node.op == 'reduce':
+            elif node.op in ('reduce', 'reduce_abssum', 'reduce_absmax',
+                              'reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
                 out = node.results[0].name
                 ty = next(t for (scope, name), t in self.types.items() if name == node.operands[0])
                 self.add(indent, f'{out}_wide = T.alloc_fragment({ty.shape!r}, "{node.results[0].type.dtype}")')
-                if len(ty.shape) == 2 and node.attrs['axis'] == 0:
+                if node.op == 'reduce' and len(ty.shape) == 2 and node.attrs['axis'] == 0:
                     self.add(indent, f'{out}_reduce_shared = T.alloc_shared({ty.shape!r}, "{ty.dtype}")')
-                if (ty.dtype.startswith('float') and node.attrs['kind'] in ('max', 'min')
+                if (node.op == 'reduce' and ty.dtype.startswith('float') and node.attrs['kind'] in ('max', 'min')
                         and not (len(ty.shape) == 2 and node.attrs['axis'] == 0)):
                     self.add(indent, f'{out}_nan = T.alloc_fragment({ty.shape!r}, "int32")')
                     self.add(indent, f'{out}_nan_count = T.alloc_fragment({node.results[0].type.shape or (1,)!r}, "int32")')
@@ -137,6 +139,22 @@ class ExtendedLowering:
                 self.add(indent, f'T.copy({args[1]}, {out}_b_shared)')
                 self.add(indent, f'T.copy({args[2]}, {out})')
                 self.add(indent, f'T.gemm({out}_a_shared, {out}_b_shared, {out})')
+                continue
+            if op in ('scan_sum', 'scan_max'):
+                self.add(indent, f'T.{"cumsum" if op == "scan_sum" else "cummax"}({args[0]}, {out}, dim=0)')
+                continue
+            if op in ('reduce_abssum', 'reduce_absmax'):
+                src_ty = self.ty(scope, args[0])
+                level, indices = self.loop(indent, src_ty.shape)
+                self.add(level, f"{out}_wide[{', '.join(indices)}] = {self.ref(scope, args[0], indices)}")
+                self.add(indent, f'T.clear({out})')
+                self.add(indent, f'T.{op}({out}_wide, {out}, dim=0)')
+                continue
+            if op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
+                src_ty = self.ty(scope, args[0])
+                level, indices = self.loop(indent, src_ty.shape)
+                self.add(level, f"{out}_wide[{', '.join(indices)}] = {self.ref(scope, args[0], indices)}")
+                self.add(indent, f'T.{op}({out}_wide, {out}, dim=0, clear=True)')
                 continue
             if op == 'reduce':
                 src_ty = self.ty(scope, args[0])
@@ -219,11 +237,18 @@ class ExtendedLowering:
             elif op in ('add', 'sub', 'mul', 'bitand', 'bitxor', 'lt', 'eq', 'and', 'or'):
                 symbol = {'add':'+', 'sub':'-', 'mul':'*', 'bitand':'&', 'bitxor':'^', 'lt':'<', 'eq':'==', 'and':'and', 'or':'or'}[op]
                 expression = f'({references[0]} {symbol} {references[1]})'
+            elif op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
+                expression = elementwise_expr(op, references[0], references[1] if len(references) > 1 else '',
+                                              '', a, '')
             elif op == 'fma':
                 # TileLang has no scalar fma (T.fma2 is packed x2 only); the
                 # plain contraction may or may not fuse under the compiler's
                 # pass pipeline, and the fma checker accepts both outcomes.
                 expression = f'({references[0]} * {references[1]} + {references[2]})'
+            elif op == 'dsl_sigmoid':
+                expression = f'T.sigmoid({references[0]})'
+            elif op == 'dsl_clamp':
+                expression = f'T.clamp({references[0]}, -0.5, 0.5)'
             elif op == 'mod':
                 expression = f'T.floormod({references[0]}, T.max(T.abs({references[1]}), 1))'
             elif op == 'select':

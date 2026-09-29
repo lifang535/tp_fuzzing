@@ -7,7 +7,8 @@ references instead of reusing one shared expectation.
 """
 import copy
 
-from src.ir.extended import TensorType as Ty, Node, Value, broadcast_shape
+from src.ir.extended import (TensorType as Ty, Node, Value, broadcast_shape,
+                             FLOAT_UNARY_OPS, FLOAT_BINARY_OPS)
 
 
 def extended_variant_label(backend, index, options):
@@ -21,6 +22,8 @@ def _consumer_dtype(program, node, position, types):
     """Fixed dtype a consumer expects at an operand position, or None when the
     consumer accepts the operand's own dtype (dtype-agnostic operations)."""
     op = node.op
+    if op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
+        return 'float32'
     if op in ('add', 'sub', 'mul'):
         return types[node.operands[1 - position]].dtype
     if op == 'select' and position in (1, 2):

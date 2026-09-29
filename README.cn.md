@@ -113,8 +113,9 @@ python main.py --backend triton --seed 42 -n 100 --no-save-artifacts
 | `--no-extended-identities` | 关闭 | 指定后禁用代数恒等式扫掠（分配律副本） |
 | `--random-config-count` | 2 | 每个 Extended 程序额外采样的随机 pass 管线配置数（按程序+seed 确定性采样；0 关闭） |
 | `--extended-atomic-prob` | 0.25 | Extended 程序中全局内存原子 add/max/min 的生成概率 |
+| `--extended-elementwise-prob` | 0.50 | 在 Extended 程序中组合一个通用 float32 数学操作；`elementwise` 骨架固定选择三个 |
 | `--extended-fma-prob` | 0.30 | Extended 程序中标量 FMA 链的生成概率 |
-| `--extended-shape-op-prob` | 0.30 | Extended 程序中形状 op 的生成概率（flip 双 DSL 支持；interleave/join/split 仅 triton） |
+| `--extended-shape-op-prob` | 0.30 | 共用 Extended 种子中 `flip` 的生成概率；Triton 专属形状操作在单独的 extend 阶段生成 |
 | `--extended-int8-prob` | 0.30 | Extended matmul 使用 int8 × int8（int32 累加）的概率 |
 | `--region-int8-prob` | 0.15 | 普通 Region 生成 int8 GEMM-only 程序的概率（规格取自预校验网格） |
 | `--no-region-pass-config` | 关闭 | 指定后禁用 Region 的 pass-config 不变性配对 |
@@ -135,7 +136,32 @@ v3 使用完整 fp32 tile；v4 在此基础上加入 fp16/fp32、tile/row/column
 
 probe 使用整函数 `probe` 节点，其参数选择 copy、reduce_sum/max/min、softmax、argmax 或 GEMM+argmax。它专门测试物理步长、偏移、广播、尾部掩码、特殊数值、重复执行和缓存复用，使用专用参考检查。生成、变异、保存和恢复全部采用 `RegionProgram`。
 
-Extended 使用单独的 IR 和生成器，提供 `arithmetic`、`indexed_memory`、`shape_matmul`、`control_calls`、`mixed` 五类程序骨架；在各骨架中实例化带类型的操作、操作数和属性。它支持显式内部 matmul、索引访存、多值控制流/函数接口，以及中间结果观测和编译配置配对。它不是旧 `DynamicSequence` 的改名。
+Extended 使用单独的 IR 和生成器，提供 `arithmetic`、`indexed_memory`、`shape_matmul`、`control_calls`、`elementwise`、`mixed` 六类程序骨架；在各骨架中实例化带类型的操作、操作数和属性。`elementwise` 骨架按轮次覆盖两种后端共用的 18 种 float32 数学操作。它支持显式内部 matmul、索引访存、多值控制流/函数接口，以及中间结果观测和编译配置配对。这里覆盖的是有界的操作族，不代表 TileLang/Triton 的全部 API、dtype、形状及硬件特性。它不是旧 `DynamicSequence` 的改名。
+
+### 共用种子与 DSL 专属 extend 阶段
+
+新 campaign 的 Extended 生成默认只产生两种 DSL 共用的 IR 结构：Triton 专属的 `join/split/interleave` 和流水化 `for` 不再混入共用种子；两后端的 `mixed` 骨架也采用相同的结构。`--legacy-extended-mix` 可恢复旧生成行为，以便继续原先的实验设置。这里的“共用”指同一 IR 的语义和结构，不表示两种编译器生成相同代码。
+
+```bash
+# 第一阶段：生成、实例化并执行共用 Extended IR；仅通过的样例进入 passed/
+python main.py --backend triton --extended-prob 1 -n 10000
+
+# 第二阶段：读取第一阶段的 passed/*.json，定向测试目标 DSL 的操作
+python extend.py --backend triton --passed-dir results/<campaign>/passed -n 10000
+python extend.py --backend tilelang --passed-dir results/<campaign>/passed -n 10000
+# 可用 --op 指定下表中的一项操作
+```
+
+extend 的输入是**已实例化且执行通过的 ExtendedProgram JSON**，不是 IR 模板，也不读取仅编译通过的 `compiled/` 或普通 Region 样例。程序在目标环境、当前输入 seed 下复跑成功后，才注入目标操作并执行派生程序。输出是独立目录中的 `passed/`、`failed/`、`summary.json`；每个派生 JSON 记录原样例路径、IR 哈希、操作和输入 seed，供复现与归因。脚本每轮更换输入 seed，可用 `-n` 长时间运行；默认从通过样例中等概率保留最多 5000 个“样例×操作”组合，避免读取大型语料时占满内存（`--max-sources 0` 不限制）。失败实例全部保存，通过实例默认每种操作仅保存 20 个（`--max-passed-saved 0` 全部保存），完整执行计数写入 `summary.json`。第一阶段和第二阶段的失败数应分开统计；派生失败仍需人工核验，不能直接等同于 DSL bug。
+
+| 后端 | extend 阶段的 `--op` | 检查内容 |
+| --- | --- | --- |
+| Triton | `join`、`split`、`interleave`、`scan_sum`、`scan_product`、`sort`、`histogram`、`argmax`、`argmin`、`xor_sum`、`dsl_sigmoid`、`dsl_clamp`、`softmax`、`topk`、`gather`、`atomic_and`、`atomic_or`、`atomic_xor` | 形状变换、扫描/排序、整数归约、逐元素数学运算、按位原子更新；`topk`/`gather` 仅在安装版本导出对应 API 时启用 |
+| TileLang | `pipelined_for`、`scan_sum`、`scan_max`、`reduce_abssum`、`reduce_absmax`、`reduce_bitand`、`reduce_bitor`、`reduce_bitxor`、`dsl_sigmoid`、`dsl_clamp` | 流水化循环、扫描、归约、逐元素数学运算 |
+
+数值扩展保留父样例的原有检查输出，额外返回 DSL 专属操作结果。浮点输入由父结果导出并限幅；直方图和按位归约优先使用父程序的精确整数值，否则使用依赖运行时参数的整数索引，直方图桶位于 0–15。这样避免把父程序容差内的浮点误差放大成离散结果误报。表中仍是有界子集，不能声称覆盖全部 API；异步/TMA 等硬件专属指令、自定义扫描组合函数及任意 dtype/形状组合尚未纳入。
+
+用 `python api_coverage.py --backend triton --summary results/<扩展实验>/summary.json --passed-code-dir results/<共用实验>/passed --output triton_api.json`（TileLang 将后端改为 `tilelang`）审计当前 Conda 环境导出的 CUDA 语言 API。清单逐项记录安装版本与状态：`executed_pass` 表示扩展实验至少有一个通过样例；`seen_in_passing_code` 表示保存的通过样例代码中有该 DSL 的直接调用；`implemented_no_run` 表示有生成代码但缺少实验通过证据；`unmapped` 表示清单尚无证据，不代表 fuzzer 其它阶段从未调用。单一样例也不代表覆盖该 API 的全部参数、数据类型与硬件路径。应在目标版本 Triton 3.8、TileLang 0.1.14 的环境分别生成清单。
 
 MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Extended 程序加入全局内存原子操作（在刻意竞态的地址上做可交换 add/max/min）、带数据依赖操作数的标量 FMA 链、triton 形状原语（flip/interleave/join/split）以及 int32 累加的 int8 × int8 matmul。普通 Region 加入超越函数元素操作（tanh/erf/log/log2/exp2/rsqrt/sin/cos/floor/ceil）和 int8 GEMM-only 程序（规格来自预校验网格：block_K ∈ {32, 64}、int32 累加、精确整数参考）。fp32 GEMM 永不与边界台阶 op（ceil/floor/round/cast）组合：TF32 张量核计算相对精确 fp32 参考会翻动取整边界，使 oracle 淹没在无法与 bug 区分的噪声里。
 

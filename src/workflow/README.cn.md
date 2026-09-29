@@ -4,7 +4,7 @@
 
 生成器、变异器和 Oracle 通过 `src.backends.get_backend()` 调用所选 DSL 的参数策略、emitter、启动配置和诊断规则。实现位于 `src/backends/tilelang/`、`triton/`；公用测试脚本组装位于 `src/backends/common/`，参考解释器和运行检查位于 `src/workflow/emitter/`。添加后端需实现 `src/backends/base.py` 的接口，并通过 `register_backend()` 注册；`--backend-plugin MODULE` 可加载注册模块。
 
-1. `generator/generator.py` 按 `extended_prob` 选择扩展域，未选中则调用 `RegionGenerator.generate()`。CLI 新 campaign 默认概率 0.25；库默认 0。
+1. `generator/generator.py` 按 `extended_prob` 选择扩展域，未选中则调用 `RegionGenerator.generate()`。CLI 新 campaign 默认概率 0.25；库默认 0。新 Extended 样例先生成共用、已实例化的 IR；独立的 `extend.py` 只接收执行通过的 Extended JSON，复跑基线后注入目标 DSL 操作，输出另一组完整 IR 和结果。
 2. `program_template()` 先生成全部辅助函数和入口的操作树与签名，之后 `instantiate_program()` 按顺序实例化。默认有 1–3 个辅助函数，后续函数和入口只调用先前定义的函数，调用也可以位于 if/for 内。普通入口默认各以 50% 概率选择 load/GEMM。
 3. 最后通过 `instantiate_function()` 构建入口并选择整个程序的形状、类型和调度参数。v4 值池区分 fp16/fp32、tile/row/column/scalar 和 tensor/buffer；生成的函数接口仍采用完整 fp32 tile，IR 也支持显式紧凑类型签名。
 4. `RegionProgram.validate()` 检查作用域、操作契约、循环边界与类型，以及调用签名和无递归环。Triton 输出 JIT 函数，TileLang 输出宏；参考解释器按独立函数作用域执行调用。

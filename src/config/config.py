@@ -72,6 +72,9 @@ class Config:
     # Extended exploration IR: disabled by default in the library;
     # the CLI opts new campaigns into a 25% mixture.
     extended_prob: float = 0.0
+    # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong
+    # to the separate extend-from-passed stage.
+    extended_common_only: bool = True
     extended_configuration_pair: bool = True
     extended_observation_pair: bool = True
     # MLIRSmith-style pass configuration sweep for extended programs:
@@ -112,6 +115,8 @@ class Config:
     instance_grid: bool = True
     # Global-memory atomics in extended programs (commutative scratch races).
     extended_atomic_prob: float = 0.25
+    # Shared float32 math operations, composed with the Extended dataflow.
+    extended_elementwise_prob: float = 0.50
     # Scalar fused multiply-add chains in extended programs.
     extended_fma_prob: float = 0.30
     # Triton shape primitives (flip everywhere; join/split/interleave triton).

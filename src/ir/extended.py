@@ -11,6 +11,12 @@ import keyword
 
 DTYPES = ('float16', 'float32', 'int32', 'int8', 'bool')
 
+# Shared contract for Extended math operations supported by both lowerings
+# and the reference interpreter.
+FLOAT_UNARY_OPS = ('neg', 'abs', 'sqrt', 'exp', 'log', 'log2', 'exp2',
+                   'rsqrt', 'sin', 'cos', 'floor', 'ceil', 'tanh', 'erf', 'round')
+FLOAT_BINARY_OPS = ('minimum', 'maximum', 'div')
+
 
 @dataclass(frozen=True)
 class TensorType:
@@ -227,6 +233,16 @@ def analyze(program):
                 if len(args) != 1 or len(outs) != 1:
                     raise ValueError('Invalid cast')
                 expected = [TensorType(outs[0].dtype, args[0].shape)]
+            elif op in FLOAT_UNARY_OPS:
+                if len(args) != 1 or args[0].dtype != 'float32':
+                    raise ValueError('Extended math unary requires one float32 operand')
+                if op == 'round' and node.attrs.get('dtype') not in ('float16', 'float32'):
+                    raise ValueError('Extended round requires a floating point target dtype')
+                expected = [args[0]]
+            elif op in FLOAT_BINARY_OPS:
+                if len(args) != 2 or args[0] != args[1] or args[0].dtype != 'float32':
+                    raise ValueError('Extended math binary requires matching float32 operands')
+                expected = [args[0]]
             elif op in ('reshape', 'broadcast', 'transpose', 'slice'):
                 if len(args) != 1 or len(outs) != 1:
                     raise ValueError('Invalid shape operation')
@@ -271,6 +287,44 @@ def analyze(program):
                     raise ValueError('Invalid split')
                 expected = [TensorType(args[0].dtype, args[0].shape[:-1]),
                             TensorType(args[0].dtype, args[0].shape[:-1])]
+            elif op in ('scan_sum', 'scan_product', 'scan_max', 'sort',
+                        'dsl_sigmoid', 'dsl_clamp', 'softmax'):
+                if (len(args) != 1 or len(args[0].shape) != 1
+                        or args[0].dtype != 'float32' or len(outs) != 1):
+                    raise ValueError('Invalid scan or sort operand')
+                expected = [args[0]]
+            elif op in ('argmax', 'argmin', 'xor_sum'):
+                if (len(args) != 1 or len(args[0].shape) != 1
+                        or args[0].dtype != 'int32' or len(outs) != 1):
+                    raise ValueError('Invalid integer reduction operand')
+                expected = [TensorType('int32')]
+            elif op == 'topk':
+                k = a.get('k')
+                if (len(args) != 1 or len(args[0].shape) != 1 or args[0].dtype != 'float32'
+                        or type(k) is not int or k < 1 or k > args[0].shape[0] or k & (k - 1)
+                        or len(outs) != 1):
+                    raise ValueError('Invalid topk operand or k')
+                expected = [TensorType('float32', (k,))]
+            elif op == 'gather':
+                if (len(args) != 2 or len(args[0].shape) != 1 or args[0].dtype != 'float32'
+                        or args[1] != TensorType('int32', args[0].shape) or len(outs) != 1):
+                    raise ValueError('Invalid gather operands')
+                expected = [args[0]]
+            elif op in ('reduce_abssum', 'reduce_absmax'):
+                if (len(args) != 1 or len(args[0].shape) != 1
+                        or args[0].dtype != 'float32' or len(outs) != 1):
+                    raise ValueError('Invalid absolute reduction operand')
+                expected = [TensorType('float32')]
+            elif op == 'histogram':
+                if (len(args) != 1 or len(args[0].shape) != 1
+                        or args[0].dtype != 'int32' or len(outs) != 1):
+                    raise ValueError('Invalid histogram operand')
+                expected = [TensorType('int32', (16,))]
+            elif op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
+                if (len(args) != 1 or len(args[0].shape) != 1
+                        or args[0].dtype != 'int32' or len(outs) != 1):
+                    raise ValueError('Invalid bitwise reduction operand')
+                expected = [TensorType('int32')]
             elif op in ('add', 'sub', 'mul', 'bitand', 'bitxor', 'mod', 'lt', 'eq', 'and', 'or'):
                 if len(args) != 2 or args[0].dtype != args[1].dtype:
                     raise ValueError('Binary operation dtype/arity mismatch')
@@ -306,12 +360,14 @@ def analyze(program):
                         or any(t.shape != () for t in args)):
                     raise ValueError('Invalid fma')
                 expected = [TensorType(args[0].dtype)]
-            elif op in ('atomic_add', 'atomic_max', 'atomic_min'):
+            elif op in ('atomic_add', 'atomic_max', 'atomic_min',
+                        'atomic_and', 'atomic_or', 'atomic_xor'):
                 buf = buffers.get(a.get('buffer'))
                 if (buf is None or buf.role != 'scratch' or len(args) != 3
                         or args[0].dtype != 'int32' or args[1] != TensorType('bool', args[0].shape)
                         or args[2] != TensorType(buf.dtype, args[0].shape)
-                        or buf.dtype not in ('int32', 'float16', 'float32') or len(outs) != 0):
+                        or buf.dtype not in (('int32',) if op in ('atomic_and', 'atomic_or', 'atomic_xor')
+                                              else ('int32', 'float16', 'float32')) or len(outs) != 0):
                     raise ValueError('Invalid atomic operation')
                 # The race is the point: a commutative reduction over possibly
                 # duplicate addresses, so indices are deliberately not unique.
@@ -387,7 +443,8 @@ def analyze(program):
                 dependencies[ident].update((callee, v) for v in functions[callee].body.returns)
                 for arg, source in zip(functions[callee].body.arguments, node.operands):
                     argument_sources.setdefault((callee, arg.name), set()).add((scope, source))
-            if op in ('store', 'barrier', 'atomic_add', 'atomic_max', 'atomic_min'):
+            if op in ('store', 'barrier', 'atomic_add', 'atomic_max', 'atomic_min',
+                      'atomic_and', 'atomic_or', 'atomic_xor'):
                 effects.add(ident)
             for result in node.results:
                 name(result.name)

@@ -1,6 +1,7 @@
 """Triton lowering of typed exploration programs; no TileLang conditionals."""
-from src.ir.extended import analyze
+from src.ir.extended import analyze, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
 from src.workflow.generator.identities import extended_variant_label
+from .ops import elementwise_expr
 
 
 class ExtendedLowering:
@@ -91,6 +92,9 @@ class ExtendedLowering:
             elif op in ('add', 'sub', 'mul', 'bitand', 'bitxor', 'lt', 'eq', 'and', 'or'):
                 symbol = {'add':'+', 'sub':'-', 'mul':'*', 'bitand':'&', 'bitxor':'^', 'lt':'<', 'eq':'==', 'and':'&', 'or':'|'}[op]
                 expression = f'({args[0]} {symbol} {args[1]})'
+            elif op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
+                expression = elementwise_expr(op, args[0], args[1] if len(args) > 1 else '',
+                                              '', a, '')
             elif op == 'mod':
                 rem = f'({args[0]} % tl.maximum(tl.abs({args[1]}), 1))'
                 expression = f'tl.where({rem} < 0, {rem} + tl.maximum(tl.abs({args[1]}), 1), {rem})'
@@ -127,7 +131,26 @@ class ExtendedLowering:
                 # Two results bypass the single-expression tail; the elements
                 # keep their dtype.
                 self.add(indent, f'{names[0]}, {names[1]} = tl.split({args[0]})')
-            elif op in ('atomic_add', 'atomic_max', 'atomic_min'):
+            elif op in ('scan_sum', 'scan_product', 'scan_max', 'sort'):
+                fn = {'scan_sum': 'cumsum', 'scan_product': 'cumprod',
+                      'scan_max': 'cummax', 'sort': 'sort'}[op]
+                expression = f'tl.{fn}({args[0]}, 0)' if op != 'sort' else f'tl.sort({args[0]}, descending=False)'
+            elif op == 'histogram':
+                expression = f'tl.histogram({args[0]}, 16)'
+            elif op in ('argmax', 'argmin', 'xor_sum'):
+                expression = f'tl.{op}({args[0]}, 0)'
+            elif op == 'dsl_sigmoid':
+                expression = f'tl.sigmoid({args[0]})'
+            elif op == 'dsl_clamp':
+                expression = f'tl.clamp({args[0]}, -0.5, 0.5)'
+            elif op == 'softmax':
+                expression = f'tl.softmax({args[0]}, 0)'
+            elif op == 'topk':
+                expression = f'tl.topk({args[0]}, {a["k"]}, dim=0)'
+            elif op == 'gather':
+                expression = f'tl.gather({args[0]}, {args[1]}, 0)'
+            elif op in ('atomic_add', 'atomic_max', 'atomic_min',
+                        'atomic_and', 'atomic_or', 'atomic_xor'):
                 buf = self.buffers[a['buffer']]
                 root = self.buffers[buf.base or buf.name]
                 address = f'{root.name} + bid * {root.size + 32} + {16 + buf.offset} + {args[0]} * {buf.stride}'

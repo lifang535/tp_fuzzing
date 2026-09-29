@@ -465,6 +465,7 @@ class TileSmith:
                 "max_oracle_unstable_saved": self.config.max_oracle_unstable_saved,
                 "generation_config": {
                     "extended_prob": self.config.extended_prob,
+                    "extended_common_only": self.config.extended_common_only,
                     "extended_configuration_pair": self.config.extended_configuration_pair,
                     "extended_config_depth": self.config.extended_config_depth,
                     "extended_fast_math_pair": self.config.extended_fast_math_pair,

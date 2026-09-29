@@ -122,6 +122,31 @@ def extended_reference(program, inputs, steps, limit):
                 out = [torch.tensor({'steps': steps, 'limit': limit, 'block': bid}[a['name']], dtype=torch.int32, device=device)]
             elif op == 'cast':
                 out = [args[0].to(getattr(torch, types[0]['dtype']))]
+            elif op in ('neg', 'abs', 'sqrt', 'exp', 'log', 'log2', 'exp2',
+                        'rsqrt', 'sin', 'cos', 'floor', 'ceil', 'tanh', 'erf', 'round'):
+                x = args[0].float()
+                if op == 'neg': value = -x
+                elif op == 'abs': value = x.abs()
+                elif op == 'sqrt': value = x.abs().sqrt()
+                elif op == 'exp': value = x.clamp(-10, 10).exp()
+                elif op == 'log': value = x.abs().clamp_min(0.001).log()
+                elif op == 'log2': value = x.abs().clamp_min(0.001).log2()
+                elif op == 'exp2': value = x.clamp(-10, 10).exp2()
+                elif op == 'rsqrt': value = x.abs().clamp_min(1e-6).rsqrt()
+                elif op == 'sin': value = x.sin()
+                elif op == 'cos': value = x.cos()
+                elif op == 'floor': value = x.floor()
+                elif op == 'ceil': value = x.ceil()
+                elif op == 'tanh': value = x.tanh()
+                elif op == 'round': value = x.to(getattr(torch, a['dtype'])).float()
+                else: value = torch.erf(x)
+                out = [value]
+            elif op in ('minimum', 'maximum', 'div'):
+                x, y = (value.float() for value in args)
+                if op == 'minimum': value = torch.minimum(x, y)
+                elif op == 'maximum': value = torch.maximum(x, y)
+                else: value = x / y.abs().clamp_min(0.001)
+                out = [value]
             elif op == 'reshape':
                 out = [args[0].reshape(types[0]['shape'])]
             elif op == 'broadcast':
@@ -184,23 +209,68 @@ def extended_reference(program, inputs, steps, limit):
                 out = [torch.stack((args[0], args[1]), dim=-1)]
             elif op == 'split':
                 out = [args[0][..., 0], args[0][..., 1]]
-            elif op in ('atomic_add', 'atomic_max', 'atomic_min'):
+            elif op in ('scan_sum', 'scan_product', 'scan_max', 'sort'):
+                if op == 'scan_sum': out = [torch.cumsum(args[0], dim=0)]
+                elif op == 'scan_product': out = [torch.cumprod(args[0], dim=0)]
+                elif op == 'scan_max': out = [torch.cummax(args[0], dim=0).values]
+                else: out = [torch.sort(args[0], dim=0).values]
+            elif op in ('reduce_abssum', 'reduce_absmax'):
+                out = [args[0].abs().sum() if op == 'reduce_abssum' else args[0].abs().max()]
+            elif op == 'histogram':
+                out = [torch.bincount(args[0].long(), minlength=16).to(torch.int32)]
+            elif op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
+                value = args[0].reshape(-1)
+                acc = value[0]
+                for item in value[1:]:
+                    if op == 'reduce_bitand': acc = torch.bitwise_and(acc, item)
+                    elif op == 'reduce_bitor': acc = torch.bitwise_or(acc, item)
+                    else: acc = torch.bitwise_xor(acc, item)
+                out = [acc]
+            elif op in ('argmax', 'argmin', 'xor_sum'):
+                if op == 'argmax': out = [torch.argmax(args[0]).to(torch.int32)]
+                elif op == 'argmin': out = [torch.argmin(args[0]).to(torch.int32)]
+                else:
+                    acc = args[0].reshape(-1)[0]
+                    for item in args[0].reshape(-1)[1:]:
+                        acc = torch.bitwise_xor(acc, item)
+                    out = [acc]
+            elif op == 'dsl_sigmoid':
+                out = [torch.sigmoid(args[0])]
+            elif op == 'dsl_clamp':
+                out = [torch.clamp(args[0], -0.5, 0.5)]
+            elif op == 'softmax':
+                out = [torch.softmax(args[0], dim=0)]
+            elif op == 'topk':
+                out = [torch.topk(args[0], a['k'], dim=0).values]
+            elif op == 'gather':
+                out = [torch.gather(args[0], 0, args[1].long())]
+            elif op in ('atomic_add', 'atomic_max', 'atomic_min',
+                        'atomic_and', 'atomic_or', 'atomic_xor'):
                 buf = buffers[a['buffer']]
                 root = buf['base'] or buf['name']
                 index = args[0].long()
                 valid = args[1] & (index >= 0) & (index < buf['size'])
                 address = 16 + buf['offset'] + index.clamp(0, buf['size'] - 1) * buf['stride']
-                kind = {'atomic_add': 'sum', 'atomic_max': 'amax', 'atomic_min': 'amin'}[op]
                 # A masked scatter-reduce models any interleaving of the
                 # commutative race; include_self folds the initial scratch
                 # value into the reduction exactly like the hardware. The
                 # scatter addresses are the payload offsets inside the root
                 # row, mirroring the kernels' 16 + offset + index * stride.
                 slot = memory[root][bid]
-                target = slot.double() if slot.dtype.is_floating_point else slot.long()
-                source = args[2][valid].double() if slot.dtype.is_floating_point else args[2][valid].long()
-                target.scatter_reduce_(0, address[valid], source, reduce=kind, include_self=True)
-                slot.copy_(target.to(slot.dtype))
+                if op in ('atomic_and', 'atomic_or', 'atomic_xor'):
+                    # Integer bitwise updates commute, so this serial order
+                    # has the same final memory as any GPU interleaving.
+                    fn = {'atomic_and': torch.bitwise_and, 'atomic_or': torch.bitwise_or,
+                          'atomic_xor': torch.bitwise_xor}[op]
+                    for location, enabled, value in zip(address.reshape(-1), valid.reshape(-1), args[2].reshape(-1)):
+                        if bool(enabled):
+                            slot[location] = fn(slot[location], value)
+                else:
+                    kind = {'atomic_add': 'sum', 'atomic_max': 'amax', 'atomic_min': 'amin'}[op]
+                    target = slot.double() if slot.dtype.is_floating_point else slot.long()
+                    source = args[2][valid].double() if slot.dtype.is_floating_point else args[2][valid].long()
+                    target.scatter_reduce_(0, address[valid], source, reduce=kind, include_self=True)
+                    slot.copy_(target.to(slot.dtype))
             elif op in ('load', 'store'):
                 buf = buffers[a['buffer']]
                 root = buf['base'] or buf['name']

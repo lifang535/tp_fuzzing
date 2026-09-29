@@ -46,6 +46,8 @@ def main():
                         help='Probability of type/shape/memory operations in fresh regions; 0 generates v3')
     parser.add_argument('--extended-prob', type=float, default=None,
                         help='Fresh typed exploration programs: default 0.25 (0 when resuming an old campaign)')
+    parser.add_argument('--legacy-extended-mix', action='store_true',
+                        help='Restore the historical Extended generator that mixes DSL-specific shape operations into fresh cases')
     parser.add_argument('--compile-only', action='store_true',
                         help='Compile extended programs without GPU execution; implies --extended-prob 1')
     parser.add_argument('--no-save-artifacts', action='store_true',
@@ -75,6 +77,8 @@ def main():
                              'attribute corners are then sampled uniformly at random')
     parser.add_argument('--extended-atomic-prob', type=float, default=0.25,
                         help='Probability of global-memory atomics per extended program')
+    parser.add_argument('--extended-elementwise-prob', type=float, default=0.50,
+                        help='Probability of adding a shared float32 math operation to an extended program')
     parser.add_argument('--extended-fma-prob', type=float, default=0.30,
                         help='Probability of scalar fused multiply-add per extended program')
     parser.add_argument('--extended-shape-op-prob', type=float, default=0.30,
@@ -146,16 +150,21 @@ def main():
              "are appended to the same directory.",
     )
     args = parser.parse_args()
+    saved_generation = {}
+    if args.resume:
+        import json
+        from pathlib import Path
+        saved = Path(args.resume)
+        if not saved.exists():
+            saved = Path(args.output) / args.resume
+        if (saved / 'summary.json').exists():
+            saved_generation = json.loads((saved / 'summary.json').read_text()).get('generation_config', {})
+        # Old campaigns predate the separated common/DSL stages. Preserve
+        # their generation mode when appending results to the same directory.
+        if saved_generation and not args.legacy_extended_mix:
+            args.legacy_extended_mix = not saved_generation.get('extended_common_only', False)
     if args.extended_prob is None:
-        args.extended_prob = 0.0 if args.resume else 0.25
-        if args.resume:
-            import json
-            from pathlib import Path
-            saved = Path(args.resume)
-            if not saved.exists():
-                saved = Path(args.output) / args.resume
-            if (saved / 'summary.json').exists():
-                args.extended_prob = json.loads((saved / 'summary.json').read_text()).get('generation_config', {}).get('extended_prob', 0.0)
+        args.extended_prob = saved_generation.get('extended_prob', 0.0) if args.resume else 0.25
     if not 0 <= args.extended_prob <= 1:
         parser.error('--extended-prob must be between 0 and 1')
     if args.compile_only:
@@ -186,6 +195,7 @@ def main():
     if not 0 <= args.random_config_count <= 8:
         parser.error("--random-config-count must be between 0 and 8")
     for flag, name in ((args.extended_atomic_prob, '--extended-atomic-prob'),
+                       (args.extended_elementwise_prob, '--extended-elementwise-prob'),
                        (args.extended_fma_prob, '--extended-fma-prob'),
                        (args.extended_shape_op_prob, '--extended-shape-op-prob'),
                        (args.extended_int8_prob, '--extended-int8-prob'),
@@ -194,11 +204,15 @@ def main():
             parser.error(f'{name} must be between 0 and 1')
     if args.list_kernels:
         from src.ir.region_ops import OPS, TYPED_OPS
+        from src.ir.extended import FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
+        from src.workflow.generator.extended import FAMILIES
         print("Registered region operations:")
         for kind, contract in {**OPS, **TYPED_OPS}.items():
             print(f"  {kind}: operands={contract.arity}, regions={contract.regions}, entry={contract.entry}")
         print("  probe: restricted whole-function template with dedicated oracle")
         print("  call: 1-3 tile operands, one tile result, previously generated callee")
+        print("Extended families: " + ', '.join(FAMILIES))
+        print("Extended shared float32 math: " + ', '.join(FLOAT_UNARY_OPS + FLOAT_BINARY_OPS))
         return 0
 
     config = Config(
@@ -210,6 +224,7 @@ def main():
         region_gemm_prob=args.gemm_prob,
         region_typed_prob=args.typed_op_prob,
         extended_prob=args.extended_prob,
+        extended_common_only=not args.legacy_extended_mix,
         extended_configuration_pair=not args.no_extended_configurations,
         extended_config_depth=0 if args.no_extended_configurations else args.extended_config_depth,
         extended_fast_math_pair=args.extended_fast_math,
@@ -219,6 +234,7 @@ def main():
         random_config_count=args.random_config_count,
         instance_grid=not args.no_instance_grids,
         extended_atomic_prob=args.extended_atomic_prob,
+        extended_elementwise_prob=args.extended_elementwise_prob,
         extended_fma_prob=args.extended_fma_prob,
         extended_shape_op_prob=args.extended_shape_op_prob,
         extended_int8_prob=args.extended_int8_prob,

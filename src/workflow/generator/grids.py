@@ -69,6 +69,12 @@ SHAPE_OP_GRID = {
     'split': ({'shape': (8, 2)}, {'shape': (16, 2)}, {'shape': (32, 2)}),
 }
 
+# One round-robin cursor per backend makes every common math operation
+# reachable even when the random program budget is small.
+ELEMENTWISE_GRID = ('neg', 'abs', 'sqrt', 'exp', 'log', 'log2', 'exp2',
+                    'rsqrt', 'sin', 'cos', 'floor', 'ceil', 'tanh', 'erf', 'round',
+                    'minimum', 'maximum', 'div')
+
 
 class GridState:
     """Round-robin cursors, one per (op, backend), over the grid tables."""

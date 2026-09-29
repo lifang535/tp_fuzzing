@@ -1955,7 +1955,8 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "4eb0ff8d96a63fd23bd7b8ffacc731b288baf09b21ceb752b557ad9b7ffd4de2"
+  "emission": "4eb0ff8d96a63fd23bd7b8ffacc731b288baf09b21ceb752b557ad9b7ffd4de2",
+  "kernel_emission": "a56f175c19b0ee8d7cf0f73b9376779ec7640e8895f95395eed83082b7e0e99e"
  },
  {
   "case": "tilelang/extended/1",
@@ -2425,7 +2426,8 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "94b67f91c8807430c29be7adacb786f5dfe767d1d97d609895303973c3f8de4f"
+  "emission": "94b67f91c8807430c29be7adacb786f5dfe767d1d97d609895303973c3f8de4f",
+  "kernel_emission": "1e2a98d0f0292546b1db5377dad27b4602dcd6274d44de3a8caaebbe363ca71b"
  },
  {
   "case": "tilelang/nested_program/float16",
@@ -5031,7 +5033,8 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "626cfa008966bac6c71ecabd87ce42b3810ba2b848e7dd247111cb7eb6a1b45b"
+  "emission": "626cfa008966bac6c71ecabd87ce42b3810ba2b848e7dd247111cb7eb6a1b45b",
+  "kernel_emission": "cb55d24526288812befeffb90300202de0a89be23e5c1738347b1709ff281987"
  },
  {
   "case": "triton/extended/1",
@@ -5501,7 +5504,8 @@
    "observation_pair": true,
    "family": "arithmetic"
   },
-  "emission": "8c55ffeb1c4b508e9ec8cbafc4e8c66db62f40634329dc46e3f1fe6542edac9c"
+  "emission": "8c55ffeb1c4b508e9ec8cbafc4e8c66db62f40634329dc46e3f1fe6542edac9c",
+  "kernel_emission": "bf0ebaffd67e833163e1cf01458534090eb72050e8e1a51f9151461372f1297d"
  },
  {
   "case": "triton/nested_program/float16",

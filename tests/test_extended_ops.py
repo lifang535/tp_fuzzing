@@ -6,6 +6,7 @@ grids, serialization round trips, and the coverage audit tags.
 """
 import ast
 import json
+import random
 import re
 import unittest
 
@@ -13,13 +14,14 @@ import torch
 
 from src.backends import get_backend
 from src.config import Config
-from src.ir.extended import TensorType as Ty, ExtendedProgram
+from src.ir.extended import TensorType as Ty, ExtendedProgram, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
 from src.ir.serialization import program_from_dict, program_to_dict
 from src.workflow.coverage_audit import program_capabilities
 from src.workflow.emitter.extended_runtime import (extended_inputs, extended_reference,
                                                    extended_check_atomic, extended_check_fma)
 from src.workflow.generator.extended import Builder, ExtendedGenerator
-from src.workflow.generator.grids import (ATOMIC_GRID, FMA_GRID, SHAPE_OP_GRID, GridState)
+from src.workflow.generator.grids import (ATOMIC_GRID, ELEMENTWISE_GRID, FMA_GRID,
+                                          SHAPE_OP_GRID, GridState)
 
 
 def validated(gen, builder, observations=()):
@@ -39,6 +41,41 @@ def reference(program, steps=0, limit=1):
     encoded = json.loads(json.dumps(program.to_dict()))
     inputs = extended_inputs(encoded)
     return extended_reference(encoded, inputs, steps, limit)
+
+
+class ElementwiseCoverageTests(unittest.TestCase):
+    def test_math_contract_and_both_lowerings(self):
+        self.assertEqual(set(ELEMENTWISE_GRID), set(FLOAT_UNARY_OPS + FLOAT_BINARY_OPS))
+        for backend in ('triton', 'tilelang'):
+            for op in ELEMENTWISE_GRID:
+                with self.subTest(backend=backend, op=op):
+                    gen = ExtendedGenerator(Config(extended_prob=1), backend)
+                    builder = Builder(gen)
+                    left = builder.load(gen.buffer('float32', 16), (16,))
+                    args = [left]
+                    if op in FLOAT_BINARY_OPS:
+                        args.append(builder.load(gen.buffer('float32', 16), (16,)))
+                    result = builder.emit(op, args, [Ty('float32', (16,))],
+                                          **({'dtype': 'float16'} if op == 'round' else {}))
+                    builder.block.returns = [result.name]
+                    program = validated(gen, builder)
+                    emit(backend, program)
+                    outputs, _ = reference(program)
+                    self.assertEqual(outputs[result.name].shape, (program.blocks, 16))
+
+    def test_grid_reaches_every_shared_math_op(self):
+        state = random.getstate()
+        self.addCleanup(random.setstate, state)
+        config = Config(extended_prob=1, extended_atomic_prob=0, extended_fma_prob=0,
+                        extended_shape_op_prob=0, extended_elementwise_prob=0)
+        for backend in ('triton', 'tilelang'):
+            grid = GridState()
+            seen = set()
+            for seed in range(6):
+                random.seed(seed)
+                program = ExtendedGenerator(config, backend, grids=grid).generate('elementwise')
+                seen.update(node.op for node in program.all_operations())
+            self.assertEqual(seen.intersection(ELEMENTWISE_GRID), set(ELEMENTWISE_GRID))
 
 
 class AnalyzeContractTests(unittest.TestCase):

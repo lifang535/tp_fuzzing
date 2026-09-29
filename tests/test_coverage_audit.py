@@ -28,16 +28,23 @@ class CoverageAuditTests(unittest.TestCase):
         # The int8 flavor produces gemm-only programs whose internal_matmul
         # would land in the old program too; this test compares the shared
         # inventory of the float domain.
-        config = Config(coverage_probe_prob=0, dim_range=(16, 80), region_int8_prob=0)
+        config = Config(coverage_probe_prob=0, dim_range=(16, 80), region_int8_prob=0,
+                        extended_int8_prob=0)
         old = RegionGenerator(config, 'triton').generate()
-        new = ExtendedGenerator(config, 'triton').generate('mixed')
-        old_features, new_features = program_capabilities(old), program_capabilities(new)
+        # The common mixed skeleton is deliberately small; its component
+        # families jointly cover the complete shared inventory.
+        new = [ExtendedGenerator(config, 'triton').generate(family)
+               for family in ('indexed_memory', 'shape_matmul', 'control_calls')]
+        old_features = program_capabilities(old)
+        new_features = set().union(*(program_capabilities(program) for program in new))
         self.assertTrue(old_features <= CAPABILITIES.keys())
         self.assertTrue(new_features <= CAPABILITIES.keys())
         self.assertTrue({'internal_matmul', 'dependent_matmul', 'computed_memory_mask',
                          'bounded_while', 'multiple_function_results', 'scratch_contents_checked'} <= new_features - old_features)
-        new.family = 'arithmetic'
-        self.assertEqual(program_capabilities(new), new_features)
+        for program in new:
+            before = program_capabilities(program)
+            program.family = 'arithmetic'
+            self.assertEqual(program_capabilities(program), before)
 
     def test_dead_arithmetic_does_not_count_and_observations_are_optional(self):
         p = ExtendedGenerator(Config(extended_int8_prob=0, extended_fma_prob=0,

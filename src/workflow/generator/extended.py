@@ -2,12 +2,13 @@
 import copy
 import random
 from src.ir.extended import (TensorType as Ty, Value, Node, Block, Helper, Buffer,
-                             ExtendedProgram, broadcast_shape)
-from src.workflow.generator.grids import (ATOMIC_GRID, FMA_GRID, INT8_MATMUL_GRID,
+                             ExtendedProgram, broadcast_shape, FLOAT_UNARY_OPS,
+                             FLOAT_BINARY_OPS)
+from src.workflow.generator.grids import (ATOMIC_GRID, ELEMENTWISE_GRID, FMA_GRID, INT8_MATMUL_GRID,
                                           SHAPE_OP_GRID)
 
 
-FAMILIES = ('arithmetic', 'indexed_memory', 'shape_matmul', 'control_calls', 'mixed')
+FAMILIES = ('arithmetic', 'indexed_memory', 'shape_matmul', 'control_calls', 'elementwise', 'mixed')
 
 # Per-backend shape-op availability; flip is expressible in both DSLs while
 # join/split/interleave are triton-only primitives.
@@ -149,14 +150,10 @@ class ExtendedGenerator:
         answer = builder.arithmetic(start, random.randint(1, 3))
         watched, functions, extras = [start], [], []
 
-        # The mixed family composes several feature blocks. tilelang's
-        # LayoutInference turns superlinear on large fragment graphs
-        # (measured: ~62s for the four-block mixed kernel vs ~7s per kernel
-        # for a single-block family), so the tilelang mixed case keeps just
-        # the arithmetic x matmul composition. Every dropped block is still
-        # exercised by its own family case on both backends, and the matmul
-        # keeps the precision/identity pair surface alive. Triton compiles
-        # the full composition in seconds.
+        # A common seed has the same structure on both backends. Keep mixed
+        # to arithmetic x matmul: TileLang LayoutInference is superlinear on
+        # the larger graph, while each omitted block has its own family.
+        # --legacy-extended-mix retains the historical target-specific choice.
         blocks = []
         if family in ('arithmetic', 'mixed'):
             blocks.append('arithmetic')
@@ -166,7 +163,7 @@ class ExtendedGenerator:
             blocks.append('shape_matmul')
         if family in ('control_calls', 'mixed'):
             blocks.append('control_calls')
-        if family == 'mixed' and self.backend == 'tilelang':
+        if family == 'mixed' and (self.config.extended_common_only or self.backend == 'tilelang'):
             blocks = ['arithmetic', 'shape_matmul']
 
         if 'arithmetic' in blocks:
@@ -194,6 +191,10 @@ class ExtendedGenerator:
             answer, functions, scalar_outputs = self.control(builder, answer)
             extras.extend(scalar_outputs)
 
+        if family == 'elementwise' or random.random() < self.config.extended_elementwise_prob:
+            answer, observed = self.elementwise(builder, answer, 3 if family == 'elementwise' else 1)
+            watched.extend(observed)
+
         # New op surfaces: global-memory atomics (effects only), scalar FMA
         # chains with data-dependent operands, and triton shape primitives.
         # Each is its own compiler code path and consumes one grid corner.
@@ -203,7 +204,8 @@ class ExtendedGenerator:
             observed = self.fma(builder, answer)
             watched.extend(observed)
         if random.random() < self.config.extended_shape_op_prob:
-            answer, observed = self.shape_ops(builder, answer)
+            answer, observed = self.shape_ops(builder, answer,
+                                              op='flip' if self.config.extended_common_only else None)
             watched.extend(observed)
 
         # More producers/consumers around the anchors make them compositional.
@@ -229,6 +231,27 @@ class ExtendedGenerator:
         from src.backends import get_backend
         get_backend(self.backend).validate_program(program)
         return program
+
+    def elementwise(self, b, value, count):
+        """Compose bounded float32 math with the existing typed dataflow.
+
+        Round-robin selection visits the complete shared math table over
+        successive generated cases; the result remains in the answer chain.
+        """
+        current = value if value.type.dtype == 'float32' else b.cast(value, 'float32')
+        observed = []
+        for _ in range(count):
+            op = self.grid_cell('elementwise', ELEMENTWISE_GRID)
+            if op in FLOAT_UNARY_OPS:
+                attrs = {'dtype': 'float16'} if op == 'round' else {}
+                current = b.emit(op, [current], [current.type], **attrs)
+            elif op in FLOAT_BINARY_OPS:
+                rhs = b.get_or_create(current.type)
+                current = b.emit(op, [current, rhs], [current.type])
+            else:
+                raise ValueError(f'Unknown extended elementwise operation: {op}')
+            observed.append(current)
+        return current, observed
 
     def memory(self, b, value):
         # Two overlapping views of one allocation. Every individual scatter is
@@ -349,13 +372,15 @@ class ExtendedGenerator:
         chained = b.emit('fma', [first, scaled[1], scaled[2]], [Ty(dtype)])
         return [first, chained]
 
-    def shape_ops(self, b, value):
+    def shape_ops(self, b, value, op=None):
         """Triton shape primitives folded into the checked chain. flip is
         shape-preserving and applied in place; the others synthesize bounded
         sources per grid corner, and the results are both watched (exact
         order check) and reduced back into the answer."""
         available = [op for op, backends in EXTENDED_SHAPE_CAPS.items() if self.backend in backends]
-        op = random.choice(available)
+        op = op or random.choice(available)
+        if op not in available:
+            raise ValueError(f'{op} is not supported by {self.backend}')
         cell = self.grid_cell('shape_' + op, SHAPE_OP_GRID[op])
         dtype = value.type.dtype
         if op == 'flip':
@@ -432,7 +457,8 @@ class ExtendedGenerator:
             child.block.returns = [new_tile.name, total.name, count.name]
             results = [b.value(v.type) for v in carried]
             b.block.operations.append(Node(loop, results, [bound.name] + [v.name for v in carried],
-                                           {'max_steps': 4, 'pipelined': loop == 'for' and random.choice((True, False))}, [child.block]))
+                                           {'max_steps': 4, 'pipelined': loop == 'for' and not self.config.extended_common_only
+                                            and random.choice((True, False))}, [child.block]))
             b.pool.extend(results)
             carried = results
         return carried[0], [fn], carried[1:]

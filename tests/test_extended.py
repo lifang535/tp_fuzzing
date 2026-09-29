@@ -165,7 +165,8 @@ class ExtendedTests(unittest.TestCase):
 
     def test_invalid_scope_signature_and_alias_are_rejected(self):
         for change in ('scope', 'signature', 'view', 'version'):
-            p = self.program()
+            p = self.program('control_calls' if change == 'signature' else
+                             'indexed_memory' if change == 'view' else 'mixed')
             if change == 'scope':
                 p.body.operations[-1].operands = ['missing']
             elif change == 'signature':

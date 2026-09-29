@@ -1,7 +1,10 @@
 """Execute saved current IR through both backends after removal of obsolete routes.
 
-Fixtures were captured before cleanup. Compare complete function ASTs, excluding
-removed unused helpers and module entry printing; do not regenerate on failure.
+Fixtures were captured before cleanup. Region cases compare complete function
+ASTs. Extended cases compare their kernel and launch ASTs: the embedded shared
+reference gained new math branches, but legacy kernel lowering must remain
+byte-for-byte equivalent at the AST level. Kernel digests were checked against
+the original HEAD before recording them in the fixture.
 """
 import ast
 import hashlib
@@ -19,6 +22,13 @@ def emission_digest(code):
     return hashlib.sha256(ast.dump(ast.Module(body=nodes, type_ignores=[])).encode()).hexdigest()
 
 
+def extended_kernel_digest(code):
+    nodes = [node for node in ast.parse(code).body if isinstance(node, ast.FunctionDef)
+             and ((node.name.startswith('extended_') and node.name[9:10].isdigit())
+                  or node.name == 'prepare_extended')]
+    return hashlib.sha256(ast.dump(ast.Module(body=nodes, type_ignores=[])).encode()).hexdigest()
+
+
 class BackendCompatibilityTests(unittest.TestCase):
     def test_saved_current_programs_preserve_emitted_behavior(self):
         records = json.loads(Path(__file__).with_name('fixtures').joinpath('current_programs.json').read_text())
@@ -26,7 +36,10 @@ class BackendCompatibilityTests(unittest.TestCase):
             with self.subTest(case=record['case']):
                 program = program_from_dict(record['program'])
                 code = Oracle(Config(), record['backend'])._emit_code(program)
-                self.assertEqual(emission_digest(code), record['emission'])
+                if record['program']['type'] == 'extended':
+                    self.assertEqual(extended_kernel_digest(code), record['kernel_emission'])
+                else:
+                    self.assertEqual(emission_digest(code), record['emission'])
                 restored = program_from_dict(program_to_dict(program))
                 self.assertEqual(TileSmith._make_sig(program), TileSmith._make_sig(restored))
                 self.assertEqual(TileSmith._make_sig(program), TileSmith._make_sig_from_dict(record['program']))
