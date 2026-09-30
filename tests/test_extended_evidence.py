@@ -116,6 +116,16 @@ class ExtendedEvidenceTests(unittest.TestCase):
         self.assertIn('partial stdout', log)
         self.assertIn('partial stderr', log)
 
+    def test_known_pass_signature_survives_bounded_error_tail(self):
+        diagnostic = ('operand #0 does not dominate this use\n'
+                      'TritonGPURemoveLayoutConversions\n' + 'x' * 2500)
+        with patch('src.workflow.oracle.process.run_isolated', self.launcher(
+                returncode=7, stdout=diagnostic)):
+            report = self.oracle.test(self.program)
+        self.assertNotIn('operand #0', report.error_message)
+        self.assertEqual(report.confirmed_signature, 'triton_layout_conversion_dominance')
+        self.assertEqual(report.to_dict()['confirmed_signature'], report.confirmed_signature)
+
     def test_changed_compiler_artifact_cannot_count_as_success(self):
         def launch(command, **options):
             result = self.launcher()(command, **options)

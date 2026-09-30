@@ -5,11 +5,44 @@ executions drive selection; attempted features are retained separately so invali
 programs cannot masquerade as successfully exercised combinations.
 """
 from collections import Counter
+import hashlib
 import json
+import re
 
 
 def key(*parts):
     return json.dumps(parts, separators=(',', ':'))
+
+
+def program_digest(program):
+    from src.ir.serialization import program_to_dict
+    encoded = json.dumps(program_to_dict(program), sort_keys=True).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def confirmed_failure(bug_or_message, backend):
+    """Conservative signatures of manually audited compiler mechanisms.
+
+    A broad root_cause label must never be used to suppress an unreviewed
+    failure. New signatures remain unpenalized and every failure is saved.
+    """
+    message = (bug_or_message if isinstance(bug_or_message, str)
+               else bug_or_message.error_message)
+    if backend == 'tilelang':
+        if 'Cannot convert type bool' in message and 'to CUDA type' in message:
+            return 'tilelang_bool_cuda_type'
+        if 'ReduceOp cannot lower' in message or 'CanProveEqual' in message:
+            return 'tilelang_reduce_layout'
+        if 'IsValidCPAsyncTransferBytes' in message:
+            return 'tilelang_two_byte_cp_async'
+    elif backend == 'triton':
+        if ('triton.compiler.errors.CompilationError' in message
+                and re.search(r'tl\.flip\([^\n]*\)[^\n]*\n\s*\^', message)):
+            return 'triton_flip_default_axis'
+        if ('TritonGPURemoveLayoutConversions' in message
+                and 'operand #0 does not dominate this use' in message):
+            return 'triton_layout_conversion_dominance'
+    return None
 
 
 def program_features(program):
@@ -112,6 +145,9 @@ class StructuralFeedback:
         self.passed = Counter()
         self.compiled = Counter()
         self.compiler = Counter()
+        self.seed_compiler = {}
+        self.known_seed_failures = Counter()
+        self.known_signatures = Counter()
 
     def observe(self, program, passed):
         features = program_features(program)
@@ -130,9 +166,35 @@ class StructuralFeedback:
             self.compiled.update(program_features(program))
         return len(novel)
 
+    def register_seed(self, program, records):
+        """Associate observed post-lowering features with a passing seed."""
+        features = {f for record in records for f in record.get('features', [])}
+        if features:
+            self.seed_compiler[program_digest(program)] = sorted(features)
+
+    def observe_known_failure(self, source_digest, signature):
+        if signature is None:
+            return
+        self.known_signatures[signature] += 1
+        if source_digest:
+            self.known_seed_failures[source_digest] += 1
+
+    def retain_seeds(self, digests):
+        self.seed_compiler = {digest: features for digest, features in self.seed_compiler.items()
+                              if digest in digests}
+        self.known_seed_failures = Counter({digest: count for digest, count in self.known_seed_failures.items()
+                                            if digest in digests})
+
     def seed_weight(self, program):
         features = program_features(program)
-        return 1.0 + 4.0 * sum(1 / (1 + self.passed[f]) for f in sorted(features)) / max(1, len(features))
+        structural = 1.0 + 4.0 * sum(1 / (1 + self.passed[f]) for f in sorted(features)) / max(1, len(features))
+        digest = program_digest(program)
+        compiler = self.seed_compiler.get(digest, ())
+        # Only actually retained compiler features guide this component.
+        rare = sum(1 / (1 + self.compiler[f]) for f in compiler) / max(1, len(compiler))
+        repeats = max(0, self.known_seed_failures[digest] - 1)
+        # Keep a nonzero exploration floor so one early failure cannot ban a seed.
+        return (structural + 4.0 * rare) / (1.0 + min(repeats, 12) * 0.5)
 
     def weight(self, feature, base=1.0, passed_decay=2.0, uncovered_boost=0.0):
         """Selection weight for one structural feature.
@@ -157,8 +219,11 @@ class StructuralFeedback:
         return base + passed_decay / (1 + self.passed[feature])
 
     def save(self, path):
-        data = {'version': 1, 'attempted': dict(self.attempted), 'passed': dict(self.passed),
-                'compiled': dict(self.compiled), 'compiler': dict(self.compiler)}
+        data = {'version': 2, 'attempted': dict(self.attempted), 'passed': dict(self.passed),
+                'compiled': dict(self.compiled), 'compiler': dict(self.compiler),
+                'seed_compiler': self.seed_compiler,
+                'known_seed_failures': dict(self.known_seed_failures),
+                'known_signatures': dict(self.known_signatures)}
         temporary = path.with_suffix('.tmp')
         temporary.write_text(json.dumps(data, sort_keys=True))
         temporary.replace(path)
@@ -167,7 +232,7 @@ class StructuralFeedback:
         if not path.exists():
             return  # Old campaigns start with empty structural feedback.
         data = json.loads(path.read_text())
-        if data.get('version') != 1:
+        if data.get('version') not in (1, 2):
             raise ValueError('Unsupported structural feedback version')
         counters = []
         for name in ('attempted', 'passed', 'compiled', 'compiler'):
@@ -176,3 +241,16 @@ class StructuralFeedback:
                 raise ValueError('Invalid structural feedback counts')
             counters.append(Counter(values))
         self.attempted, self.passed, self.compiled, self.compiler = counters
+        if data.get('version') == 2:
+            features = data.get('seed_compiler', {})
+            if not isinstance(features, dict) or any(
+                    not isinstance(digest, str) or not isinstance(values, list)
+                    or any(not isinstance(value, str) for value in values)
+                    for digest, values in features.items()):
+                raise ValueError('Invalid seed compiler features')
+            self.seed_compiler = features
+            for name in ('known_seed_failures', 'known_signatures'):
+                values = data.get(name, {})
+                if not isinstance(values, dict) or any(type(v) is not int or v < 0 for v in values.values()):
+                    raise ValueError('Invalid known failure counts')
+                setattr(self, name, Counter(values))

@@ -49,6 +49,7 @@ class BugReport:
     timestamp: float = field(default_factory=time.time)
     root_cause: str = ""
     location: str = ""
+    confirmed_signature: str = ""
 
     def classify_root_cause(self, backend=None):
         from src.backends.common.diagnostics import _failure_location
@@ -61,7 +62,7 @@ class BugReport:
         self.location = _failure_location(self.error_message)
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "bug_type": self.bug_type.value,
             "root_cause": self.root_cause,
             "location": self.location,
@@ -71,6 +72,9 @@ class BugReport:
             "error_message": self.error_message[:2000],
             "timestamp": self.timestamp,
         }
+        if self.confirmed_signature:
+            result['confirmed_signature'] = self.confirmed_signature
+        return result
 
     def summary(self) -> str:
         return f"[{self.bug_type.value}|{self.root_cause}] {self.compute_kind} params={self.params}"
@@ -204,6 +208,10 @@ class Oracle:
                     compute_kind=compute_kind_str,
                     generated_code=code,
                 )
+                # Classify against the complete diagnostic before keeping its
+                # bounded tail; pass names can otherwise be truncated away.
+                from src.workflow.feedback import confirmed_failure
+                report.confirmed_signature = confirmed_failure(error_msg, self.backend) or ''
                 report.classify_root_cause(self.backend)
                 if extended and progress:
                     # The progress manifest names the exact variant and stage

@@ -142,7 +142,7 @@ Extended 使用单独的 IR 和生成器，提供 `arithmetic`、`indexed_memory
 
 新 campaign 的 Extended 生成默认只产生两种 DSL 共用的 IR 结构：Triton 专属的 `join/split/interleave` 和流水化 `for` 不再混入共用种子；两后端的 `mixed` 骨架也采用相同的结构。`--legacy-extended-mix` 可恢复旧生成行为，以便继续原先的实验设置。这里的“共用”指同一 IR 的语义和结构，不表示两种编译器生成相同代码。
 
-现在 `main.py` 可在同一实验中交替执行两条路线。新实验的 `--dsl-extend-prob` 默认为 0.35：存在执行通过的共用 Extended 样例后，每次生成有 35% 的概率从有界种子池派生目标 DSL 操作；其余仍走原本的 Region/Extended 生成路线（该路线的 `--extended-prob` 默认 0.25）。扩展池为空或“样例×操作”组合耗尽时继续生成共用程序。调度优先选择尝试次数最少的目标操作，且同一输入样例的同一操作只派生一次。专属扩展结果不会回流到共用生成池或其反馈；`summary.json` 中的 `dsl_extension.by_op` 单独统计操作覆盖。`dsl_stage.json` 用于正常中断后的恢复，恢复的共用样例复用前会重新验证。指定 `--dsl-extend-prob 0` 可关闭一体化阶段。
+现在 `main.py` 可在同一实验中交替执行两条路线。新实验的 `--dsl-extend-prob` 默认为 0.35：存在执行通过的共用 Extended 样例后，每次生成有 35% 的概率从有界种子池派生目标 DSL 操作；其余仍走原本的 Region/Extended 生成路线（该路线的 `--extended-prob` 默认 0.25）。扩展池为空或“样例×操作”组合耗尽时继续生成共用程序。调度优先选择尝试次数最少的目标操作，且同一输入样例的同一操作只派生一次；在可选父样例间优先考虑实际编译产物中的稀有阶段、相邻 IR 操作与编译配置／操作组合。DSL 专属编译特征保存在独立的 `dsl_stage.json` 账本，不影响共用 IR 生成反馈。某个父样例反复触发人工确认过的具体失败签名时，其选择权重逐步降低但不会归零；未知签名和同目录的其它错误不受该惩罚，失败样例仍照常保存。`--no-structural-feedback` 可关闭这种种子引导。这些编译产物特征只是代理指标，并非实测编译 pass 或分支覆盖；Region 程序目前仅有结构反馈。`summary.json` 记录 `dsl_extension.by_op` 和 `confirmed_failure_signatures`；`dsl_stage.json` 支持恢复，恢复的共用样例复用前会重新验证。指定 `--dsl-extend-prob 0` 可关闭一体化阶段。
 
 ```bash
 # 第一阶段：生成、实例化并执行共用 Extended IR；仅通过的样例进入 passed/

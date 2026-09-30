@@ -1,8 +1,10 @@
 """SSA dependency feedback, persistence and successful campaign novelty."""
 import ast
 import contextlib
+import copy
 from dataclasses import asdict
 import io
+import json
 import random
 import tempfile
 import unittest
@@ -12,10 +14,12 @@ import torch
 from src.config import Config
 from src.ir import TileKernel, ComputeKind, DataType
 from src.ir.region import RegionProgram, Region, Operation as Op
-from src.workflow.feedback import StructuralFeedback, key, program_features
+from src.workflow.feedback import (StructuralFeedback, confirmed_failure, key,
+                                   program_digest, program_features)
 from src.workflow.fuzzer.fuzzer import TileSmith
 from src.workflow.emitter.region_runtime import _region_reference
 from src.workflow.oracle import Oracle
+from src.workflow.oracle.oracle import BugReport, BugType
 
 
 def dataflow_program():
@@ -27,6 +31,95 @@ def dataflow_program():
 
 
 class FeedbackTests(unittest.TestCase):
+    def test_campaign_attributes_known_repeats_to_mutation_parent(self):
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stdout(io.StringIO()):
+            config = Config(output_dir=directory, seed=23, mutate_prob=1,
+                            seed_add_prob=1, backends=['tilelang'])
+            fuzzer = TileSmith(config)
+            parent = dataflow_program()
+            children = []
+            for size in (3, 4):
+                child = copy.deepcopy(parent)
+                child.spec.M = size
+                children.append(child)
+            bugs = [BugReport(BugType.COMPILE_CRASH,
+                              'Cannot convert type boolx8 to CUDA type',
+                              params=child.params_dict,
+                              root_cause='tilelang_codegen_error') for child in children]
+            with patch.object(fuzzer.generator, 'generate', return_value=parent), \
+                    patch.object(fuzzer.mutator, 'mutate', side_effect=children), \
+                    patch.object(fuzzer.oracle, 'test', side_effect=[None, *bugs]):
+                fuzzer.run(3, verbose=False)
+            digest = program_digest(parent)
+            self.assertEqual(fuzzer.feedback.known_seed_failures[digest], 2)
+            self.assertEqual(fuzzer.feedback.known_signatures['tilelang_bool_cuda_type'], 2)
+            saved = list((fuzzer.output_dir / 'failed' / 'tilelang_codegen_error').glob('*.json'))
+            self.assertEqual(len(saved), 2)
+            self.assertTrue(all(json.loads(path.read_text())['generation_origin']['seed_digest'] == digest
+                                for path in saved))
+            restored = TileSmith(config, resume_dir=str(fuzzer.output_dir))
+            self.assertEqual(restored.feedback.known_seed_failures[digest], 2)
+
+    def test_compiler_features_and_confirmed_failures_change_seed_weight(self):
+        program = dataflow_program()
+        feedback = StructuralFeedback()
+        digest = program_digest(program)
+        features = [key('compiler_stage', 'ttgir'),
+                    key('compiler_pair', 'ttgir', 'tt.load', 'tt.add')]
+        records = [{'features': features}]
+        feedback.observe(program, True)
+        feedback.observe_compilation(program, records, complete=True)
+        structural_only = feedback.seed_weight(program)
+        feedback.register_seed(program, records)
+        self.assertGreater(feedback.seed_weight(program), structural_only)
+        known = 'tilelang_bool_cuda_type'
+        feedback.observe_known_failure(digest, known)
+        first_failure_weight = feedback.seed_weight(program)
+        self.assertGreater(first_failure_weight, structural_only)
+        feedback.observe_known_failure(digest, known)
+        self.assertLess(feedback.seed_weight(program), first_failure_weight)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'feedback.json'
+            feedback.save(path)
+            restored = StructuralFeedback()
+            restored.restore(path)
+            self.assertEqual(restored.seed_weight(program), feedback.seed_weight(program))
+            self.assertEqual(restored.known_signatures[known], 2)
+            restored.retain_seeds(set())
+            self.assertNotIn(digest, restored.seed_compiler)
+
+    def test_failure_matching_does_not_use_coarse_category(self):
+        def bug(message):
+            return BugReport(BugType.COMPILE_CRASH, message, root_cause='triton_compile_error')
+        self.assertIsNone(confirmed_failure(bug('different internal assertion'), 'triton'))
+        self.assertEqual(confirmed_failure(bug(
+            'triton.compiler.errors.CompilationError: at 2:7:\n'
+            '    x = (tl.flip(value)).to(tl.float32)\n           ^\n'
+            'Process exited with return code 1'), 'triton'), 'triton_flip_default_axis')
+
+    def test_compilation_records_stage_and_ir_neighbours(self):
+        from src.workflow.emitter.extended_runtime import record_extended_compilation
+        import json
+        import os
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, TILESMITH_ARTIFACT_DIR=directory):
+            record_extended_compilation('variant', {'ttgir': 'tt.load tt.add tt.store'},
+                                        {'enable_fp_fusion': True})
+            record = json.loads((Path(directory) / 'compilation.json').read_text())[0]
+            self.assertIn(key('compiler_stage', 'ttgir'), record['features'])
+            self.assertIn(key('compiler_pair', 'ttgir', 'tt.load', 'tt.add'), record['features'])
+            self.assertIn(key('compiler_setting_op', 'ttgir', 'enable_fp_fusion', True, 'tt.load'),
+                          record['features'])
+
+    def test_previous_feedback_version_remains_resumable(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'feedback.json'
+            path.write_text(json.dumps({'version': 1, 'attempted': {}, 'passed': {},
+                                        'compiled': {}, 'compiler': {key('compiler', 'ttir', 'tt.load'): 2}}))
+            feedback = StructuralFeedback()
+            feedback.restore(path)
+            self.assertEqual(feedback.compiler[key('compiler', 'ttir', 'tt.load')], 2)
+            self.assertFalse(feedback.seed_compiler)
+
     def test_data_edges_follow_operands_not_text_adjacency(self):
         features = program_features(dataflow_program())
         self.assertIn(key('data', 'scale', 'add'), features)

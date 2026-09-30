@@ -77,8 +77,9 @@ class TileSmith:
         if config.dsl_extend_prob and config.compile_only:
             raise ValueError('DSL extension requires execution mode')
         from .dsl_stage import DSLStage
-        self.dsl_stage = DSLStage(config, self.backend, self.generator.grids)
+        self.dsl_stage = DSLStage(config, self.backend, self.generator.grids, self.feedback)
         self._current_extension = None
+        self._current_origin = None
 
         if resume_dir:
             # Resume mode: use the specified directory
@@ -220,8 +221,12 @@ class TileSmith:
                 if len(pending) == 2:
                     pending_i, program = pending
                     pending_extension = None
-                else:
+                    pending_origin = None
+                elif len(pending) == 3:
                     pending_i, program, pending_extension = pending
+                    pending_origin = None
+                else:
+                    pending_i, program, pending_extension, pending_origin = pending
                 # Normalize previous native specs and validate the executable IR.
                 program = self._dict_to_program(self._program_to_dict(program))
             except Exception as error:
@@ -229,6 +234,7 @@ class TileSmith:
             self._resume_pending_i = pending_i
             self._resume_pending_program = program
             self._resume_pending_extension = pending_extension
+            self._resume_pending_origin = pending_origin
             print(f"[resume] Restored pending program [{pending_i}] (interrupted test will be re-run)")
 
     def _save_dim_pool(self):
@@ -377,10 +383,12 @@ class TileSmith:
         try:
             while new_tested < num_iterations:
                 self._current_extension = None
+                self._current_origin = None
                 if _pending_program is not None:
                     # Resume the interrupted program directly (already past dedup).
                     program = _pending_program
                     self._current_extension = getattr(self, '_resume_pending_extension', None)
+                    self._current_origin = getattr(self, '_resume_pending_origin', None)
                     i = _pending_i
                     self.tested_configs.add(self._make_sig(program))
                     self.stats.total_generated += 1
@@ -426,7 +434,15 @@ class TileSmith:
                     self.stats.programs_passed += 1
                 if self._current_extension:
                     self.dsl_stage.record(self._current_extension['extension_op'], bug is None)
+                    self.dsl_stage.observe_compilation(self._current_extension['source_sha256'],
+                                                       self.oracle.last_compilation,
+                                                       passed=bug is None and not self.config.compile_only)
                 if bug:
+                    from src.workflow.feedback import confirmed_failure
+                    signature = bug.confirmed_signature or confirmed_failure(bug, self.backend)
+                    source_digest = ((self._current_origin or {}).get('seed_digest')
+                                     or (self._current_extension or {}).get('source_sha256'))
+                    self.feedback.observe_known_failure(source_digest, signature)
                     if bug.root_cause == 'oracle_unstable':
                         # The numeric check was skipped: no implementation could
                         # pass it, so this is wasted fuzzing effort (MLIRSmith
@@ -463,13 +479,17 @@ class TileSmith:
                 else:
                     passed_path = self._save_passed(program, i)
                     if not self._current_extension:
+                        retained_as_dsl_source = False
                         if self.config.dsl_extend_prob and not self.config.compile_only:
-                            self.dsl_stage.add(program, passed_path)
-                        if ((self.config.structural_feedback and (novelty or compiler_novelty))
-                                or random.random() < self.config.seed_add_prob):
+                            retained_as_dsl_source = self.dsl_stage.add(program, passed_path)
+                        retained_as_mutation_seed = ((self.config.structural_feedback and (novelty or compiler_novelty))
+                                                     or random.random() < self.config.seed_add_prob)
+                        if retained_as_mutation_seed:
                             self.seed_pool.append(program)
                             if len(self.seed_pool) > self.config.seed_pool_max:
                                 self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
+                        if retained_as_dsl_source or retained_as_mutation_seed:
+                            self.feedback.register_seed(program, self.oracle.last_compilation)
                     if verbose:
                         status = 'COMPILED' if self.config.compile_only else 'PASSED'
                         print(f"[{i}] [{status}] {self._kind_label(program)}")
@@ -478,6 +498,8 @@ class TileSmith:
                     total_bugs = self._historical_bugs_total + len(self.stats.bugs_found)
                     total_unique = len(self.known_root_causes)
                     print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} categories={total_unique}")
+                if new_tested % 100 == 0:
+                    self._prune_seed_feedback()
 
         finally:
             bugs_total = sum(self.known_root_causes.values())
@@ -545,7 +567,10 @@ class TileSmith:
                 "bugs_unique": bugs_unique,
                 "root_causes": self.known_root_causes,
                 "root_cause_locations": {cause: dict(counts) for cause, counts in self.root_cause_locations.items()},
+                "confirmed_failure_signatures": dict(self.feedback.known_signatures),
                 "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
+                                  "compiler_features": len(self.dsl_stage.compiler),
+                                  "compiler_guided_sources": len(self.dsl_stage.source_compiler),
                                   "source_pool": len(self.dsl_stage.sources),
                                   "baseline_rejected": self.dsl_stage.baseline_rejected,
                                   "invalid_extension": self.dsl_stage.invalid_extension},
@@ -566,10 +591,12 @@ class TileSmith:
             # _inflight_program is non-None only when interrupt happened inside oracle.test()
             if _inflight_program is not None:
                 with open(pending_path, "wb") as f:
-                    pickle.dump((_inflight_i, _inflight_program, self._current_extension), f)
+                    pickle.dump((_inflight_i, _inflight_program, self._current_extension,
+                                 self._current_origin), f)
             elif pending_path.exists():
                 pending_path.unlink()
 
+            self._prune_seed_feedback()
             self.feedback.save(self.output_dir / "structural_feedback.json")
             self._save_dim_pool()
             self._save_seed_pool()
@@ -592,6 +619,12 @@ class TileSmith:
         data = program_to_dict(program)
         return (data['type'], json.dumps(data, sort_keys=True, separators=(',', ':')))
 
+    def _prune_seed_feedback(self):
+        from src.workflow.feedback import program_digest
+        retained = {program_digest(program) for program in self.seed_pool}
+        retained.update(entry[3] for entry in self.dsl_stage.sources)
+        self.feedback.retain_seeds(retained)
+
     @staticmethod
     def _make_sig_from_dict(data):
         from src.ir.serialization import program_from_dict
@@ -603,8 +636,11 @@ class TileSmith:
             derivative = self.dsl_stage.generate(self.oracle)
             if derivative is not None:
                 program, self._current_extension = derivative
+                self._current_origin = {'strategy': 'dsl_extend',
+                                        'seed_digest': self._current_extension['source_sha256']}
                 return program
         if not self.seed_pool:
+            self._current_origin = {'strategy': 'fresh'}
             return self.generator.generate()
         strategy = random.choices(
             ["fresh", "mutate"],
@@ -612,9 +648,12 @@ class TileSmith:
             k=1,
         )[0]
         if strategy == "mutate":
+            from src.workflow.feedback import program_digest
             seed = (random.choices(self.seed_pool, weights=[self.feedback.seed_weight(p) for p in self.seed_pool], k=1)[0]
                     if self.config.structural_feedback else random.choice(self.seed_pool))
+            self._current_origin = {'strategy': 'mutate', 'seed_digest': program_digest(seed)}
             return self.mutator.mutate(seed)
+        self._current_origin = {'strategy': 'fresh'}
         return self.generator.generate()
 
     def _kind_label(self, program) -> str:
@@ -650,6 +689,8 @@ class TileSmith:
         report = bug.to_dict()
         if self._current_extension:
             report.update(self._current_extension)
+        if self._current_origin:
+            report['generation_origin'] = self._current_origin
         with open(failed_dir / f"{name}.json", "w") as f:
             json.dump(report, f, indent=2)
         with open(failed_dir / f"{name}.py", "w") as f:

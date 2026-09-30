@@ -20,11 +20,25 @@ def record_extended_compilation(label, artifacts, options, complete=True):
     from pathlib import Path
     features, stages = set(), {}
     directory = os.environ.get('TILESMITH_ARTIFACT_DIR')
+    settings = []
+    if isinstance(options, dict):
+        for name, value in options.items():
+            if name == 'pass_configs' and isinstance(value, dict):
+                settings.extend((key, item) for key, item in value.items()
+                                if isinstance(item, (bool, int, str)))
+            elif name in ('enable_fp_fusion', 'enable_fast_math', 'num_warps', 'num_stages') \
+                    and isinstance(value, (bool, int, str)):
+                settings.append((name, value))
+    features.update(json.dumps(['compiler_setting', name, value], separators=(',', ':'))
+                    for name, value in settings)
     for stage, source in artifacts.items():
         if not isinstance(source, (str, bytes, bytearray)):
             continue
         raw = source.encode() if isinstance(source, str) else source
         stages[stage] = {'sha256': hashlib.sha256(raw).hexdigest(), 'bytes': len(raw)}
+        # This is an observed compiler artifact, not a claim about individual
+        # pass coverage. Keep stage reachability even when the IR has no tokens.
+        features.add(json.dumps(['compiler_stage', stage], separators=(',', ':')))
         if isinstance(source, str) and stage in ('ttir', 'ttgir', 'llir', 'ptx', 'lowered_tir', 'cuda'):
             # Post-lowering vocabulary. The saved input TIR is evidence of the
             # attempted program, not a retained compiler operation.
@@ -32,6 +46,12 @@ def record_extended_compilation(label, artifacts, options, complete=True):
             if stage in ('ptx', 'cuda'):
                 tokens += re.findall(r'\b(?:mma|ld|st|bar|shfl|cvt|add|mul|setp|selp)(?:\.[A-Za-z0-9_]+)+', source)
             features.update(json.dumps(['compiler', stage, op], separators=(',', ':')) for op in tokens)
+            # Lexical neighbours are a bounded IR-combination proxy. They are
+            # deliberately not called def-use edges or executed pass coverage.
+            features.update(json.dumps(['compiler_pair', stage, left, right], separators=(',', ':'))
+                            for left, right in zip(tokens, tokens[1:]) if left != right)
+            features.update(json.dumps(['compiler_setting_op', stage, name, value, op], separators=(',', ':'))
+                            for name, value in settings for op in set(tokens))
         if directory:
             path = Path(directory)
             path.mkdir(parents=True, exist_ok=True)

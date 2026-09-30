@@ -10,6 +10,7 @@ from unittest.mock import patch
 from src.config import Config
 from src.workflow.fuzzer.dsl_stage import DSLStage
 from src.workflow.fuzzer.fuzzer import TileSmith
+from src.workflow.feedback import StructuralFeedback, key
 from src.workflow.generator.dsl_extend import eligible_ops, is_common_seed
 from src.workflow.generator.extended import ExtendedGenerator
 from api_coverage import campaign_passes
@@ -68,6 +69,25 @@ class IntegratedDSLStageTests(unittest.TestCase):
             stage.record(origin['extension_op'], True)
         self.assertEqual(set(seen), set(eligible_ops(parent, 'tilelang')))
         self.assertIsNone(stage.generate(PassingOracle()))
+
+    def test_dsl_compiler_feedback_is_separate_from_common_generation(self):
+        parent = ExtendedGenerator(self.config, 'tilelang').generate('arithmetic')
+        feedback = StructuralFeedback()
+        stage = DSLStage(self.config, 'tilelang', feedback=feedback)
+        stage.add(parent, 'parent.json')
+        digest = stage.sources[0][3]
+        feature = key('compiler_pair', 'lowered_tir', 'T.copy', 'T.gemm')
+        stage.observe_compilation(digest, [{'features': [feature]}], passed=True)
+        self.assertEqual(stage.compiler[feature], 1)
+        self.assertFalse(feedback.compiler)
+        initial_weight = stage.source_weight(parent, digest)
+        self.assertGreater(initial_weight, feedback.seed_weight(parent))
+        for _ in range(3):
+            feedback.observe_known_failure(digest, 'tilelang_bool_cuda_type')
+        self.assertLess(stage.source_weight(parent, digest), initial_weight)
+        restored = DSLStage(self.config, 'tilelang', feedback=feedback)
+        restored.restore(stage.snapshot())
+        self.assertEqual(restored.source_compiler[digest], [feature])
 
     def test_restored_source_is_revalidated_and_rejected_if_stale(self):
         parent = ExtendedGenerator(self.config, 'tilelang').generate('arithmetic')
