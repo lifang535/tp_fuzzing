@@ -109,6 +109,17 @@ def main():
     parser.add_argument("--uncovered-boost", type=float, default=50.0,
                         help="Additive weight boost for never-attempted structural features "
                              "(MLIRSmith DiversityCriteria-style; 0 restores legacy weighting)")
+    parser.add_argument("--quarantine", action=argparse.BooleanOptionalAction, default=None,
+                        help="Redraw fresh/mutated candidates matching a learned rule of a recurring "
+                             "failure bucket (default: on; a resumed campaign keeps its setting)")
+    parser.add_argument("--quarantine-retries", type=int, default=8,
+                        help="Redraws before a quarantined candidate is tested anyway (default: 8)")
+    parser.add_argument("--explained-feedback", action=argparse.BooleanOptionalAction, default=None,
+                        help="Treat features of duplicate failures as exercised in rarity weights "
+                             "(default: on; a resumed campaign keeps its setting)")
+    parser.add_argument("--swarm-prob", type=float, default=None,
+                        help="Probability that a native region draws from a random half of the "
+                             "operations (default: 0.5; a resumed campaign keeps its setting)")
     parser.add_argument("--seed", type=int, default=None)
     parser.add_argument("--input-seed", type=int, default=0,
                         help="Independent PyTorch tensor seed embedded in saved tests (default: 0)")
@@ -171,6 +182,18 @@ def main():
     if args.dsl_extend_prob is None:
         args.dsl_extend_prob = (saved_generation.get('dsl_extend_prob', 0.0) if args.resume
                                 else 0.0 if args.compile_only or args.extended_prob == 0 else 0.35)
+    # Campaigns that predate failure triage resume without it, so appended
+    # results keep the generation distribution of the earlier segments.
+    if args.quarantine is None:
+        args.quarantine = saved_generation.get('quarantine', False) if args.resume else True
+    if args.explained_feedback is None:
+        args.explained_feedback = saved_generation.get('explained_feedback', False) if args.resume else True
+    if args.swarm_prob is None:
+        args.swarm_prob = saved_generation.get('swarm_prob', 0.0) if args.resume else 0.5
+    if not 0 <= args.swarm_prob <= 1:
+        parser.error('--swarm-prob must be between 0 and 1')
+    if args.quarantine_retries < 0:
+        parser.error('--quarantine-retries must be >= 0')
     if not 0 <= args.dsl_extend_prob <= 1:
         parser.error('--dsl-extend-prob must be between 0 and 1')
     if args.compile_only and args.dsl_extend_prob:
@@ -229,6 +252,10 @@ def main():
         seed=args.seed,
         structural_feedback=not args.no_structural_feedback,
         uncovered_boost=args.uncovered_boost,
+        quarantine=args.quarantine,
+        quarantine_retries=args.quarantine_retries,
+        explained_feedback=args.explained_feedback,
+        swarm_prob=args.swarm_prob,
         coverage_probe_prob=args.probe_prob,
         dtype_mutate_prob=args.dtype_mutate_prob,
         region_gemm_prob=args.gemm_prob,

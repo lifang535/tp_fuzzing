@@ -35,6 +35,8 @@ def extended_features(program):
                 memory[root] = n.op
             if n.op in ('for', 'while', 'if', 'call'):
                 local.add(key('region_signature', n.op, sig))
+            elif n.op == 'flip':
+                local.add(key('attribute', 'flip', n.attrs.get('axis', -1) % len(sig[0][1])))
             features.update(local)
             if (scope, id(n)) in live:
                 features.update(key('observable', f) for f in local)

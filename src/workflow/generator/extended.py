@@ -1,5 +1,6 @@
 """Type-directed generation with bounded operand synthesis and coverage anchors."""
 import copy
+from functools import lru_cache
 import random
 from src.ir.extended import (TensorType as Ty, Value, Node, Block, Helper, Buffer,
                              ExtendedProgram, broadcast_shape, FLOAT_UNARY_OPS,
@@ -18,6 +19,20 @@ EXTENDED_SHAPE_CAPS = {
     'join': {'triton'},
     'split': {'triton'},
 }
+
+
+@lru_cache(maxsize=None)
+def flip_axes(backend, rank):
+    """Axes a flip may name. Triton <= 3.3 documents (and asserts) that only
+    the minor dimension can be flipped; later releases flip any dimension."""
+    if backend == 'triton':
+        try:
+            import triton.language as tl
+        except ImportError:
+            return (rank - 1,)
+        if 'only final dimension' in (tl.flip.__doc__ or ''):
+            return (rank - 1,)
+    return tuple(range(rank))
 
 
 class Builder:
@@ -384,7 +399,8 @@ class ExtendedGenerator:
         cell = self.grid_cell('shape_' + op, SHAPE_OP_GRID[op])
         dtype = value.type.dtype
         if op == 'flip':
-            flipped = b.emit('flip', [value], [value.type])
+            axis = random.choice(flip_axes(self.backend, len(value.type.shape)))
+            flipped = b.emit('flip', [value], [value.type], axis=axis)
             return flipped, [flipped]
         shape = cell['shape']
         left = b.get_or_create(Ty(dtype, shape))
@@ -468,9 +484,14 @@ def mutate_extended(program, config, backend):
     if random.random() < .3:
         return ExtendedGenerator(config, backend).generate(program.family)
     result = copy.deepcopy(program)
-    candidates = [n for n in result.all_operations() if n.op in ('constant', 'index', 'add', 'sub', 'lt', 'eq')]
+    candidates = [n for n in result.all_operations() if n.op in ('constant', 'index', 'add', 'sub', 'lt', 'eq', 'flip')]
     node = random.choice(candidates)
-    if node.op == 'constant':
+    if node.op == 'flip':
+        # SSA names are program-unique, so the scoped type table resolves them.
+        types, _ = result.validate()
+        rank = len(next(t for (_, name), t in types.items() if name == node.operands[0]).shape)
+        node.attrs['axis'] = random.choice(flip_axes(backend, rank))
+    elif node.op == 'constant':
         dtype = node.results[0].type.dtype
         node.attrs['value'] = (random.choice((False, True)) if dtype == 'bool' else
                                random.choice((-1, 0, 1, 3)) if dtype == 'int32' else random.choice((-0.125, 0., 0.125, 0.5)))

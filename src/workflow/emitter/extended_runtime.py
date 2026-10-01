@@ -219,7 +219,7 @@ def extended_reference(program, inputs, steps, limit):
                 # fp16/fp32 evaluation; the fma checker accepts both.
                 out = [(args[0].double() * args[1].double() + args[2].double()).to(args[0].dtype)]
             elif op == 'flip':
-                out = [torch.flip(args[0], [-1])]
+                out = [torch.flip(args[0], [a.get('axis', -1)])]
             elif op == 'interleave':
                 # stack along the minor axis then reshape interleaves the
                 # elements: [a0, b0, a1, b1, ...].

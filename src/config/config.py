@@ -181,6 +181,29 @@ class Config:
     # global, not per root cause, so the two knobs never interact.
     max_oracle_unstable_saved: int = 0
 
+    # ── Known-bug triage ───────────────────────────────────────────────
+    # Every failure is assigned a bucket from its normalized diagnostic
+    # (src/workflow/triage.py). With the quarantine on, a fresh or mutated
+    # candidate that matches a rule learned for a recurring bucket is redrawn
+    # unless a per-bucket exploration draw lets it through; that probability
+    # shrinks as the bucket recurs, down to quarantine_min_explore. After
+    # quarantine_retries redraws the next candidate is tested regardless.
+    # A rule must fail in its bucket for quarantine_precision of the matching
+    # tests among the last quarantine_window. Tested failures are all saved.
+    quarantine: bool = False
+    quarantine_window: int = 1024
+    quarantine_precision: float = 0.9
+    quarantine_retries: int = 8
+    quarantine_min_explore: float = 0.01
+    # Count the features of a failure in an already-seen bucket as exercised,
+    # so rarity weights stop steering generation back to an unfixed bug.
+    explained_feedback: bool = False
+    # Swarm testing (Groce et al., ISSTA 2012): with this probability a native
+    # region program draws its operations from a random half of the leaf and
+    # control operations, so frequent triggers and suppressors are absent
+    # from a share of the programs instead of being present in nearly all.
+    swarm_prob: float = 0.0
+
     # ── Oracle timeouts ─────────────────────────────────────────────────
     compile_timeout: int = 60   # seconds for compilation
     execute_timeout: int = 60   # seconds for execution

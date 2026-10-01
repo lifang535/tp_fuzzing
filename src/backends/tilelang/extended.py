@@ -226,10 +226,13 @@ class ExtendedLowering:
             elif op == 'transpose':
                 expression = self.ref(scope, args[0], indices[::-1])
             elif op == 'flip':
-                # Reverse the minor dimension; a copied permutation remains
-                # a permutation for later store/unique checks. The source was
-                # staged in shared memory (fragment reversal has no layout).
-                reversed_indices = indices[:-1] + (f'{shape[-1] - 1} - {indices[-1]}',)
+                # Reverse one dimension (the minor one unless an axis is
+                # named); a copied permutation remains a permutation for later
+                # store/unique checks. The source was staged in shared memory
+                # (fragment reversal has no layout).
+                axis = a.get('axis', -1) % len(shape)
+                reversed_indices = tuple(f'{size - 1} - {index}' if i == axis else index
+                                         for i, (size, index) in enumerate(zip(shape, indices)))
                 expression = f"{out}_flip_shared[{', '.join('0' if size == 1 else index for size, index in zip(shape, reversed_indices))}]"
             elif op == 'slice':
                 positions = ', '.join(f'({i} + {offset})' for i, offset in zip(indices, a['offsets']))

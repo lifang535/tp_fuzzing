@@ -63,6 +63,8 @@ def step_op_noise_trap(program) -> bool:
 
 class RegionGenerator:
     LEAVES = tuple(k for k, spec in OPS.items() if not spec.entry and not spec.regions)
+    # Template choices a swarm configuration may omit (to_tile is an adapter).
+    SWARM_KINDS = LEAVES + ('for', 'if') + tuple(k for k in TYPED_OPS if k != 'to_tile')
 
     def __init__(self, config, backend="tilelang", type_gen=None, grids=None):
         if not 0 <= config.region_max_depth <= 4 or not 1 <= config.region_max_ops <= 127 or config.region_max_length < 1:
@@ -97,6 +99,9 @@ class RegionGenerator:
             raise ValueError('region_int8_prob must be between 0 and 1')
         if not 0 <= config.region_typed_prob <= 1 or config.region_scratch_max_bytes < 4096:
             raise ValueError('Invalid typed-region probability or scratch budget')
+        if not 0 <= config.swarm_prob <= 1:
+            raise ValueError('swarm_prob must be between 0 and 1')
+        self._swarm = None
 
     def template(self, depth=0, budget=None, parent="function", functions=(), has_buffer=False):
         if budget is None:
@@ -113,7 +118,7 @@ class RegionGenerator:
             choices = list(self.LEAVES)
             if depth < self.config.region_max_depth and budget[0] >= 3:
                 choices += ['for', 'if']
-            controls = [k for k in choices if k in ("if", "for")]
+            controls = [k for k in choices if k in ("if", "for") and (self._swarm is None or k in self._swarm)]
             if controls and random.random() < self.config.region_control_prob:
                 choices = controls
             else:
@@ -122,6 +127,8 @@ class RegionGenerator:
                     choices = ['cast', 'reduce_tile', 'broadcast_tile', 'load_input', 'store_tile']
                     if has_buffer:
                         choices += ['load_tile', 'write_tile']
+            if self._swarm is not None:
+                choices = [k for k in choices if k in self._swarm] or choices
             if self.feedback is None:
                 kind = random.choice(choices)
             else:
@@ -262,6 +269,8 @@ class RegionGenerator:
 
     def program_template(self, initial=None):
         """Build all function skeletons before binding any SSA operands."""
+        # A probe or int8 template must not inherit the previous mask.
+        self._swarm = None
         if initial is None and random.random() < self.config.coverage_probe_prob:
             return ProgramTemplate([TemplateOp('probe')])
         if initial is None:
@@ -277,6 +286,11 @@ class RegionGenerator:
                 self._int8 = True
                 return ProgramTemplate([TemplateOp('gemm')])
             initial = 'gemm' if random.random() < self.config.region_gemm_prob else 'load'
+        # Swarm testing: one operation subset for the whole program, so an
+        # operation that triggers or suppresses a failure is absent from part
+        # of the programs rather than present in nearly every larger one.
+        if self.config.swarm_prob and random.random() < self.config.swarm_prob:
+            self._swarm = {k for k in self.SWARM_KINDS if random.random() < 0.5}
         # Templates expose names/signatures, not instantiated SSA values.
         # Reserve one mandatory call per helper/entry connection; all helpers
         # are reachable, while random call sites also occur in nested regions.

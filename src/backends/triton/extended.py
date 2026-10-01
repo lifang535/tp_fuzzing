@@ -122,7 +122,11 @@ class ExtendedLowering:
             elif op == 'fma':
                 expression = f'tl.fma({args[0]}, {args[1]}, {args[2]})'
             elif op == 'flip':
-                expression = f'tl.flip({args[0]})'
+                # Always name the axis: the dim=None default is a confirmed
+                # Triton 3.8 front-end bug (triton_flip_default_axis) that
+                # would mask the rest of every program containing a flip.
+                axis = a.get('axis', -1) % len(t.shape)
+                expression = f'tl.flip({args[0]}, {axis})'
             elif op == 'interleave':
                 expression = f'tl.interleave({args[0]}, {args[1]})'
             elif op == 'join':

@@ -50,6 +50,10 @@ class BugReport:
     root_cause: str = ""
     location: str = ""
     confirmed_signature: str = ""
+    # Normalized diagnostic grouping (src.workflow.triage), computed from the
+    # complete message; the root cause alone merges unrelated mechanisms.
+    failure_bucket: str = ""
+    failure_key: str = ""
 
     def classify_root_cause(self, backend=None):
         from src.backends.common.diagnostics import _failure_location
@@ -74,6 +78,9 @@ class BugReport:
         }
         if self.confirmed_signature:
             result['confirmed_signature'] = self.confirmed_signature
+        if self.failure_bucket:
+            result['failure_bucket'] = self.failure_bucket
+            result['failure_key'] = self.failure_key
         return result
 
     def summary(self) -> str:
@@ -217,6 +224,9 @@ class Oracle:
                     # The progress manifest names the exact variant and stage
                     # the subprocess reached, which beats message inference.
                     report.location = f"{progress.get('stage')}:{progress.get('variant')}"
+                from src.workflow.triage import failure_bucket
+                report.failure_bucket, report.failure_key = failure_bucket(
+                    error_msg, report.root_cause, report.confirmed_signature, report.location)
                 return report
 
         except subprocess.TimeoutExpired as exc:
@@ -248,6 +258,9 @@ class Oracle:
                 if isinstance(stderr, bytes):
                     stderr = stderr.decode(errors='replace')
                 report.location = _failure_location(stderr or '')
+            from src.workflow.triage import failure_bucket
+            report.failure_bucket, report.failure_key = failure_bucket(
+                report.error_message, report.root_cause, location=report.location)
             return report
         finally:
             if extended:

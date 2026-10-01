@@ -36,8 +36,10 @@ def confirmed_failure(bug_or_message, backend):
         if 'IsValidCPAsyncTransferBytes' in message:
             return 'tilelang_two_byte_cp_async'
     elif backend == 'triton':
+        # Only the one-argument call: an explicit axis is a different
+        # mechanism and must stay unpenalized until it is audited.
         if ('triton.compiler.errors.CompilationError' in message
-                and re.search(r'tl\.flip\([^\n]*\)[^\n]*\n\s*\^', message)):
+                and re.search(r'tl\.flip\(\s*\w+\s*\)[^\n]*\n\s*\^', message)):
             return 'triton_flip_default_axis'
         if ('TritonGPURemoveLayoutConversions' in message
                 and 'operand #0 does not dominate this use' in message):
@@ -148,15 +150,27 @@ class StructuralFeedback:
         self.seed_compiler = {}
         self.known_seed_failures = Counter()
         self.known_signatures = Counter()
+        # Features of programs that reproduced an already-seen failure bucket.
+        self.explained = Counter()
 
-    def observe(self, program, passed):
-        features = program_features(program)
+    def observe(self, program, passed, features=None):
+        if features is None:
+            features = program_features(program)
         novel = features - self.passed.keys() if passed else set()
         self.attempted.update(features)
         if passed:
             self.passed.update(features)
         return len(novel)
 
+    def explain(self, features):
+        """Count features of a duplicate failure as exercised.
+
+        Rarity weights reward features that seldom pass, and a feature seldom
+        passes when the region around it keeps hitting one unfixed bug: the
+        boost then pulls generation back to that bug. A known failure explains
+        its features as well as a pass would, so they stop looking rare.
+        """
+        self.explained.update(features)
 
     def observe_compilation(self, program, records, complete=False):
         features = {f for r in records for f in r.get('features', [])}
@@ -187,7 +201,8 @@ class StructuralFeedback:
 
     def seed_weight(self, program):
         features = program_features(program)
-        structural = 1.0 + 4.0 * sum(1 / (1 + self.passed[f]) for f in sorted(features)) / max(1, len(features))
+        structural = 1.0 + 4.0 * sum(1 / (1 + self.passed[f] + self.explained[f])
+                                     for f in sorted(features)) / max(1, len(features))
         digest = program_digest(program)
         compiler = self.seed_compiler.get(digest, ())
         # Only actually retained compiler features guide this component.
@@ -216,14 +231,15 @@ class StructuralFeedback:
             return base + passed_decay + uncovered_boost
         if not self.passed[feature]:
             return base * 0.6
-        return base + passed_decay / (1 + self.passed[feature])
+        return base + passed_decay / (1 + self.passed[feature] + self.explained[feature])
 
     def save(self, path):
         data = {'version': 2, 'attempted': dict(self.attempted), 'passed': dict(self.passed),
                 'compiled': dict(self.compiled), 'compiler': dict(self.compiler),
                 'seed_compiler': self.seed_compiler,
                 'known_seed_failures': dict(self.known_seed_failures),
-                'known_signatures': dict(self.known_signatures)}
+                'known_signatures': dict(self.known_signatures),
+                'explained': dict(self.explained)}
         temporary = path.with_suffix('.tmp')
         temporary.write_text(json.dumps(data, sort_keys=True))
         temporary.replace(path)
@@ -249,7 +265,8 @@ class StructuralFeedback:
                     for digest, values in features.items()):
                 raise ValueError('Invalid seed compiler features')
             self.seed_compiler = features
-            for name in ('known_seed_failures', 'known_signatures'):
+            # 'explained' is absent from campaigns before duplicate damping.
+            for name in ('known_seed_failures', 'known_signatures', 'explained'):
                 values = data.get(name, {})
                 if not isinstance(values, dict) or any(type(v) is not int or v < 0 for v in values.values()):
                     raise ValueError('Invalid known failure counts')

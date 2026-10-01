@@ -80,6 +80,15 @@ class TileSmith:
         self.dsl_stage = DSLStage(config, self.backend, self.generator.grids, self.feedback)
         self._current_extension = None
         self._current_origin = None
+        # Failure bucket -> count, and bucket -> normalized diagnostic.
+        self.failure_buckets = Counter()
+        self.failure_bucket_keys = {}
+        if config.quarantine_retries < 0:
+            raise ValueError('quarantine_retries must be non-negative')
+        from src.workflow.triage import Quarantine
+        self.quarantine = (Quarantine(config.quarantine_window, config.quarantine_precision,
+                                      config.quarantine_min_explore) if config.quarantine else None)
+        self._current_features = None
 
         if resume_dir:
             # Resume mode: use the specified directory
@@ -97,6 +106,7 @@ class TileSmith:
             self._restore_seed_pool()
             self._restore_dsl_stage()
             self.feedback.restore(self.output_dir / "structural_feedback.json")
+            self._restore_quarantine()
         else:
             # New run: create fresh directory
             timestamp = datetime.now().strftime("%Y.%m.%d-%H.%M")
@@ -139,6 +149,9 @@ class TileSmith:
                         failed_count += 1
                         dir_count += 1
                         self.root_cause_locations.setdefault(root_cause, Counter())[d.get('location', '')] += 1
+                        bucket, bucket_key = self._history_bucket(d, root_cause)
+                        self.failure_buckets[bucket] += 1
+                        self.failure_bucket_keys.setdefault(bucket, bucket_key)
                     except (json.JSONDecodeError, KeyError):
                         pass
                 if dir_count > 0:
@@ -163,6 +176,11 @@ class TileSmith:
             total_count = max(total_count, summary.get("total_tested", 0))
             for cause, count in summary.get("root_causes", {}).items():
                 self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
+            for bucket, count in summary.get('failure_buckets', {}).items():
+                if type(count) is int:
+                    self.failure_buckets[bucket] = max(self.failure_buckets[bucket], count)
+            for bucket, bucket_key in summary.get('failure_bucket_keys', {}).items():
+                self.failure_bucket_keys.setdefault(bucket, bucket_key)
             for cause, counts in summary.get("root_cause_locations", {}).items():
                 if isinstance(counts, dict) and counts:
                     current = self.root_cause_locations.get(cause, Counter())
@@ -195,6 +213,35 @@ class TileSmith:
         print(f"[resume] Known root causes: {self.known_root_causes}")
         print(f"[resume] Previous tests: {self.stats.total_tested}")
         print()
+
+    def _history_bucket(self, report, root_cause):
+        """Bucket of a saved reproducer. Reports from before failure triage
+        are bucketed from their bounded message tail instead of the complete
+        diagnostic, so a few may split from the buckets of new failures."""
+        if report.get('failure_bucket'):
+            return report['failure_bucket'], report.get('failure_key', '')
+        from src.workflow.feedback import confirmed_failure
+        from src.workflow.triage import failure_bucket
+        message = report.get('error_message') or ''
+        return failure_bucket(message, report.get('root_cause') or root_cause,
+                              report.get('confirmed_signature') or confirmed_failure(message, self.backend),
+                              report.get('location', ''))
+
+    def _restore_quarantine(self):
+        if self.quarantine is None:
+            return
+        path = self.output_dir / 'quarantine.json'
+        if path.exists():
+            try:
+                self.quarantine.restore(json.loads(path.read_text()))
+            except (ValueError, json.JSONDecodeError) as error:
+                raise ValueError(f'Cannot resume quarantine state {path}: {error}') from error
+            print(f'[resume] Restored quarantine ({len(self.quarantine.samples)} window samples, '
+                  f'{sum(map(len, self.quarantine.rules.values()))} rules)')
+        # Segments run without the quarantine still counted their failures;
+        # without a window, rules are relearned from the new tests.
+        for bucket, count in self.failure_buckets.items():
+            self.quarantine.hits[bucket] = max(self.quarantine.hits[bucket], count)
 
     def _restore_rng_state(self):
         rng_path = self.output_dir / "rng_state.json"
@@ -384,6 +431,7 @@ class TileSmith:
             while new_tested < num_iterations:
                 self._current_extension = None
                 self._current_origin = None
+                self._current_features = None
                 if _pending_program is not None:
                     # Resume the interrupted program directly (already past dedup).
                     program = _pending_program
@@ -420,14 +468,25 @@ class TileSmith:
                 self.stats.total_tested += 1
                 new_tested += 1
 
+                bucket = self._record_bucket(bug) if bug else None
                 # Target-only operations have their own coverage accounting;
                 # they must not steer the common-IR generator's feedback.
                 if self._current_extension:
                     novelty = compiler_novelty = False
+                    if bucket and self.quarantine is not None:
+                        # How well sampled a bucket is counts every reproducer.
+                        self.quarantine.hits[bucket] += 1
                 else:
-                    novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only)
+                    from src.workflow.feedback import program_features
+                    features = self._current_features or program_features(program)
+                    novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only,
+                                                    features=features)
                     compiler_novelty = self.feedback.observe_compilation(
                         program, self.oracle.last_compilation, self.oracle.compilation_complete)
+                    if bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback:
+                        self.feedback.explain(features)
+                    if self.quarantine is not None:
+                        self.quarantine.observe(features, bucket)
                 if self.oracle.compilation_complete:
                     self.stats.programs_compiled += 1
                 if bug is None and not self.config.compile_only:
@@ -457,7 +516,8 @@ class TileSmith:
                             self._save_bug(bug, i, program)
                         if verbose:
                             marker = 'saved' if saved else 'dup'
-                            print(f"[{i}] [ORACLE UNSTABLE] ({marker}) {self._kind_label(program)}")
+                            print(f"[{i}] [ORACLE UNSTABLE] ({marker}) {self._kind_label(program)}"
+                                  f"{self._bucket_label(bucket)}")
                         continue
                     self.stats.bugs_found.append(bug)
                     seen = self.known_root_causes.get(bug.root_cause, 0)
@@ -475,7 +535,8 @@ class TileSmith:
                     self.root_cause_locations.setdefault(bug.root_cause, Counter())[bug.location] += 1
                     if verbose:
                         marker = 'NEW' if seen == 0 else ('saved' if saved else 'dup')
-                        print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}")
+                        print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}"
+                              f"{self._bucket_label(bucket)}")
                 else:
                     passed_path = self._save_passed(program, i)
                     if not self._current_extension:
@@ -506,6 +567,7 @@ class TileSmith:
             bugs_unique = len(self.known_root_causes)
 
             from src.backends.common.versions import TARGET_TILELANG, TARGET_TRITON, environment
+            from src.workflow.triage import species
             summary = {
                 "backend": self.backend,
                 # What this campaign actually ran against: the harness adapts
@@ -556,6 +618,13 @@ class TileSmith:
                     "region_schedule_pair": self.config.region_schedule_pair,
                     "region_layout_prob": self.config.region_layout_prob,
                     "uncovered_boost": self.config.uncovered_boost,
+                    "quarantine": self.config.quarantine,
+                    "quarantine_window": self.config.quarantine_window,
+                    "quarantine_precision": self.config.quarantine_precision,
+                    "quarantine_retries": self.config.quarantine_retries,
+                    "quarantine_min_explore": self.config.quarantine_min_explore,
+                    "explained_feedback": self.config.explained_feedback,
+                    "swarm_prob": self.config.swarm_prob,
                 },
                 "structural_features_attempted": len(self.feedback.attempted),
                 "structural_features_passed": len(self.feedback.passed),
@@ -568,6 +637,17 @@ class TileSmith:
                 "root_causes": self.known_root_causes,
                 "root_cause_locations": {cause: dict(counts) for cause, counts in self.root_cause_locations.items()},
                 "confirmed_failure_signatures": dict(self.feedback.known_signatures),
+                "failure_buckets": dict(self.failure_buckets.most_common()),
+                "failure_bucket_keys": {bucket: self.failure_bucket_keys.get(bucket, '')
+                                        for bucket, _ in self.failure_buckets.most_common()},
+                # Distinct failure mechanisms, oracle noise excluded: the
+                # Good-Turing estimate is the chance that the next test shows
+                # an unseen bucket, Chao1 a lower bound on the bucket total.
+                "failure_species": species(Counter({bucket: count for bucket, count in self.failure_buckets.items()
+                                                    if not bucket.startswith('oracle_unstable:')}),
+                                           samples=self.stats.total_tested),
+                "structural_species": species(self.feedback.passed),
+                "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
                 "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
                                   "compiler_features": len(self.dsl_stage.compiler),
                                   "compiler_guided_sources": len(self.dsl_stage.source_compiler),
@@ -598,6 +678,11 @@ class TileSmith:
 
             self._prune_seed_feedback()
             self.feedback.save(self.output_dir / "structural_feedback.json")
+            if self.quarantine is not None:
+                path = self.output_dir / 'quarantine.json'
+                temporary = path.with_suffix('.tmp')
+                temporary.write_text(json.dumps(self.quarantine.snapshot()))
+                temporary.replace(path)
             self._save_dim_pool()
             self._save_seed_pool()
             if self.config.dsl_extend_prob:
@@ -639,6 +724,21 @@ class TileSmith:
                 self._current_origin = {'strategy': 'dsl_extend',
                                         'seed_digest': self._current_extension['source_sha256']}
                 return program
+        if self.quarantine is None:
+            return self._generate_native()
+        # Redraw candidates in a learned known-bug region; the last retry is
+        # tested regardless, so a generator confined to such regions still runs.
+        from src.workflow.feedback import program_features
+        attempt = 0
+        while True:
+            program = self._generate_native()
+            features = program_features(program)
+            if self.quarantine.admit(features, force=attempt >= self.config.quarantine_retries):
+                self._current_features = features
+                return program
+            attempt += 1
+
+    def _generate_native(self):
         if not self.seed_pool:
             self._current_origin = {'strategy': 'fresh'}
             return self.generator.generate()
@@ -655,6 +755,21 @@ class TileSmith:
             return self.mutator.mutate(seed)
         self._current_origin = {'strategy': 'fresh'}
         return self.generator.generate()
+
+    def _record_bucket(self, bug):
+        if not bug.failure_bucket:  # a report not produced by Oracle.test
+            from src.workflow.feedback import confirmed_failure
+            from src.workflow.triage import failure_bucket
+            bug.failure_bucket, bug.failure_key = failure_bucket(
+                bug.error_message, bug.root_cause,
+                bug.confirmed_signature or confirmed_failure(bug, self.backend), bug.location)
+        self.failure_buckets[bug.failure_bucket] += 1
+        self.failure_bucket_keys.setdefault(bug.failure_bucket, bug.failure_key)
+        return bug.failure_bucket
+
+    def _bucket_label(self, bucket):
+        count = self.failure_buckets[bucket]
+        return f" [{bucket}{' NEW' if count == 1 else f' x{count}'}]"
 
     def _kind_label(self, program) -> str:
         """Summarize static function calls in filenames, with a full IR hash.

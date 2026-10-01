@@ -46,7 +46,12 @@ def _vector_input(builder, answer):
         value = builder.emit('broadcast', [value], [TensorType(value.type.dtype, (16,))])
     if value.type.dtype != 'float32':
         value = builder.cast(value, 'float32')
-    finite = builder.binary('eq', value, value)
+    # Not `value == value`: TVM's simplifier folds self-comparison to true,
+    # so NaN reached the clamp below (-1 on CUDA, 0 in the reference) and
+    # every downstream target op reported a false wrong_result. A magnitude
+    # bound cannot be folded and also rejects +/-Inf.
+    magnitude = builder.emit('abs', [value], [value.type])
+    finite = builder.binary('lt', magnitude, builder.constant(value.type, 1e30))
     value = builder.emit('select', [finite, value,
                                    builder.constant(value.type, 0)], [value.type])
     # Restrict scan products and absolute reductions to finite, bounded

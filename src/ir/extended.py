@@ -262,8 +262,12 @@ def analyze(program):
                 if op == 'reshape' and node.operands[0] in unique:
                     unique[node.results[0].name] = unique[node.operands[0]]
             elif op == 'flip':
-                if len(args) != 1 or len(outs) != 1:
+                if len(args) != 1 or len(outs) != 1 or not args[0].shape:
                     raise ValueError('Invalid flip')
+                # Absent axis keeps old programs valid: the minor dimension.
+                axis = a.get('axis', -1)
+                if type(axis) is not int or not -len(args[0].shape) <= axis < len(args[0].shape):
+                    raise ValueError('Invalid flip axis')
                 expected = [TensorType(args[0].dtype, args[0].shape)]
                 # Reversing a permutation is still a permutation.
                 if node.operands[0] in unique:
