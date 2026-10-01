@@ -486,7 +486,10 @@ class TileSmith:
                     if bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback:
                         self.feedback.explain(features)
                     if self.quarantine is not None:
-                        self.quarantine.observe(features, bucket)
+                        # Wrong results share the oracle's message, not a
+                        # compiler diagnostic: never quarantined.
+                        self.quarantine.observe(features, bucket,
+                                                learn=bug is None or bug.bug_type is not BugType.WRONG_RESULT)
                 if self.oracle.compilation_complete:
                     self.stats.programs_compiled += 1
                 if bug is None and not self.config.compile_only:

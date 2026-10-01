@@ -166,14 +166,17 @@ class Quarantine:
         self.rejected.update(matched)
         return False
 
-    def observe(self, features, bucket=None):
+    def observe(self, features, bucket=None, learn=True):
+        """Record a test outcome. learn=False still counts a failure, but its
+        bucket gets no rule: an oracle mismatch message does not identify the
+        miscompilation, so one bucket may hold several."""
         ids = self.ids(features)
         self.samples.append((ids, bucket))
         del self.samples[:-self.window]
         if bucket is not None:
             self.hits[bucket] += 1
             rules = self.rules.get(bucket, [])
-            if len(rules) < self.max_rules and not any(rule <= ids for rule in rules):
+            if learn and len(rules) < self.max_rules and not any(rule <= ids for rule in rules):
                 rule = self.learn(bucket)
                 if rule is not None:
                     self.rules[bucket] = rules + [rule]

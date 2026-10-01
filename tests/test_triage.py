@@ -216,6 +216,13 @@ class QuarantineTests(unittest.TestCase):
         quarantine.observe({'op:select', 'dtype:bool'}, 'bool')
         self.assertEqual(quarantine.stats()['rules'], {'bool': [['dtype:bool']]})
 
+    def test_unlearnable_failures_are_counted_without_a_rule(self):
+        quarantine = scenario(failures=0)
+        for i in range(8):
+            quarantine.observe({'op:select', 'dtype:bool', f'size:{i % 4}'}, 'wrong', learn=False)
+        self.assertEqual((quarantine.rules, quarantine.learned, quarantine.hits['wrong']), ({}, 0, 8))
+        self.assertEqual([label for _, label in quarantine.samples].count('wrong'), 8)
+
     def test_snapshot_round_trip(self):
         quarantine = scenario()
         quarantine.observe({'op:flip'}, 'other:0123456789')
@@ -637,6 +644,24 @@ class CampaignBucketTests(unittest.TestCase):
                 self.assertLess(guarded.failure_buckets[bucket], 0.7 * baseline.failure_buckets[bucket])
                 # Every quarantined bucket is still revisited.
                 self.assertGreater(guarded.quarantine.explored[bucket], 0)
+
+    def test_wrong_results_are_never_quarantined(self):
+        # Distinct miscompilations share this message: one rule could hide all.
+        exp = key('op', 'exp')
+        message = 'RuntimeError: WRONG RESULT: structured reference: error=0.5, tolerance=0.01'
+
+        def verdict(index, program):
+            if exp not in program_features(program):
+                return None
+            return BugReport(BugType.WRONG_RESULT, message, params=program.params_dict,
+                             root_cause='wrong_result', generated_code='# exp\n')
+
+        with tempfile.TemporaryDirectory() as directory:
+            fuzzer, _, _ = campaign(directory, 150, verdict, verbose=False)
+        bucket = failure_bucket(message, 'wrong_result')[0]
+        self.assertGreater(fuzzer.failure_buckets[bucket], 10)
+        self.assertEqual(fuzzer.quarantine.hits[bucket], fuzzer.failure_buckets[bucket])
+        self.assertEqual((fuzzer.quarantine.rules, fuzzer.quarantine.learned), ({}, 0))
 
 
 class MainDefaultsTests(unittest.TestCase):
