@@ -230,9 +230,18 @@ class Oracle:
                     # The progress manifest names the exact variant and stage
                     # the subprocess reached, which beats message inference.
                     report.location = f"{progress.get('stage')}:{progress.get('variant')}"
-                from src.workflow.triage import failure_bucket
+                else:
+                    # Stage markers precede a traceback that can outgrow the
+                    # kept tail (region harnesses print the program).
+                    from src.backends.common.diagnostics import _failure_location
+                    report.location = _failure_location(error_msg)
+                from src.workflow.triage import failure_bucket, wrong_result_origin
+                # Every wrong value shares the checker's message; the operation
+                # producing the earliest one separates the mechanisms.
+                origin = (wrong_result_origin(params['extended_program'], error_msg)
+                          if extended and bug_type is BugType.WRONG_RESULT else '')
                 report.failure_bucket, report.failure_key = failure_bucket(
-                    error_msg, report.root_cause, report.confirmed_signature, report.location)
+                    error_msg, report.root_cause, report.confirmed_signature, report.location, origin)
                 return report
 
         except subprocess.TimeoutExpired as exc:

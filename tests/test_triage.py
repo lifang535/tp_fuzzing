@@ -20,15 +20,16 @@ from unittest.mock import patch
 import torch
 
 from src.config import Config
+from src.ir.extended import Block, ExtendedProgram, Helper, Node, TensorType as Ty
 from src.workflow import triage
 from src.workflow.extended_feedback import extended_features
 from src.workflow.feedback import StructuralFeedback, confirmed_failure, key, program_features
 from src.workflow.fuzzer.fuzzer import TileSmith
 from src.workflow.generator.dsl_extend import extend_passed
-from src.workflow.generator.extended import Builder, ExtendedGenerator, flip_axes, mutate_extended
+from src.workflow.generator.extended import FAMILIES, Builder, ExtendedGenerator, flip_axes, mutate_extended
 from src.workflow.generator.region_generator import RegionGenerator
 from src.workflow.oracle.oracle import BugReport, BugType
-from src.workflow.triage import Quarantine, failure_bucket, failure_key, species
+from src.workflow.triage import Quarantine, failure_bucket, failure_key, species, wrong_result_origin
 from test_extended_ops import emit, reference, validated
 from test_feedback import dataflow_program
 
@@ -125,6 +126,139 @@ class FailureBucketTests(unittest.TestCase):
         self.assertEqual(failure_bucket(tvm_check(7), 'other')[0], bucket)
         self.assertTrue(failure_bucket(tvm_check(1), '')[0].startswith('other:'))
         self.assertNotEqual(failure_bucket(tvm_check(1), 'tilelang_layout')[0], bucket)
+
+    def test_origin_splits_one_check_message(self):
+        check = 'RuntimeError: WRONG RESULT: triton_0:e{}:seed=1:steps=1:limit=15; max_abs=0.5'
+        cast, floor = (failure_bucket(check.format(5), 'wrong_result', origin=origin)
+                       for origin in ('cast float16 r2 <- float32', 'floor float32 r2'))
+        self.assertNotEqual(cast[0], floor[0])
+        self.assertEqual(floor[1], failure_key(check.format(5)) + ' | origin floor float32 r2')
+        # Value names still vary between reproducers of one mechanism.
+        self.assertEqual(failure_bucket(check.format(9), 'wrong_result', origin='floor float32 r2'), floor)
+        self.assertEqual(failure_bucket(check.format(5), 'wrong_result', origin='')[1], failure_key(check.format(5)))
+        self.assertEqual(failure_bucket(check.format(5), 'wrong_result', 'audited', origin='floor float32 r2'),
+                         ('audited', floor[1]))
+
+
+def origin_program():
+    """A validated program (dict form) whose watched values come from a cast, a
+    reduction, a rounding, a scan, a call, a pipelined loop and a conditional
+    passing one branch through; the conditional's value is also stored into a
+    strided view of a scratch buffer. Returns the program and its names."""
+    generator = ExtendedGenerator(Config(extended_prob=1), 'triton')
+    b = Builder(generator)
+    source = b.load(generator.buffer('float32', 64), (4, 16), b.indices((4, 16), shuffled=False))
+    names = dict(load=source)
+    names['cast'] = b.cast(source, 'float16')
+    names['reduce'] = b.reduce(names['cast'], 1, 'max')
+    names['round'] = b.emit('round', [source], [source.type], dtype='float16')
+    names['scan'] = b.emit('scan_sum', [source], [source.type], axis=-2, reverse=True)
+    row = names['reduce'].type
+    argument = b.value(row)
+    helper = Builder(generator, Block([argument]))
+    helper.block.returns = [helper.binary('add', argument, argument).name]
+    names['call'] = b.emit('call', [names['reduce']], [row], callee='twice')
+    bound = b.emit('parameter', types=[Ty('int32')], name='steps')
+    body = Builder(generator, Block([b.value(Ty('int32')), b.value(row)]), b.pool)
+    body.block.returns = [body.emit('sqrt', [body.block.arguments[1]], [row]).name]
+    names['for'] = b.value(row)
+    b.block.operations.append(Node('for', [names['for']], [bound.name, names['call'].name],
+                                   {'max_steps': 4, 'pipelined': True}, [body.block]))
+    taken, kept = b.value(row), b.value(row)
+    branch = Builder(generator, Block([taken]), b.pool)
+    branch.block.returns = [branch.emit('neg', [taken], [row]).name]
+    names['if'] = b.value(row)
+    b.block.operations.append(Node('if', [names['if']], [b.constant(Ty('bool'), True).name, names['for'].name],
+                                   {}, [branch.block, Block([kept], [], [kept.name])]))
+    scratch = generator.buffer('float32', 8, 'scratch')
+    view = generator.buffer('float32', 4, 'scratch', base=scratch.name, offset=1, stride=2)
+    b.emit('store', [b.indices((4,), shuffled=False), b.constant(Ty('bool', (4,)), True), names['if']],
+           buffer=view.name)
+    b.block.returns = [names[op].name for op in ('cast', 'reduce', 'round', 'scan', 'call', 'for', 'if')]
+    program = ExtendedProgram(b.block, generator.buffers, [Helper('twice', helper.block)],
+                              observations=[source.name], family='hand')
+    program.validate()
+    names = {op: value.name for op, value in names.items()}
+    names['memory'] = 'memory:' + scratch.name
+    return json.loads(json.dumps(program.to_dict())), names
+
+
+class WrongResultOriginTests(unittest.TestCase):
+    def origin(self, program, *values):
+        return wrong_result_origin(program, 'RuntimeError: WRONG RESULT: simulated\nWRONG VALUES: ' + ', '.join(values))
+
+    def test_describes_the_producer_through_regions_and_stores(self):
+        program, names = origin_program()
+        for op, expected in (('load', 'load float32 r2'),
+                             ('cast', 'cast float16 r2 <- float32'),
+                             ('reduce', 'reduce float32 r1 <- float16 kind=max axis=1'),
+                             ('round', 'round float32 r2 dtype=float16'),
+                             ('scan', 'scan_sum float32 r2 axis=-2 reverse'),
+                             ('call', 'call{add float32 r1}'),
+                             ('for', 'for pipelined{sqrt float32 r1}'),
+                             ('if', 'if{neg float32 r1 | argument}'),
+                             ('memory', 'store float32 of if{neg float32 r1 | argument}')):
+            with self.subTest(op=op):
+                self.assertEqual(self.origin(program, names[op]), expected)
+        # A flag that is off is spelled as if absent.
+        loop = next(node for node in program['body']['operations'] if node['op'] == 'for')
+        loop['attrs']['pipelined'] = False
+        self.assertEqual(self.origin(program, names['for']), 'for{sqrt float32 r1}')
+
+    def test_earliest_wrong_value_wins_over_check_order(self):
+        program, names = origin_program()
+        self.assertEqual(self.origin(program, names['memory'], names['if'], names['scan'], names['reduce']),
+                         'reduce float32 r1 <- float16 kind=max axis=1')
+        self.assertEqual(self.origin(program, 'e999', names['memory']),
+                         'store float32 of if{neg float32 r1 | argument}')
+        self.assertEqual(self.origin(program, 'e999', 'memory:mem0'), '')
+
+    def test_messages_without_wrong_values_name_values_in_the_check(self):
+        program, names = origin_program()
+        scratch = names['memory'][len('memory:'):]
+        for line, expected in (
+                (f"WRONG RESULT: triton_1:{names['scan']}:seed=3:steps=1:limit=15; max_abs=0.5; actual=1e5",
+                 'scan_sum float32 r2 axis=-2 reverse'),
+                (f"WRONG RESULT: configuration/observation invariance:{names['round']}",
+                 'round float32 r2 dtype=float16'),
+                (f'WRONG RESULT: precision:scratch:{scratch}; max_abs=2.0', 'store float32 of if{neg float32 r1 | argument}'),
+                (f'WRONG RESULT: repeat determinism:memory:{scratch}', 'store float32 of if{neg float32 r1 | argument}'),
+                # Input memory has no writer; an unknown value has no producer.
+                ('WRONG RESULT: input storage modified: mem0', ''),
+                ('WRONG RESULT: triton_0:e999:seed=1', '')):
+            with self.subTest(line=line):
+                message = f'Traceback (most recent call last):\n  File "x.py", line 3\nRuntimeError: {line}\n'
+                self.assertEqual(wrong_result_origin(program, message), expected)
+
+    def test_unreadable_programs_have_no_origin(self):
+        program, names = origin_program()
+        self.assertEqual(wrong_result_origin(program, 'WRONG VALUES: ' + names['scan'], limit=8), 'scan_sum')
+        call = next(node for node in program['body']['operations'] if node['op'] == 'call')
+        call['attrs']['callee'] = 'missing'
+        for case, broken in enumerate((None, {}, {'body': {'operations': []}}, program)):
+            with self.subTest(case=case):
+                self.assertEqual(self.origin(broken, names['call']), '')
+
+    def test_generated_programs_attribute_every_watched_value(self):
+        state = random.getstate()
+        self.addCleanup(random.setstate, state)
+        random.seed(13)
+        for backend in ('triton', 'tilelang'):
+            for family in FAMILIES:
+                for _ in range(4):
+                    program = ExtendedGenerator(Config(extended_prob=1), backend).generate(family)
+                    roots = {b.name: b.base or b.name for b in program.buffers}
+                    written = {roots[n.attrs['buffer']] for n in program.all_operations()
+                               if n.op == 'store' or n.op.startswith('atomic_')}
+                    program = json.loads(json.dumps(program.to_dict()))
+                    for name in (program['body']['returns'] + program['observations']
+                                 + ['memory:' + root for root in written]):
+                        with self.subTest(backend=backend, family=family, value=name):
+                            origin = self.origin(program, name)
+                            self.assertTrue(origin)
+                            self.assertNotIn('?', origin)
+                            if name.startswith('memory:'):
+                                self.assertRegex(origin, r'^(store|atomic_\w+) ')
 
 
 class SpeciesTests(unittest.TestCase):
@@ -572,6 +706,31 @@ class CampaignBucketTests(unittest.TestCase):
             del summary['failure_buckets'], summary['failure_bucket_keys']
             path.write_text(json.dumps(summary))
             restored = resume(fuzzer)
+            self.assertEqual(restored.failure_buckets, fuzzer.failure_buckets)
+            self.assertEqual(restored.failure_bucket_keys, fuzzer.failure_bucket_keys)
+
+    def test_rebucketed_wrong_results_keep_their_origin(self):
+        def wrong(index, program):
+            # One check message; the earliest wrong value differs per program.
+            returns = program.body.returns
+            message = (f'RuntimeError: WRONG RESULT: tilelang_0:{returns[-1]}:seed=1; max_abs=1.0\n'
+                       'WRONG VALUES: ' + ', '.join(reversed(returns)))
+            return BugReport(BugType.WRONG_RESULT, message, params=program.params_dict,
+                             root_cause='wrong_result', generated_code='# wrong\n')
+        with tempfile.TemporaryDirectory() as directory:
+            fuzzer, calls, _ = campaign(directory, 12, wrong, verbose=False, extended_prob=1)
+            origins = {key.rsplit(' | origin ', 1)[1] for key in fuzzer.failure_bucket_keys.values()}
+            self.assertEqual(len(origins), len(fuzzer.failure_buckets))
+            self.assertGreater(len(origins), 1)
+            for path in (fuzzer.output_dir / 'failed').rglob('*.json'):
+                report = json.loads(path.read_text())
+                del report['failure_bucket'], report['failure_key']
+                path.write_text(json.dumps(report))
+            path = fuzzer.output_dir / 'summary.json'
+            summary = json.loads(path.read_text())
+            del summary['failure_buckets'], summary['failure_bucket_keys']
+            path.write_text(json.dumps(summary))
+            restored = resume(fuzzer, extended_prob=1)
             self.assertEqual(restored.failure_buckets, fuzzer.failure_buckets)
             self.assertEqual(restored.failure_bucket_keys, fuzzer.failure_bucket_keys)
 

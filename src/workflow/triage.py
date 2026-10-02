@@ -86,13 +86,120 @@ def failure_key(message, location=''):
     return ' | '.join(parts)
 
 
-def failure_bucket(message, root_cause, confirmed=None, location=''):
+def failure_bucket(message, root_cause, confirmed=None, location='', origin=''):
     """(bucket, key). An audited signature is its own bucket; any other failure
-    is grouped as root_cause:digest of its normalized diagnostic."""
+    is grouped as root_cause:digest of its normalized diagnostic and, for a
+    wrong result, the origin of its earliest wrong value."""
     key = failure_key(message, location)
+    if origin:
+        key += ' | origin ' + origin
     if confirmed:
         return confirmed, key
     return f'{root_cause or "other"}:{hashlib.sha1(key.encode()).hexdigest()[:10]}', key
+
+
+# Attributes that change what an operation computes or how a loop is
+# compiled. Constants, index shifts, buffer names and loop bounds vary between
+# reproducers of one mechanism; a flag that is off is spelled as if absent.
+_ORIGIN_ATTRIBUTES = ('kind', 'axis', 'k', 'dtype', 'reverse', 'descending', 'keep_dims', 'pipelined')
+_STORES = ('store', 'atomic_add', 'atomic_max', 'atomic_min', 'atomic_and', 'atomic_or', 'atomic_xor')
+
+
+def wrong_result_origin(program, message, limit=160):
+    """Where the earliest wrong value of an extended program (its dict form)
+    comes from, or '' when the message names none of its values.
+
+    The wrong values are the WRONG VALUES line of the message (otherwise the
+    value names in its WRONG RESULT line); the earliest is the one the first
+    operation of the entry block produces. Every wrong value of one launch
+    shares the diagnostic text, while the operation producing the earliest
+    tells mechanisms apart: its name, result dtype and rank, operand dtypes
+    that differ from the result, and semantic attributes, followed through
+    loops, conditionals and calls to the operation yielding the value. A
+    wrong buffer is attributed to the first store or atomic writing it.
+    Attribution never stops a campaign: an unreadable program has no origin."""
+    try:
+        return _origin(program, message)[:limit]
+    except (AttributeError, IndexError, KeyError, StopIteration, TypeError):
+        return ''
+
+
+def _origin(program, message):
+    functions = {f['name']: f['body'] for f in program.get('functions', [])}
+    producers, types, arguments = {}, {}, set()
+
+    def index(block):
+        for value in block['arguments']:
+            arguments.add(value['name'])
+            types[value['name']] = value['type']
+        for node in block['operations']:
+            for position, value in enumerate(node['results']):
+                producers[value['name']] = node, position
+                types[value['name']] = value['type']
+            for region in node['regions']:
+                index(region)
+    index(program['body'])
+    for body in functions.values():
+        index(body)
+    roots = {b['name']: b['base'] or b['name'] for b in program.get('buffers', [])}
+
+    def flags(node):
+        settings = ((attribute, node['attrs'].get(attribute, False)) for attribute in _ORIGIN_ATTRIBUTES)
+        return ''.join(f' {attribute}' if setting is True else f' {attribute}={setting}'
+                       for attribute, setting in settings if setting is not False)
+
+    def describe(name, depth=0):
+        if name in arguments:
+            return 'argument'  # a parameter, or a value carried through unchanged
+        if name not in producers or depth > 8:
+            return '?'
+        node, position = producers[name]
+        op = node['op']
+        if op in ('for', 'while', 'if', 'call'):
+            bodies = [functions[node['attrs']['callee']]] if op == 'call' else node['regions']
+            inner = dict.fromkeys(describe(body['returns'][position], depth + 1) for body in bodies)
+            return f"{op}{flags(node)}{{{' | '.join(inner)}}}"
+        dtype, shape = node['results'][position]['type']['dtype'], node['results'][position]['type']['shape']
+        # A load's operands are always its int32 indices and bool mask.
+        sources = sorted({types[v]['dtype'] for v in node['operands'] if v in types} - {dtype}) if op != 'load' else []
+        return f"{op} {dtype} r{len(shape)}{' <- ' + '+'.join(sources) if sources else ''}{flags(node)}"
+
+    def writer(block, root):
+        """The first store or atomic into `root`, in execution order."""
+        for node in block['operations']:
+            if node['op'] in _STORES and roots.get(node['attrs'].get('buffer')) == root:
+                return node
+            bodies = ([functions[node['attrs']['callee']]] if node['op'] == 'call' and node['attrs'].get('callee')
+                      in functions else node['regions'])
+            for body in bodies:
+                found = writer(body, root)
+                if found is not None:
+                    return found
+        return None
+
+    # The wrong values in the order of the entry-block operation they come from.
+    top = program['body']['operations']
+    position = {value['name']: i for i, node in enumerate(top) for value in node['results']}
+    match = re.findall(r'^WRONG VALUES: (.+)$', message, flags=re.MULTILINE)
+    if match:
+        names = [name.strip() for name in match[-1].split(',')]
+    else:
+        line = next((line for line in reversed(message.splitlines()) if 'WRONG RESULT' in line), '')
+        tokens = re.findall(r'(?<![\w.])[A-Za-z_]\w*', line)
+        names = [t for t in tokens if t in position] + ['memory:' + t for t in tokens if roots.get(t) == t]
+    candidates = []
+    for name in names:
+        if name in position:
+            candidates.append((position[name], describe(name)))
+        elif name.startswith('memory:'):
+            for i, node in enumerate(top):
+                store = writer({'operations': [node]}, name[len('memory:'):])
+                if store is not None:
+                    dtype = next(b['dtype'] for b in program['buffers'] if b['name'] == store['attrs']['buffer'])
+                    candidates.append((i, f"{store['op']} {dtype} of {describe(store['operands'][-1])}"))
+                    break
+    # Ties (results of one operation) keep the check order of the message.
+    return min(candidates, key=lambda candidate: candidate[0])[1] if candidates else ''
 
 
 def species(counts, samples=None):

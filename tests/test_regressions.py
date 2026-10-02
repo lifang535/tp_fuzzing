@@ -161,6 +161,17 @@ class EmissionTests(unittest.TestCase):
         self.assertEqual(report.root_cause, 'segfault')
         self.assertIn('SIGSEGV', report.error_message)
 
+    def test_region_location_survives_a_long_diagnostic(self):
+        # The stage marker precedes a traceback longer than the kept tail.
+        stderr = ('TILESMITH_STAGE=prepare_0\nTILESMITH_STAGE=execute_variant_1\n'
+                  + '  File "/tmp/tilesmith_x.py", line 7, in <module>\n' * 60
+                  + 'RuntimeError: CUDA error: an illegal memory access was encountered\n')
+        completed = type('Result', (), dict(returncode=1, stderr=stderr, stdout=''))()
+        with patch('src.workflow.oracle.oracle.subprocess.run', return_value=completed):
+            report = Oracle(Config(), 'triton').test(nested_program())
+        self.assertNotIn('TILESMITH_STAGE', report.error_message)
+        self.assertEqual(report.location, 'execute_variant_1')
+
 
 
 if __name__ == '__main__':

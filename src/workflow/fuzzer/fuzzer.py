@@ -321,11 +321,14 @@ class TileSmith:
         if report.get('failure_bucket'):
             return report['failure_bucket'], report.get('failure_key', '')
         from src.workflow.feedback import confirmed_failure
-        from src.workflow.triage import failure_bucket
+        from src.workflow.triage import failure_bucket, wrong_result_origin
         message = report.get('error_message') or ''
+        program = (report.get('params') or {}).get('extended_program')
+        origin = (wrong_result_origin(program, message)
+                  if isinstance(program, dict) and report.get('bug_type') == 'wrong_result' else '')
         return failure_bucket(message, report.get('root_cause') or root_cause,
                               report.get('confirmed_signature') or confirmed_failure(message, self.backend),
-                              report.get('location', ''))
+                              report.get('location', ''), origin)
 
     def _restore_quarantine(self):
         if self.quarantine is None:
@@ -920,10 +923,13 @@ class TileSmith:
     def _record_bucket(self, bug):
         if not bug.failure_bucket:  # a report not produced by Oracle.test
             from src.workflow.feedback import confirmed_failure
-            from src.workflow.triage import failure_bucket
+            from src.workflow.triage import failure_bucket, wrong_result_origin
+            program = bug.params.get('extended_program')
+            origin = (wrong_result_origin(program, bug.error_message)
+                      if isinstance(program, dict) and bug.bug_type is BugType.WRONG_RESULT else '')
             bug.failure_bucket, bug.failure_key = failure_bucket(
                 bug.error_message, bug.root_cause,
-                bug.confirmed_signature or confirmed_failure(bug, self.backend), bug.location)
+                bug.confirmed_signature or confirmed_failure(bug, self.backend), bug.location, origin)
         if bug.failure_bucket not in self.failure_bucket_first_seen:
             self.failure_bucket_first_seen[bug.failure_bucket] = {
                 'tested': self.stats.total_tested, 'seconds': round(self._campaign_seconds(), 1),
