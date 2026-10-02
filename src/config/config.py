@@ -247,6 +247,13 @@ class Config:
     # GEMM-entry Region programs (relative error).
     region_rtol_fp16: float = 0.10
     region_rtol_fp32: float = 0.05
+    # Elementwise relative slack added to either region tolerance
+    # (|C - ref| <= atol + rtol * |ref|): one storage ulp at a large magnitude
+    # exceeds elemwise_atol (fp16 already above 2, fp32 above ~8e3). The
+    # region wrong results of the 2026-10-01 campaigns that only this slack
+    # clears needed at most 9.6e-4 (one fp16 ulp) and 2.7e-6 (fp32 row sums).
+    region_elem_rtol_fp16: float = 2e-3
+    region_elem_rtol_fp32: float = 1e-5
 
     # ── Supported dtypes ────────────────────────────────────────────────
     # bfloat16 excluded: unstable on TileLang 0.1.11 + sm_89 (Ada Lovelace).

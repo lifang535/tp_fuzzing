@@ -25,11 +25,14 @@ def double_reference_source(function):
     return source
 
 
-def _finite_compare(C, ref, check_signed_zero=False):
+def _finite_compare(C, ref, check_signed_zero=False, rtol=0.0):
     """Check exceptional values before measuring finite numerical error.
 
     Reference results are rounded to the declared output storage dtype. Matching
     NaNs are allowed; a NaN/Inf introduced or lost by the kernel is not.
+    rtol > 0 measures each element's error beyond rtol * |ref| (the elementwise
+    mixed tolerance |C - ref| <= atol + rtol * |ref|): one storage ulp at a
+    large magnitude exceeds any fixed absolute tolerance.
     """
     import torch
     if C.shape != ref.shape:
@@ -53,7 +56,8 @@ def _finite_compare(C, ref, check_signed_zero=False):
             if not torch.equal(torch.signbit(c[zeros]), torch.signbit(r[zeros])):
                 raise RuntimeError("WRONG RESULT: signed zeros differ")
         mask = torch.isfinite(c) & torch.isfinite(r)
-        max_error = torch.maximum(max_error, torch.where(mask, (c - r).abs(), 0.0).max())
+        error = (c - r).abs() - rtol * r.abs() if rtol else (c - r).abs()
+        max_error = torch.maximum(max_error, torch.where(mask, error, 0.0).max())
         magnitude_sum += torch.where(mask, r.abs(), 0.0).sum()
         finite_count += mask.sum()
     count = finite_count.item()

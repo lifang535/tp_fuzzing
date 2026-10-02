@@ -1,7 +1,9 @@
 """Independent batched-tile interpreter with masked memory side effects."""
 
 
-def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, functions=()):
+def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, functions=(), tf32=None,
+                            perturb=None):
+    import math
     import torch
     m, n = A.shape[0], B.shape[1] if body['operations'][0]['kind'] == 'gemm' else A.shape[1]
     tm, tn = (m + block_m - 1) // block_m, (n + block_n - 1) // block_n
@@ -10,9 +12,65 @@ def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, function
     pool = {fn['name']: fn['body'] for fn in functions}
     memory = {}
 
+    def operand(x):
+        # fp32 GEMM operands enter the tensor cores as TF32 (10 mantissa
+        # bits). The compiler may hand over raw fp32 registers, whose 13 low
+        # bits the mma ignores (tf32='truncate'), or convert them first
+        # (tf32='nearest', round to nearest even); None keeps exact fp32.
+        x = x.float()
+        if tf32 is None:
+            return x
+        bits = x.view(torch.int32)
+        if tf32 == 'nearest':
+            bits = bits + 0xFFF + ((bits >> 13) & 1)
+        return torch.where(torch.isfinite(x), (bits & -0x2000).view(torch.float32), x)
+
     def tiles(x):
         x = torch.nn.functional.pad(x, (0, tn * block_n - n, 0, tm * block_m - m))
         return x.reshape(tm, block_m, tn, block_n).permute(0, 2, 1, 3)
+
+    signs = torch.Generator(device=A.device).manual_seed(perturb) if perturb is not None else None
+
+    def nudge(kind, attrs, args, value):
+        # The rounding moves of _region_reference's nudge, applied to the
+        # fp32 evaluation: both backends compute every typed operation in
+        # fp32 and round to the SSA dtype afterwards, so a half-precision
+        # result moves by one of its own units only near a rounding boundary.
+        if perturb is None:
+            return value
+        single = 2.0 ** -23
+        v = value.float()
+        if kind in ('mul', 'div', 'sqrt', 'rsqrt', 'scale'):
+            scale = 2 * single * v.abs()
+        elif kind in ('exp', 'exp2', 'tanh', 'erf'):
+            scale = 16 * single * v.abs()
+        elif kind in ('sin', 'cos', 'log', 'log2'):
+            scale = 16 * single * v.abs() + 2.0 ** -19 * (args[0] != 0).float()
+        elif kind == 'row_softmax':
+            scale = (2 * math.log2(block_n) + 16) * single * v.abs()
+        elif kind == 'row_sum':
+            terms = args[0].float().abs()
+            scale = (2 * math.log2(block_n) + 4) * single * terms.sum(-1, keepdim=True).expand_as(terms)
+        elif kind == 'reduce_tile' and attrs['reduction'] == 'sum':
+            terms = args[0].float().abs()
+            axis = attrs['axis'] + 2
+            scale = (2 * math.log2(max(terms.shape[axis], 2)) + 4) * single * terms.sum(axis, keepdim=True)
+        elif kind == 'gemm':
+            magnitude = tiles(operand(A).abs() @ operand(B).abs())
+            scale = (2 * math.log2(max(A.shape[1], 2)) + 4) * single * magnitude
+        else:
+            return value
+        info = torch.finfo(value.dtype)
+        _, exponent = torch.frexp(v)
+        half = exponent // 2
+        ulp = torch.ldexp(torch.ldexp(torch.full_like(v, info.eps / 2), half), exponent - half)
+        ulp = ulp.clamp_min(info.tiny * info.eps)
+        if perturb in (0, 1):
+            sign = 1 - 2 * perturb
+        else:
+            sign = torch.randint(0, 2, tuple(v.shape), generator=signs, device=v.device, dtype=torch.int8) * 2 - 1
+        moved = v + sign * torch.maximum(scale, ulp * (v != 0))
+        return torch.where(torch.isfinite(v), moved, v).to(value.dtype)
 
     def index(axis, iteration):
         return {'row': by, 'column': bx, 'checkerboard': by + bx, 'iteration': iteration}[axis]
@@ -35,7 +93,7 @@ def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, function
             if kind == 'load':
                 result = tiles(A.float())
             elif kind == 'gemm':
-                result = tiles(A.float() @ B.float())
+                result = nudge(kind, attrs, args, tiles(operand(A) @ operand(B)))
             elif kind == 'load_input':
                 result = read_input(attrs)
             elif kind == 'store_tile':
@@ -71,7 +129,7 @@ def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, function
                     result = result.float()
             elif kind == 'reduce_tile':
                 fn = {'sum': 'sum', 'max': 'amax', 'min': 'amin'}[attrs['reduction']]
-                result = getattr(args[0].float(), fn)(attrs['axis'] + 2, keepdim=True)
+                result = nudge(kind, attrs, args, getattr(args[0].float(), fn)(attrs['axis'] + 2, keepdim=True))
             elif kind == 'tile_transpose':
                 result = args[0].transpose(-1, -2)
             elif kind.startswith('row_'):
@@ -81,6 +139,7 @@ def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, function
                 else:
                     fn = {'row_sum': 'sum', 'row_max': 'amax', 'row_min': 'amin'}[kind]
                     result = getattr(x, fn)(-1, keepdim=True).expand_as(x)
+                result = nudge(kind, attrs, args, result)
             else:
                 # Half arithmetic has an explicit rounding point at every SSA
                 # definition; this is independent of the backend expression text.
@@ -112,7 +171,7 @@ def _typed_region_reference(A, B, body, block_m, block_n, output_dtype, function
                 elif kind == 'where': result = torch.where(x > 0, y, args[2].float())
                 elif kind == 'index_add': result = x + index(attrs['axis'], iteration) * attrs['scale']
                 else: raise ValueError('Unknown typed operation: ' + kind)
-                result = result.to(args[0].dtype)
+                result = nudge(kind, attrs, args, result).to(args[0].dtype)
             values[op['result']] = result
         return values[region['yield_value']]
 

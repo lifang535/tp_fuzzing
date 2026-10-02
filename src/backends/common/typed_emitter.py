@@ -33,8 +33,8 @@ def emit_typed_region(program, backend, config):
     from .region import _region_layouts, _layout_sweep_pairs
     from .region_emitter import region_variant_pairs, _variant_kinds
     from src.workflow.emitter.region_checks import (_region_input, _region_input_storage, _region_equal,
-                                                    _region_check, _ulp_jitter, _reference_stable,
-                                                    _run_region, _run_layout_case)
+                                                    _region_check, _reference_explained, _reference_bounds,
+                                                    _ulp_jitter, _reference_stable, _run_region, _run_layout_case)
     p, e = program.spec, program.execution
     gemm = program.body.operations[0].kind == 'gemm'
     # Div programs amplify magnitudes (clamped denominators chain by ~1e3 per
@@ -57,7 +57,8 @@ def emit_typed_region(program, backend, config):
     parts = [adapter.imports,
              'import torch', 'import sys', _threshold_header(config)]
     checks = (matrix_layout, _region_input, _region_input_storage, _region_equal,
-              _region_check, _ulp_jitter, _reference_stable, _run_region)
+              _region_check, _reference_explained, _reference_bounds, _ulp_jitter, _reference_stable,
+              _run_region)
     if sweep:
         checks += (_run_layout_case,)
     parts += [inspect.getsource(fn) for fn in checks + (_typed_region_reference, _prepare_typed_launch)]
@@ -70,6 +71,18 @@ def emit_typed_region(program, backend, config):
     variants = [variant for variant, _ in variant_pairs]
     variant_options = [options for _, options in variant_pairs]
     tolerance = 1.0 if int8 else (config.region_rtol_fp16 if p.dtype.value == 'float16' else config.region_rtol_fp32) if relative else config.elemwise_atol
+    rtol = 0.0 if int8 else config.region_elem_rtol_fp16 if p.dtype.value == 'float16' else config.region_elem_rtol_fp32
+    reference_args = f'{asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}'
+    oracle_args = f', rtol={rtol}'
+    if p.dtype.value == 'float32' and any(op.kind == 'gemm' for op in program.all_operations()):
+        # fp32 GEMMs run on TF32 tensor cores (tl.dot's default input
+        # precision, T.gemm), so the TF32 readings of the operands are
+        # admissible references too.
+        oracle_args += (", reference_models=lambda: [_typed_region_reference(A, B, "
+                        f"{reference_args}, tf32=mode) for mode in ('truncate', 'nearest')]")
+    if not int8:
+        oracle_args += (", reference_nudged=lambda pattern, base: _typed_region_reference(A, B, "
+                        f"{reference_args}, tf32=(None, 'truncate', 'nearest')[base], perturb=pattern)")
     kinds = _variant_kinds(variants, variant_options, p)
     # Legacy programs (thread pair only) keep the plain historical call text.
     kind_arg = f', variant_kinds={kinds!r}' if any(k != 'schedule' for k in kinds) else ''
@@ -106,7 +119,7 @@ def emit_typed_region(program, backend, config):
 {runner_code}
         print('TILESMITH_STAGE=reference', file=sys.stderr, flush=True)
         ref = _typed_region_reference(A, B, {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r})
-        _run_layout_case([{', '.join(f'run_variant_{p_index}_{i}' for i in range(len(variants)))}], (a_storage, b_storage), ref, {e.repeat_count}, {tolerance}, relative={relative!r}, layout_a={la!r}, layout_b={lb!r}, alternate={p_index != 0}{kind_arg}{marker_arg}, reference_verify=lambda: _typed_region_reference_double(A, B, {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}))''')
+        _run_layout_case([{', '.join(f'run_variant_{p_index}_{i}' for i in range(len(variants)))}], (a_storage, b_storage), ref, {e.repeat_count}, {tolerance}, relative={relative!r}, layout_a={la!r}, layout_b={lb!r}, alternate={p_index != 0}{kind_arg}{marker_arg}, reference_verify=lambda: _typed_region_reference_double(A, B, {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}){oracle_args})''')
         run_block = '\n'.join(blocks)
         body = f'''def test_kernel_0():
     for input_case in range({e.input_seed_count}):
@@ -137,7 +150,7 @@ def emit_typed_region(program, backend, config):
 {factory_code}
         print('TILESMITH_STAGE=reference', file=sys.stderr, flush=True)
         ref = _typed_region_reference(A, B, {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r})
-        _run_region([{', '.join(f'run_variant_{i}' for i in range(len(variants)))}], (a_storage, b_storage), ref, {e.repeat_count}, {tolerance}, relative={relative!r}{kind_arg}, reference_verify=lambda: _typed_region_reference_double(A, B, {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}))'''
+        _run_region([{', '.join(f'run_variant_{i}' for i in range(len(variants)))}], (a_storage, b_storage), ref, {e.repeat_count}, {tolerance}, relative={relative!r}{kind_arg}, reference_verify=lambda: _typed_region_reference_double(A, B, {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}), reference_jitter=lambda: _typed_region_reference(_ulp_jitter(A), _ulp_jitter(B), {asdict(program.body)!r}, {p.block_M}, {p.block_N}, {output_dtype!r}, {[fn.to_dict() for fn in program.functions]!r}){oracle_args})'''
     parts.append(f'''
 {body}
 

@@ -50,14 +50,88 @@ def _region_equal(actual, expected, label):
         raise RuntimeError('WRONG RESULT: ' + label)
 
 
-def _region_check(actual, expected, relative, tolerance, label):
+def _region_check(actual, expected, relative, tolerance, label, rtol=0.0):
     try:
-        maximum, _, normalized = _finite_compare(actual, expected)
+        maximum, _, normalized = _finite_compare(actual, expected, rtol=rtol)
     except RuntimeError as error:
         raise RuntimeError(f'WRONG RESULT: {label}: {error}') from error
     error = normalized if relative else maximum
     if error > tolerance:
         raise RuntimeError(f'WRONG RESULT: {label}: error={error}, tolerance={tolerance}')
+
+
+def _reference_explained(actual, references, relative, tolerance, rtol=0.0, bounds=None):
+    """Count the elements outside tolerance of references[0], and how many of
+    them no reference explains; returns (mismatched, unexplained).
+
+    references holds the fp32 reference followed by its perturbed copies (fp64,
+    one-ulp-jittered inputs, TF32 GEMM operands). A mismatched element is
+    explained when the kernel value lies inside the hull of the references at
+    that element, widened by the same tolerance band, or repeats a non-finite
+    value one of them produces: it landed where an admissible rounding of the
+    same program lands. _reference_stable judges the whole output and misses
+    a few ill-conditioned elements (a floor at an integer boundary, a log of a
+    cancelled sum) inside an otherwise stable one. bounds, from
+    _reference_bounds, widens the hull by the span of further references.
+    """
+    import torch
+    flat = actual.reshape(-1)
+    copies = [r.reshape(-1).to(dtype=actual.dtype, device=actual.device) for r in references]
+    atol = tolerance
+    if relative:
+        # The absolute allowance _finite_compare's normalized error implies.
+        both = torch.isfinite(flat) & torch.isfinite(copies[0])
+        count = int(both.sum())
+        mean = torch.where(both, copies[0].double().abs(), 0.0).sum().item() / count if count else 0.0
+        atol = tolerance * (mean + 1e-6)
+    mismatched = unexplained = 0
+    for start in range(0, flat.numel(), 1 << 20):
+        a = flat[start:start + (1 << 20)].double()
+        values = torch.stack([r[start:start + (1 << 20)].double() for r in copies])
+        r = values[0]
+        same = (a == r) | (torch.isnan(a) & torch.isnan(r))
+        close = torch.isfinite(a) & torch.isfinite(r) & ((a - r).abs() <= atol + rtol * r.abs())
+        bad = ~(same | close)
+        if not bad.any():
+            continue
+        mismatched += int(bad.sum())
+        a, values = a[bad], values[:, bad]
+        valid = torch.isfinite(values)
+        low = torch.where(valid, values, float('inf')).min(0).values
+        high = torch.where(valid, values, float('-inf')).max(0).values
+        span = valid.any(0)
+        if bounds is not None:
+            end = start + (1 << 20)
+            low = torch.minimum(low, bounds[0][start:end].to(actual.device).double()[bad])
+            high = torch.maximum(high, bounds[1][start:end].to(actual.device).double()[bad])
+            span = span | torch.isfinite(low)
+        magnitude = torch.where(valid, values.abs(), 0.0).max(0).values
+        if bounds is not None:
+            magnitude = torch.maximum(magnitude, torch.where(span, torch.maximum(low.abs(), high.abs()), 0.0))
+        band = atol + rtol * magnitude
+        inside = torch.isfinite(a) & span & (a >= low - band) & (a <= high + band)
+        repeated = ((values == a) | (torch.isnan(values) & torch.isnan(a))).any(0)
+        unexplained += int((~(inside | repeated)).sum())
+    return mismatched, unexplained
+
+
+def _reference_bounds(evaluate, patterns=8):
+    """Elementwise (low, high) of the finite values of evaluate(0..patterns-1),
+    built one reference at a time; an element no reference leaves finite gets
+    (inf, -inf). A pattern whose evaluation raises is skipped; None when all
+    do."""
+    import torch
+    low = high = None
+    for pattern in range(patterns):
+        try:
+            r = evaluate(pattern).reshape(-1)
+        except Exception:
+            continue
+        finite = torch.isfinite(r)
+        lo, hi = torch.where(finite, r, float('inf')), torch.where(finite, r, float('-inf'))
+        low = lo if low is None else torch.minimum(low, lo)
+        high = hi if high is None else torch.maximum(high, hi)
+    return None if low is None else (low, high)
 
 
 def _ulp_jitter(x):
@@ -125,7 +199,8 @@ def _run_layout_case(launches, inputs, reference, repeats, tolerance, relative,
 
 def _run_region(launches, inputs, reference, repeats, tolerance, relative=False,
                 variant_kinds=None, references=None, prepare_markers=None,
-                reference_verify=None, reference_jitter=None):
+                reference_verify=None, reference_jitter=None, rtol=0.0, reference_models=None,
+                reference_nudged=None, nudge_limit=1 << 25):
     """Compile every variant concurrently, then execute them in order.
 
     The caller computes reference before any target kernel can corrupt inputs.
@@ -147,7 +222,25 @@ def _run_region(launches, inputs, reference, repeats, tolerance, relative=False,
     failure is first checked against _reference_stable: when the fp32 reference
     disagrees with either copy, the failure is oracle noise (a chaotic or
     reduction-order-sensitive program), re-raised as ORACLE UNSTABLE instead of
-    a wrong_result.
+    a wrong_result. The same holds when every mismatched element lies within
+    the perturbed copies (_reference_explained).
+
+    reference_models, when given, returns the references under the other
+    admissible GEMM semantics: tensor cores read fp32 operands as TF32, by
+    truncation or by rounding depending on the compiler. A kernel within
+    tolerance of one of them is correct. rtol is the elementwise relative part
+    of the tolerance (_finite_compare), applied to every numeric comparison.
+
+    reference_nudged(pattern, base), when given, evaluates the reference under
+    rounding-move pattern `pattern` (0..7) of every inexact operation, from
+    base 0 (the fp32 reference) or base i (reference_models()[i - 1]); the
+    base is the reference that the kernel output mismatches least. Elements
+    the copies leave unexplained are explained by the span of the eight
+    patterns, so an approximate cos at zero under a floor, or an fp16
+    rounding boundary under a round, is ORACLE UNSTABLE too. Past
+    nudge_limit output elements only the two uniform patterns (every move
+    up, every move down) are evaluated: they bound monotone chains and keep
+    the failure path of the largest programs within the harness timeout.
     """
     import torch
     import sys
@@ -175,6 +268,7 @@ def _run_region(launches, inputs, reference, repeats, tolerance, relative=False,
     actual = output[guard:-guard].view_as(reference)
     snapshots = [tensor.clone() for tensor in inputs]
     baseline = None
+    models = copies = bounds = None
     # Integer outputs (int8 GEMM -> int32 C) cannot hold NaN poison.
     floating = reference.dtype.is_floating_point
     prepared = [None] * len(launches)
@@ -233,18 +327,60 @@ def _run_region(launches, inputs, reference, repeats, tolerance, relative=False,
                     repeat_baseline = baseline
                 else:
                     _region_check(actual, baseline, relative, tolerance,
-                                  f'{variant_kinds[variant]} invariance')
+                                  f'{variant_kinds[variant]} invariance', rtol)
                     repeat_baseline = actual.clone()
             else:
                 _region_equal(actual, repeat_baseline, 'repeat determinism')
             try:
-                _region_check(actual, expected, relative, tolerance, 'structured reference')
+                _region_check(actual, expected, relative, tolerance, 'structured reference', rtol)
             except RuntimeError:
+                # Copies are computed once, on the first failure: most
+                # programs never need them. The admissible models and the
+                # rounding envelope only widen the check; out of device
+                # memory, it falls back to the strict fp32 one rather than
+                # turning a numeric mismatch into a gpu_oom crash.
+                if models is None:
+                    try:
+                        models = list(reference_models()) if reference_models is not None else []
+                    except torch.cuda.OutOfMemoryError:
+                        models = []
+                admissible = False
+                for model in models:
+                    try:
+                        _region_check(actual, model, relative, tolerance, 'structured reference', rtol)
+                        admissible = True
+                        break
+                    except RuntimeError:
+                        pass
+                if admissible:
+                    continue
+                if reference_verify is None:
+                    raise
+                if copies is None:
+                    copies = [reference_verify()] + ([reference_jitter()] if reference_jitter is not None else [])
                 # Suppress the chain: the chained WRONG RESULT text would leak
                 # into stderr and skew root-cause classification.
-                if reference_verify is not None and not _reference_stable(
-                        expected, reference_verify(),
-                        reference_jitter() if reference_jitter is not None else None):
+                if not _reference_stable(expected, *copies):
                     raise RuntimeError('ORACLE UNSTABLE: reference disagrees with its '
                                        'fp64 or one-ulp-jittered copy; numeric check skipped') from None
+                mismatched, unexplained = _reference_explained(
+                    actual, [expected] + copies + models, relative, tolerance, rtol)
+                if unexplained and reference_nudged is not None:
+                    if bounds is None:
+                        bases = [expected] + models
+                        base = min(range(len(bases)), key=lambda i: _reference_explained(
+                            actual, [bases[i]], relative, tolerance, rtol)[0])
+                        # () caches an envelope whose patterns all failed.
+                        patterns = 8 if reference.numel() <= nudge_limit else 2
+                        try:
+                            bounds = _reference_bounds(lambda pattern: reference_nudged(pattern, base),
+                                                       patterns) or ()
+                        except torch.cuda.OutOfMemoryError:
+                            bounds = ()
+                    if bounds:
+                        mismatched, unexplained = _reference_explained(
+                            actual, [expected] + copies + models, relative, tolerance, rtol, bounds)
+                if not unexplained:
+                    raise RuntimeError(f'ORACLE UNSTABLE: {mismatched} mismatched elements lie within '
+                                       'the perturbed references; numeric check skipped') from None
                 raise
