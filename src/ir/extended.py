@@ -16,6 +16,12 @@ DTYPES = ('float16', 'float32', 'int32', 'int8', 'bool')
 FLOAT_UNARY_OPS = ('neg', 'abs', 'sqrt', 'exp', 'log', 'log2', 'exp2',
                    'rsqrt', 'sin', 'cos', 'floor', 'ceil', 'tanh', 'erf', 'round')
 FLOAT_BINARY_OPS = ('minimum', 'maximum', 'div')
+# Target calls whose attributes choose an axis, a direction, an order or a
+# count; absent attributes keep the historical 1-D spelling.
+TARGET_ATTRIBUTE_OPS = frozenset(('scan_sum', 'scan_product', 'scan_max', 'sort', 'softmax',
+                                  'topk', 'argmax', 'argmin', 'xor_sum', 'reduce_abssum',
+                                  'reduce_absmax', 'reduce_bitand', 'reduce_bitor',
+                                  'reduce_bitxor'))
 
 
 @dataclass(frozen=True)
@@ -149,6 +155,26 @@ def broadcast_shape(a, b):
             raise ValueError('Incompatible broadcast shapes')
         result.append(max(x, y))
     return tuple(result)
+
+
+def target_axis(attrs, ty):
+    """The normalized axis of a target scan, softmax or reduction.
+
+    An absent axis keeps old 1-D programs valid: the minor dimension.
+    """
+    axis = attrs.get('axis', -1)
+    if type(axis) is not int or not -len(ty.shape) <= axis < len(ty.shape):
+        raise ValueError('Invalid target operation axis')
+    return axis % len(ty.shape)
+
+
+def spelled_axis(attrs, ty):
+    """The validated axis as the program spells it, possibly negative."""
+    return attrs.get('axis', target_axis(attrs, ty))
+
+
+def reduced_shape(ty, axis):
+    return ty.shape[:axis] + ty.shape[axis + 1:]
 
 
 def analyze(program):
@@ -293,42 +319,50 @@ def analyze(program):
                             TensorType(args[0].dtype, args[0].shape[:-1])]
             elif op in ('scan_sum', 'scan_product', 'scan_max', 'sort',
                         'dsl_sigmoid', 'dsl_clamp', 'softmax'):
-                if (len(args) != 1 or len(args[0].shape) != 1
+                if (len(args) != 1 or len(args[0].shape) not in (1, 2)
                         or args[0].dtype != 'float32' or len(outs) != 1):
                     raise ValueError('Invalid scan or sort operand')
+                if op.startswith('scan_') or op == 'softmax':
+                    target_axis(a, args[0])
+                # Spelling flags: sort/topk reorder only the minor dimension.
+                for flag in {'scan_sum': ('reverse',), 'scan_product': ('reverse',),
+                             'scan_max': ('reverse',), 'sort': ('descending',),
+                             'softmax': ('keep_dims',)}.get(op, ()):
+                    if type(a.get(flag, False)) is not bool:
+                        raise ValueError(f'Invalid {op} {flag} flag')
                 expected = [args[0]]
             elif op in ('argmax', 'argmin', 'xor_sum'):
-                if (len(args) != 1 or len(args[0].shape) != 1
+                if (len(args) != 1 or len(args[0].shape) not in (1, 2)
                         or args[0].dtype != 'int32' or len(outs) != 1):
                     raise ValueError('Invalid integer reduction operand')
-                expected = [TensorType('int32')]
+                expected = [TensorType('int32', reduced_shape(args[0], target_axis(a, args[0])))]
             elif op == 'topk':
                 k = a.get('k')
-                if (len(args) != 1 or len(args[0].shape) != 1 or args[0].dtype != 'float32'
-                        or type(k) is not int or k < 1 or k > args[0].shape[0] or k & (k - 1)
-                        or len(outs) != 1):
+                if (len(args) != 1 or len(args[0].shape) not in (1, 2) or args[0].dtype != 'float32'
+                        or type(k) is not int or k < 1 or k > args[0].shape[-1] or k & (k - 1)
+                        or type(a.get('descending', True)) is not bool or len(outs) != 1):
                     raise ValueError('Invalid topk operand or k')
-                expected = [TensorType('float32', (k,))]
+                expected = [TensorType('float32', args[0].shape[:-1] + (k,))]
             elif op == 'gather':
                 if (len(args) != 2 or len(args[0].shape) != 1 or args[0].dtype != 'float32'
                         or args[1] != TensorType('int32', args[0].shape) or len(outs) != 1):
                     raise ValueError('Invalid gather operands')
                 expected = [args[0]]
             elif op in ('reduce_abssum', 'reduce_absmax'):
-                if (len(args) != 1 or len(args[0].shape) != 1
+                if (len(args) != 1 or len(args[0].shape) not in (1, 2)
                         or args[0].dtype != 'float32' or len(outs) != 1):
                     raise ValueError('Invalid absolute reduction operand')
-                expected = [TensorType('float32')]
+                expected = [TensorType('float32', reduced_shape(args[0], target_axis(a, args[0])))]
             elif op == 'histogram':
                 if (len(args) != 1 or len(args[0].shape) != 1
                         or args[0].dtype != 'int32' or len(outs) != 1):
                     raise ValueError('Invalid histogram operand')
                 expected = [TensorType('int32', (16,))]
             elif op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
-                if (len(args) != 1 or len(args[0].shape) != 1
+                if (len(args) != 1 or len(args[0].shape) not in (1, 2)
                         or args[0].dtype != 'int32' or len(outs) != 1):
                     raise ValueError('Invalid bitwise reduction operand')
-                expected = [TensorType('int32')]
+                expected = [TensorType('int32', reduced_shape(args[0], target_axis(a, args[0])))]
             elif op in ('add', 'sub', 'mul', 'bitand', 'bitxor', 'mod', 'lt', 'eq', 'and', 'or'):
                 if len(args) != 2 or args[0].dtype != args[1].dtype:
                     raise ValueError('Binary operation dtype/arity mismatch')

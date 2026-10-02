@@ -81,6 +81,12 @@ class Config:
     dsl_evolve_prob: float = 0.5
     dsl_max_depth: int = 3
     dsl_max_ops: int = 256
+    # Probability that a target call takes a rank-2 operand instead of the
+    # historical 1-D fp32 vector, and whether target calls draw their axis,
+    # direction, order and topk size. Off in the library; the CLI turns both
+    # on for new campaigns.
+    dsl_matrix_prob: float = 0.0
+    dsl_attributes: bool = False
     # Preserve rare-feature representatives when bounded corpora fill up.
     corpus_feedback: bool = True
     # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong

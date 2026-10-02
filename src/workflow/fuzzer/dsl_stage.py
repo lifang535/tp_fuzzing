@@ -6,7 +6,8 @@ import json
 import random
 
 from src.ir.serialization import program_from_dict
-from src.workflow.generator.dsl_extend import DSL_OPS, eligible_ops, extend_passed, loop_target
+from src.workflow.generator.dsl_extend import (DSL_OPS, eligible_ops, extend_passed, loop_target,
+                                               respell_target)
 from src.workflow.feedback import corpus_eviction, program_features
 
 
@@ -160,7 +161,10 @@ class DSLStage:
                     continue
                 self.targets[index] = (parent, source_file, True, digest)
             meta = self.target_meta[digest]
-            action = random.choices(('compose', 'mutate', 'loop'), weights=(0.55, 0.25, 0.20), k=1)[0]
+            # Respelling target attributes takes half of the mutation share.
+            respell = .125 if self.config.dsl_attributes else 0
+            action = random.choices(('compose', 'mutate', 'loop', 'respell'),
+                                    weights=(0.55, 0.25 - respell, 0.20, respell), k=1)[0]
             op = meta['extension_op']
             try:
                 if action == 'compose':
@@ -176,6 +180,8 @@ class DSLStage:
                                           input_name=meta.get('extension_output', parent.body.returns[0]))
                 elif action == 'loop':
                     child = loop_target(parent, self.backend)
+                elif action == 'respell':
+                    child = respell_target(parent, self.backend)
                 else:
                     child = mutate_extended(parent, self.config, self.backend, regenerate=False)
                 if sum(1 for _ in child.all_operations()) > self.config.dsl_max_ops:

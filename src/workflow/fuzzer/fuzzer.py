@@ -608,6 +608,8 @@ class TileSmith:
                     "dsl_evolve_prob": self.config.dsl_evolve_prob,
                     "dsl_max_depth": self.config.dsl_max_depth,
                     "dsl_max_ops": self.config.dsl_max_ops,
+                    "dsl_matrix_prob": self.config.dsl_matrix_prob,
+                    "dsl_attributes": self.config.dsl_attributes,
                     "corpus_feedback": self.config.corpus_feedback,
                     "extended_common_only": self.config.extended_common_only,
                     "extended_configuration_pair": self.config.extended_configuration_pair,

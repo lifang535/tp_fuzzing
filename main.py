@@ -54,6 +54,12 @@ def main():
                              '(default 0.5; old campaigns resume with 0)')
     parser.add_argument('--dsl-max-depth', type=int, default=None,
                         help='Maximum number of DSL derivation steps (default 3)')
+    parser.add_argument('--dsl-matrix-prob', type=float, default=None,
+                        help='Probability that a DSL target call takes a rank-2 operand '
+                             '(default 0.5; old campaigns resume with 0)')
+    parser.add_argument('--dsl-attributes', action=argparse.BooleanOptionalAction, default=None,
+                        help='Draw the axis, direction, order and topk size of DSL target calls '
+                             '(default on; old campaigns resume with off)')
     parser.add_argument('--corpus-feedback', action=argparse.BooleanOptionalAction, default=None,
                         help='Preserve rare-feature representatives in bounded seed pools '
                              '(default on; old campaigns resume with off)')
@@ -197,10 +203,16 @@ def main():
         args.dsl_evolve_prob = saved_generation.get('dsl_evolve_prob', 0.0) if args.resume else 0.5
     if args.dsl_max_depth is None:
         args.dsl_max_depth = saved_generation.get('dsl_max_depth', 3)
+    if args.dsl_matrix_prob is None:
+        args.dsl_matrix_prob = saved_generation.get('dsl_matrix_prob', 0.0) if args.resume else 0.5
+    if args.dsl_attributes is None:
+        args.dsl_attributes = saved_generation.get('dsl_attributes', False) if args.resume else True
     if args.corpus_feedback is None:
         args.corpus_feedback = saved_generation.get('corpus_feedback', False) if args.resume else True
     if not 0 <= args.dsl_evolve_prob <= 1 or not 1 <= args.dsl_max_depth <= 8:
         parser.error('--dsl-evolve-prob must be in [0, 1] and --dsl-max-depth in [1, 8]')
+    if not 0 <= args.dsl_matrix_prob <= 1:
+        parser.error('--dsl-matrix-prob must be between 0 and 1')
     # Campaigns that predate failure triage resume without it, so appended
     # results keep the generation distribution of the earlier segments.
     if args.quarantine is None:
@@ -283,6 +295,8 @@ def main():
         dsl_extend_prob=args.dsl_extend_prob,
         dsl_evolve_prob=args.dsl_evolve_prob,
         dsl_max_depth=args.dsl_max_depth,
+        dsl_matrix_prob=args.dsl_matrix_prob,
+        dsl_attributes=args.dsl_attributes,
         corpus_feedback=args.corpus_feedback,
         extended_common_only=not args.legacy_extended_mix,
         extended_configuration_pair=not args.no_extended_configurations,

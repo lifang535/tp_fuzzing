@@ -229,39 +229,43 @@ def extended_reference(program, inputs, steps, limit):
                 out = [torch.stack((args[0], args[1]), dim=-1)]
             elif op == 'split':
                 out = [args[0][..., 0], args[0][..., 1]]
-            elif op in ('scan_sum', 'scan_product', 'scan_max', 'sort'):
-                if op == 'scan_sum': out = [torch.cumsum(args[0], dim=0)]
-                elif op == 'scan_product': out = [torch.cumprod(args[0], dim=0)]
-                elif op == 'scan_max': out = [torch.cummax(args[0], dim=0).values]
-                else: out = [torch.sort(args[0], dim=0).values]
+            elif op in ('scan_sum', 'scan_product', 'scan_max'):
+                # An absent axis is the minor one; a reverse scan accumulates
+                # from the far end, i.e. a forward scan of the flipped axis.
+                axis, reverse = a.get('axis', -1), a.get('reverse', False)
+                value = torch.flip(args[0], [axis]) if reverse else args[0]
+                if op == 'scan_sum': value = torch.cumsum(value, dim=axis)
+                elif op == 'scan_product': value = torch.cumprod(value, dim=axis)
+                else: value = torch.cummax(value, dim=axis).values
+                out = [torch.flip(value, [axis]) if reverse else value]
+            elif op == 'sort':
+                out = [torch.sort(args[0], dim=-1, descending=a.get('descending', False)).values]
             elif op in ('reduce_abssum', 'reduce_absmax'):
-                out = [args[0].abs().sum() if op == 'reduce_abssum' else args[0].abs().max()]
+                axis = a.get('axis', -1)
+                out = [args[0].abs().sum(axis) if op == 'reduce_abssum' else args[0].abs().amax(axis)]
             elif op == 'histogram':
                 out = [torch.bincount(args[0].long(), minlength=16).to(torch.int32)]
-            elif op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
-                value = args[0].reshape(-1)
-                acc = value[0]
-                for item in value[1:]:
+            elif op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor', 'xor_sum'):
+                items = args[0].unbind(a.get('axis', -1))
+                acc = items[0]
+                for item in items[1:]:
                     if op == 'reduce_bitand': acc = torch.bitwise_and(acc, item)
                     elif op == 'reduce_bitor': acc = torch.bitwise_or(acc, item)
                     else: acc = torch.bitwise_xor(acc, item)
                 out = [acc]
-            elif op in ('argmax', 'argmin', 'xor_sum'):
-                if op == 'argmax': out = [torch.argmax(args[0]).to(torch.int32)]
-                elif op == 'argmin': out = [torch.argmin(args[0]).to(torch.int32)]
-                else:
-                    acc = args[0].reshape(-1)[0]
-                    for item in args[0].reshape(-1)[1:]:
-                        acc = torch.bitwise_xor(acc, item)
-                    out = [acc]
+            elif op in ('argmax', 'argmin'):
+                # Ties resolve to the first index, like tie_break_left=True.
+                fn = torch.argmax if op == 'argmax' else torch.argmin
+                out = [fn(args[0], dim=a.get('axis', -1)).to(torch.int32)]
             elif op == 'dsl_sigmoid':
                 out = [torch.sigmoid(args[0])]
             elif op == 'dsl_clamp':
                 out = [torch.clamp(args[0], -0.5, 0.5)]
             elif op == 'softmax':
-                out = [torch.softmax(args[0], dim=0)]
+                # keep_dims only spells the target call; the result is the same.
+                out = [torch.softmax(args[0], dim=a.get('axis', -1))]
             elif op == 'topk':
-                out = [torch.topk(args[0], a['k'], dim=0).values]
+                out = [torch.topk(args[0], a['k'], dim=-1, largest=a.get('descending', True)).values]
             elif op == 'gather':
                 out = [torch.gather(args[0], 0, args[1].long())]
             elif op in ('atomic_add', 'atomic_max', 'atomic_min',

@@ -1,5 +1,5 @@
 """Triton lowering of typed exploration programs; no TileLang conditionals."""
-from src.ir.extended import analyze, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
+from src.ir.extended import analyze, spelled_axis, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
 from src.workflow.generator.identities import extended_variant_label
 from .ops import elementwise_expr
 
@@ -135,22 +135,36 @@ class ExtendedLowering:
                 # Two results bypass the single-expression tail; the elements
                 # keep their dtype.
                 self.add(indent, f'{names[0]}, {names[1]} = tl.split({args[0]})')
-            elif op in ('scan_sum', 'scan_product', 'scan_max', 'sort'):
-                fn = {'scan_sum': 'cumsum', 'scan_product': 'cumprod',
-                      'scan_max': 'cummax', 'sort': 'sort'}[op]
-                expression = f'tl.{fn}({args[0]}, 0)' if op != 'sort' else f'tl.sort({args[0]}, descending=False)'
+            elif op in ('scan_sum', 'scan_product', 'scan_max'):
+                fn = {'scan_sum': 'cumsum', 'scan_product': 'cumprod', 'scan_max': 'cummax'}[op]
+                # A negative axis is printed as spelled, for the front end
+                # to normalize.
+                reverse = ', reverse=True' if a.get('reverse') else ''
+                expression = f'tl.{fn}({args[0]}, {spelled_axis(a, t)}{reverse})'
+            elif op == 'sort':
+                # Triton sorts only the minor dimension.
+                expression = f"tl.sort({args[0]}, descending={a.get('descending', False)})"
             elif op == 'histogram':
                 expression = f'tl.histogram({args[0]}, 16)'
             elif op in ('argmax', 'argmin', 'xor_sum'):
-                expression = f'tl.{op}({args[0]}, 0)'
+                expression = f'tl.{op}({args[0]}, {spelled_axis(a, self.ty(scope, args[0]))})'
             elif op == 'dsl_sigmoid':
                 expression = f'tl.sigmoid({args[0]})'
             elif op == 'dsl_clamp':
                 expression = f'tl.clamp({args[0]}, -0.5, 0.5)'
             elif op == 'softmax':
-                expression = f'tl.softmax({args[0]}, 0)'
+                axis = spelled_axis(a, t)
+                if axis == 0 and not a.get('keep_dims'):
+                    # Also valid on Triton 3.0, whose only softmax positional
+                    # is ieee_rounding and which always normalizes axis 0.
+                    expression = f'tl.softmax({args[0]}, 0)'
+                else:
+                    keep_dims = ', keep_dims=True' if a.get('keep_dims') else ''
+                    expression = f'tl.softmax({args[0]}, dim={axis}{keep_dims})'
             elif op == 'topk':
-                expression = f'tl.topk({args[0]}, {a["k"]}, dim=0)'
+                # Only the minor dimension; descending=True is the default.
+                descending = '' if a.get('descending', True) else ', descending=False'
+                expression = f'tl.topk({args[0]}, {a["k"]}, dim={len(t.shape) - 1}{descending})'
             elif op == 'gather':
                 expression = f'tl.gather({args[0]}, {args[1]}, 0)'
             elif op in ('atomic_add', 'atomic_max', 'atomic_min',

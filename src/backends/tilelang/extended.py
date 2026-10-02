@@ -1,5 +1,5 @@
 """TileLang exploration lowering, with explicit fragments and GEMM staging."""
-from src.ir.extended import analyze, walk, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
+from src.ir.extended import analyze, spelled_axis, target_axis, walk, FLOAT_UNARY_OPS, FLOAT_BINARY_OPS
 from src.workflow.generator.identities import extended_variant_label
 from .ops import elementwise_expr
 
@@ -68,7 +68,7 @@ class ExtendedLowering:
                 out = node.results[0].name
                 ty = next(t for (scope, name), t in self.types.items() if name == node.operands[0])
                 self.add(indent, f'{out}_wide = T.alloc_fragment({ty.shape!r}, "{node.results[0].type.dtype}")')
-                if node.op == 'reduce' and len(ty.shape) == 2 and node.attrs['axis'] == 0:
+                if len(ty.shape) == 2 and target_axis(node.attrs, ty) == 0:
                     self.add(indent, f'{out}_reduce_shared = T.alloc_shared({ty.shape!r}, "{ty.dtype}")')
                 if (node.op == 'reduce' and ty.dtype.startswith('float') and node.attrs['kind'] in ('max', 'min')
                         and not (len(ty.shape) == 2 and node.attrs['axis'] == 0)):
@@ -141,20 +141,28 @@ class ExtendedLowering:
                 self.add(indent, f'T.gemm({out}_a_shared, {out}_b_shared, {out})')
                 continue
             if op in ('scan_sum', 'scan_max'):
-                self.add(indent, f'T.{"cumsum" if op == "scan_sum" else "cummax"}({args[0]}, {out}, dim=0)')
+                # Fragment scans stage through shared memory inside TileLang,
+                # which also normalizes a negative dim.
+                reverse = ', reverse=True' if a.get('reverse') else ''
+                self.add(indent, f'T.{"cumsum" if op == "scan_sum" else "cummax"}({args[0]}, {out}, dim={spelled_axis(a, ty)}{reverse})')
                 continue
-            if op in ('reduce_abssum', 'reduce_absmax'):
+            if op in ('reduce_abssum', 'reduce_absmax', 'reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
                 src_ty = self.ty(scope, args[0])
+                axis = target_axis(a, src_ty)
+                staged = len(src_ty.shape) == 2 and axis == 0
+                if staged:
+                    # The same column staging as reduce, for MMA producers.
+                    self.add(indent, f'T.copy({args[0]}, {out}_reduce_shared)')
+                    self.add(indent, 'T.sync_threads()')
                 level, indices = self.loop(indent, src_ty.shape)
-                self.add(level, f"{out}_wide[{', '.join(indices)}] = {self.ref(scope, args[0], indices)}")
-                self.add(indent, f'T.clear({out})')
-                self.add(indent, f'T.{op}({out}_wide, {out}, dim=0)')
-                continue
-            if op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
-                src_ty = self.ty(scope, args[0])
-                level, indices = self.loop(indent, src_ty.shape)
-                self.add(level, f"{out}_wide[{', '.join(indices)}] = {self.ref(scope, args[0], indices)}")
-                self.add(indent, f'T.{op}({out}_wide, {out}, dim=0, clear=True)')
+                src = f"{out}_reduce_shared[{', '.join(indices)}]" if staged else self.ref(scope, args[0], indices)
+                self.add(level, f"{out}_wide[{', '.join(indices)}] = {src}")
+                dim = spelled_axis(a, src_ty)
+                if op in ('reduce_abssum', 'reduce_absmax'):
+                    self.add(indent, f'T.clear({out})')
+                    self.add(indent, f'T.{op}({out}_wide, {out}, dim={dim})')
+                else:
+                    self.add(indent, f'T.{op}({out}_wide, {out}, dim={dim}, clear=True)')
                 continue
             if op == 'reduce':
                 src_ty = self.ty(scope, args[0])

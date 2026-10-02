@@ -3,7 +3,7 @@
 Liveness is a static approximation; retained compiler IR has separate counters.
 No source or IR feature is described as compiler edge coverage.
 """
-from src.ir.extended import analyze, walk
+from src.ir.extended import TARGET_ATTRIBUTE_OPS, analyze, target_axis, walk
 from src.workflow.feedback import key
 
 
@@ -37,6 +37,16 @@ def extended_features(program):
                 local.add(key('region_signature', n.op, sig))
             elif n.op == 'flip':
                 local.add(key('attribute', 'flip', n.attrs.get('axis', -1) % len(sig[0][1])))
+            elif n.op in TARGET_ATTRIBUTE_OPS:
+                # The operand rank bounds the axes; a negative axis is a
+                # separate front-end spelling of the same dimension.
+                operand = types[scope, n.operands[0]]
+                axis = target_axis(n.attrs, operand)
+                local.add(key('attribute', n.op, len(operand.shape), axis,
+                              n.attrs.get('axis', axis) < 0, n.attrs.get('reverse', False),
+                              n.attrs.get('descending', n.op == 'topk'),
+                              n.attrs.get('keep_dims', False),
+                              n.attrs.get('k') == operand.shape[-1]))
             features.update(local)
             if (scope, id(n)) in live:
                 features.update(key('observable', f) for f in local)
