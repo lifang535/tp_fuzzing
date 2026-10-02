@@ -163,8 +163,12 @@ def _reference_nudge(op, attrs, args, value, direction):
     else:
         return value
     info = torch.finfo(value.dtype)
+    # ldexp computes its power of two in fp32, so the shift is split to
+    # reach 2^104 (an fp32 value near the maximum).
     _, exponent = torch.frexp(v)
-    ulp = torch.ldexp(torch.full_like(v, info.eps / 2), exponent).clamp_min(info.tiny * info.eps)
+    half = exponent // 2
+    ulp = torch.ldexp(torch.ldexp(torch.full_like(v, info.eps / 2), half), exponent - half)
+    ulp = ulp.clamp_min(info.tiny * info.eps)
     step = torch.maximum(scale.reshape(v.shape), ulp * (v != 0))
     moved = v + direction(v.shape) * step
     return torch.where(torch.isfinite(v), moved, v).to(value.dtype)
