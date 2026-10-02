@@ -81,6 +81,41 @@ class ExtendedEvidenceTests(unittest.TestCase):
             self.assertFalse(self.oracle.last_artifact_dir.exists())
             self.assertFalse(self.oracle.artifact_root.exists())
 
+    def test_compiler_temporaries_are_removed_after_every_outcome(self):
+        """Triton leaves ptxas inputs in TMPDIR when ptxas fails or its process
+        group is killed; each test owns a private TMPDIR removed with it."""
+        scratches = []
+        for fault in ({}, {'returncode': 7}, {'timeout': True}):
+            def launch(command, fault=fault, **options):
+                scratch = Path(options['env']['TMPDIR'])
+                scratches.append(scratch)
+                (scratch / 'tmpkernel.ptx').write_text('ptx')
+                return self.launcher(**fault)(command, **options)
+            with self.subTest(fault=fault), patch('src.workflow.oracle.process.run_isolated', launch):
+                self.oracle.test(self.program)
+                self.assertNotEqual(scratches[-1], Path(tempfile.gettempdir()))
+                self.assertFalse(scratches[-1].exists())
+        self.assertEqual(len(set(scratches)), 3)
+
+    def test_killed_compiler_process_group_leaves_no_temporaries(self):
+        import sys
+        from src.workflow.oracle import process
+        isolated = process.run_isolated
+        child = ('import os, sys, tempfile, time\n'
+                 'handle, path = tempfile.mkstemp(suffix=".ptx")\n'
+                 'os.write(handle, b"ptx")\n'
+                 'print(path, flush=True)\n'
+                 'time.sleep(60)\n')
+        self.config.compile_timeout = self.config.execute_timeout = 0.5
+        with patch('src.workflow.oracle.process.run_isolated',
+                   lambda command, **options: isolated([sys.executable, '-c', child], **options)):
+            report = self.oracle.test(self.program)
+        self.assertEqual(report.bug_type, BugType.TIMEOUT)
+        leaked = Path((self.oracle.last_artifact_dir / 'run.log').read_text().splitlines()[0])
+        self.assertEqual(leaked.suffix, '.ptx')
+        self.assertTrue(leaked.parent.name.startswith('tilesmith_tmp_'))
+        self.assertFalse(leaked.parent.exists())
+
     def test_truncated_or_malformed_evidence_does_not_abort(self):
         for field in ('records', 'progress'):
             for malformed in ('{"unfinished":', 'null', '42', '[]', '{"unexpected":true}'):

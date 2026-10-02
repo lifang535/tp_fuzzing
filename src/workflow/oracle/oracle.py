@@ -5,6 +5,7 @@ Test Oracle — Executes generated programs and detects bugs.
 import os
 import hashlib
 import json
+import shutil
 import signal
 import subprocess
 import tempfile
@@ -149,6 +150,11 @@ class Oracle:
                                   TILESMITH_ARTIFACT_DIR=str(artifact_dir.resolve()),
                                   TILESMITH_COMPILE_ONLY=str(int(self.config.compile_only)))
 
+        # Compilers leave temporaries in TMPDIR when they fail or are killed
+        # on timeout (Triton keeps its ptxas input and output, megabytes per
+        # kernel), so every test gets a private TMPDIR removed with it.
+        scratch = tempfile.mkdtemp(prefix='tilesmith_tmp_')
+        options['env'] = dict(options.get('env', os.environ), TMPDIR=scratch)
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, prefix="tilesmith_") as f:
             f.write(code)
             tmp_path = f.name
@@ -263,6 +269,7 @@ class Oracle:
                 report.error_message, report.root_cause, location=report.location)
             return report
         finally:
+            shutil.rmtree(scratch, ignore_errors=True)
             if extended:
                 try:
                     self._read_extended_evidence(program, artifact_dir)

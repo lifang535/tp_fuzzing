@@ -56,7 +56,9 @@ class RecordingBackend(TritonBackend):
         class Emitter:
             def emit(self, program):
                 owner.events.append('emit')
-                return ("import os\nassert os.environ['TILESMITH_PLUGIN_TEST'] == 'active'\n" +
+                return ("import os, tempfile\nassert os.environ['TILESMITH_PLUGIN_TEST'] == 'active'\n"
+                        # Region children also get a private, per-test TMPDIR.
+                        "assert os.path.basename(tempfile.gettempdir()).startswith('tilesmith_tmp_')\n" +
                         ("raise RuntimeError('plugin failure')\n" if owner.fail else "print('PLUGIN PASSED')\n"))
         return Emitter()
 
