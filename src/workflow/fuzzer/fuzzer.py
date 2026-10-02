@@ -861,6 +861,7 @@ class TileSmith:
         """
         Save passing programs under:
           passed/passed_{type_label}.{json,py}
+        The .py reproducer is skipped without config.save_passed_code.
         """
         status = 'compiled' if self.config.compile_only else 'passed'
         passed_dir = self.output_dir / status
@@ -868,7 +869,6 @@ class TileSmith:
 
         kind_label = self._kind_label(program)
         name = f"{status}_{kind_label}"
-        code = self.oracle._emit_code(program)
 
         meta = self._program_to_dict(program)
         meta["input_seed"] = self.config.input_seed
@@ -878,6 +878,7 @@ class TileSmith:
 
         with open(passed_dir / f"{name}.json", "w") as f:
             json.dump(meta, f, indent=2)
-        with open(passed_dir / f"{name}.py", "w") as f:
-            f.write(code)
+        if self.config.save_passed_code:
+            with open(passed_dir / f"{name}.py", "w") as f:
+                f.write(self.oracle._emit_code(program))
         return passed_dir / f"{name}.json"

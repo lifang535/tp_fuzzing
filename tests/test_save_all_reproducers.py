@@ -189,5 +189,48 @@ class IndependentCounterTests(unittest.TestCase):
             self.assertEqual(fuzzer.stats.oracle_unstable, 4)
 
 
+class PassedSavingTests(unittest.TestCase):
+    """Passing reproducers are most of a campaign's disk use and are never
+    read back; the IR JSON that resume and DSL evolution load must remain."""
+
+    @staticmethod
+    def verdict(index):
+        if index % 2:
+            return BugReport(bug_type=BugType.WRONG_RESULT, error_message=f'WRONG RESULT: case {index}',
+                             root_cause='other', generated_code=f'# reproducer {index}\n')
+        return None
+
+    def test_passed_code_can_be_omitted_without_losing_records_or_failures(self):
+        for save_code in (True, False):
+            with self.subTest(save_code=save_code), tempfile.TemporaryDirectory() as directory:
+                fuzzer, _, _ = _run_campaign(directory, 8, self.verdict, save_passed_code=save_code)
+                passed = fuzzer.output_dir / 'passed'
+                records = sorted(path.stem for path in passed.glob('*.json'))
+                self.assertEqual(len(records), 4)
+                self.assertEqual(sorted(path.stem for path in passed.glob('*.py')),
+                                 records if save_code else [])
+                self.assertEqual(len(_saved(fuzzer, 'other')), 4)
+
+    def test_cli_flag_disables_passed_code(self):
+        import sys
+        from unittest.mock import patch
+        import main
+        configs = []
+
+        class Recorder:
+            def __init__(self, config, resume_dir=None):
+                configs.append(config)
+
+            def run(self, num_iterations, verbose):
+                pass
+
+        with tempfile.TemporaryDirectory() as directory:
+            for argv, expected in (((), True), (('--no-save-passed-code',), False)):
+                with patch.object(main, 'TileSmith', Recorder), \
+                        patch.object(sys, 'argv', ['main.py', '-o', directory, *argv]):
+                    self.assertEqual(main.main(), 0)
+                self.assertIs(configs[-1].save_passed_code, expected)
+
+
 if __name__ == '__main__':
     unittest.main()

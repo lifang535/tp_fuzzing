@@ -145,6 +145,9 @@ class Config:
     region_warp_policy_pair: bool = True
     compile_only: bool = False
     save_artifacts: bool = True  # Persist Extended evidence; otherwise use temporary files.
+    # Passing records keep their IR JSON (the only form read back); the
+    # standalone reproducer can be re-emitted from it on demand.
+    save_passed_code: bool = True
     probe_repeat_count: int = 3
     probe_schedule_pair: bool = True
     probe_cache_cycle: bool = True

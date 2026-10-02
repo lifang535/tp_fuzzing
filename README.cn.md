@@ -210,7 +210,7 @@ tilelang 的 `opt_level` 无法穿透 `tilelang.compile`（所有 s_tir pass 声
 
 ```text
 results/<时间>_<backend>_<形状模式>_seed=<seed>/
-  passed/                         成功执行的 .json IR 和 .py
+  passed/                         成功执行的 .json IR 和 .py（--no-save-passed-code 时只保存 .json）
   compiled/                       compile-only 结果，不能等同成功执行
   failed/<root_cause>/             失败报告和独立复现脚本
   artifacts/                      Extended 编译证据（--no-save-artifacts 时不保留）
@@ -226,6 +226,8 @@ results/<时间>_<backend>_<形状模式>_seed=<seed>/
 `python main.py --backend triton -n 100 --no-save-artifacts`。
 测试仍使用临时文件完成编译证据检查和特征提取，每个测试结束后清理（包括失败和超时）；
 `passed/`、`failed/`、`compiled/` 等结果照常保存。该参数也可用于 `--resume`，不会删除已有的 `artifacts/`。
+
+通过样例的 `.py` 复现脚本约占 `passed/` 磁盘用量的 80%，且 fuzzer 从不读回（恢复和 DSL 演化只读 `.json`）。长时间运行时可添加 `--no-save-passed-code`，只保存通过样例的 `.json` IR；失败样例始终同时保存 `.json` 和 `.py`。该参数同样可用于 `--resume`，不会删除已有的 `.py`。
 
 原生文件名使用调用关系和完整 IR 哈希，Extended 文件名使用 family 和哈希。当前 Region v1–v4 与 Extended 的 JSON 可以恢复；此前原生记录中无效的 `legacy: null` 和 spec `alpha` 字段会被忽略。非空 legacy 包装及旧 single_op/pipeline/dynamic 格式不再支持恢复，应新建 campaign。已有 `results/`、`reports/` 和独立复现脚本不受此次源码清理影响。
 

@@ -63,6 +63,9 @@ def main():
                         help='Compile extended programs without GPU execution; implies --extended-prob 1')
     parser.add_argument('--no-save-artifacts', action='store_true',
                         help='Use temporary compilation evidence and delete it after each test instead of saving artifacts/')
+    parser.add_argument('--no-save-passed-code', action='store_true',
+                        help='Save passing programs only as IR JSON, without their Python reproducers '
+                             '(about 80%% of passed/ disk use); failures always keep both')
     parser.add_argument('--no-extended-observations', action='store_true',
                         help='Disable additional intermediate-output variants')
     parser.add_argument('--no-extended-configurations', action='store_true',
@@ -301,6 +304,7 @@ def main():
         region_warp_policy_pair=not args.no_region_warp_policy,
         compile_only=args.compile_only,
         save_artifacts=not args.no_save_artifacts,
+        save_passed_code=not args.no_save_passed_code,
         local_mutate_prob=args.local_mutate_prob,
         function_min_count=args.function_min_count,
         function_max_count=args.function_max_count,
