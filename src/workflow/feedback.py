@@ -20,6 +20,20 @@ def program_digest(program):
     return hashlib.sha256(encoded).hexdigest()
 
 
+def corpus_eviction(feature_sets):
+    """Evict the least irreplaceable member of a full, bounded corpus.
+
+    Prefer removing a redundant seed; if every seed owns unique features,
+    sacrifice the fewest. Feature frequencies here count corpus owners, not
+    executions. The caller includes the candidate, which may itself be evicted.
+    """
+    owners = Counter(f for features in feature_sets for f in features)
+    return min(range(len(feature_sets)), key=lambda i: (
+        sum(owners[f] == 1 for f in feature_sets[i]),
+        sum(1 / owners[f] for f in sorted(feature_sets[i])),
+        -len(feature_sets[i]), i))
+
+
 def confirmed_failure(bug_or_message, backend):
     """Conservative signatures of manually audited compiler mechanisms.
 
@@ -148,6 +162,7 @@ class StructuralFeedback:
         self.compiled = Counter()
         self.compiler = Counter()
         self.seed_compiler = {}
+        self.seed_structural = {}
         self.known_seed_failures = Counter()
         self.known_signatures = Counter()
         # Features of programs that reproduced an already-seen failure bucket.
@@ -182,9 +197,17 @@ class StructuralFeedback:
 
     def register_seed(self, program, records):
         """Associate observed post-lowering features with a passing seed."""
+        digest = program_digest(program)
+        self.seed_structural[digest] = program_features(program)
         features = {f for record in records for f in record.get('features', [])}
         if features:
-            self.seed_compiler[program_digest(program)] = sorted(features)
+            self.seed_compiler[digest] = sorted(features)
+
+    def corpus_features(self, program):
+        digest = program_digest(program)
+        if digest not in self.seed_structural:
+            self.seed_structural[digest] = program_features(program)
+        return self.seed_structural[digest] | set(self.seed_compiler.get(digest, ()))
 
     def observe_known_failure(self, source_digest, signature):
         if signature is None:
@@ -194,16 +217,21 @@ class StructuralFeedback:
             self.known_seed_failures[source_digest] += 1
 
     def retain_seeds(self, digests):
+        self.seed_structural = {digest: features for digest, features in self.seed_structural.items()
+                                if digest in digests}
         self.seed_compiler = {digest: features for digest, features in self.seed_compiler.items()
                               if digest in digests}
         self.known_seed_failures = Counter({digest: count for digest, count in self.known_seed_failures.items()
                                             if digest in digests})
 
     def seed_weight(self, program):
-        features = program_features(program)
+        digest = program_digest(program)
+        features = self.seed_structural.get(digest)
+        if features is None:
+            features = program_features(program)
+            self.seed_structural[digest] = features
         structural = 1.0 + 4.0 * sum(1 / (1 + self.passed[f] + self.explained[f])
                                      for f in sorted(features)) / max(1, len(features))
-        digest = program_digest(program)
         compiler = self.seed_compiler.get(digest, ())
         # Only actually retained compiler features guide this component.
         rare = sum(1 / (1 + self.compiler[f]) for f in compiler) / max(1, len(compiler))

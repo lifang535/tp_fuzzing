@@ -76,6 +76,13 @@ class Config:
     # already passing common Extended case. Disabled for library callers.
     dsl_extend_prob: float = 0.0
     dsl_seed_pool_max: int = 128
+    # Within the DSL route, evolve passing target-specific programs in a
+    # separate corpus. Zero restores the one-step extension baseline.
+    dsl_evolve_prob: float = 0.5
+    dsl_max_depth: int = 3
+    dsl_max_ops: int = 256
+    # Preserve rare-feature representatives when bounded corpora fill up.
+    corpus_feedback: bool = True
     # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong
     # to the separate extend-from-passed stage.
     extended_common_only: bool = True

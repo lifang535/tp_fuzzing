@@ -480,8 +480,8 @@ class ExtendedGenerator:
         return carried[0], [fn], carried[1:]
 
 
-def mutate_extended(program, config, backend):
-    if random.random() < .3:
+def mutate_extended(program, config, backend, *, regenerate=True):
+    if regenerate and random.random() < .3:
         return ExtendedGenerator(config, backend).generate(program.family)
     result = copy.deepcopy(program)
     candidates = [n for n in result.all_operations() if n.op in ('constant', 'index', 'add', 'sub', 'lt', 'eq', 'flip')]

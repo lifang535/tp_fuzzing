@@ -483,7 +483,8 @@ class TileSmith:
                                                     features=features)
                     compiler_novelty = self.feedback.observe_compilation(
                         program, self.oracle.last_compilation, self.oracle.compilation_complete)
-                    if bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback:
+                    if (bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback
+                            and bug.bug_type is not BugType.WRONG_RESULT):
                         self.feedback.explain(features)
                     if self.quarantine is not None:
                         # Wrong results share the oracle's message, not a
@@ -496,9 +497,9 @@ class TileSmith:
                     self.stats.programs_passed += 1
                 if self._current_extension:
                     self.dsl_stage.record(self._current_extension['extension_op'], bug is None)
-                    self.dsl_stage.observe_compilation(self._current_extension['source_sha256'],
-                                                       self.oracle.last_compilation,
-                                                       passed=bug is None and not self.config.compile_only)
+                    compiler_novelty = self.dsl_stage.observe_compilation(
+                        self._current_extension['source_sha256'], self.oracle.last_compilation,
+                        passed=bug is None and not self.config.compile_only)
                 if bug:
                     from src.workflow.feedback import confirmed_failure
                     signature = bug.confirmed_signature or confirmed_failure(bug, self.backend)
@@ -521,6 +522,8 @@ class TileSmith:
                             marker = 'saved' if saved else 'dup'
                             print(f"[{i}] [ORACLE UNSTABLE] ({marker}) {self._kind_label(program)}"
                                   f"{self._bucket_label(bucket)}")
+                        if new_tested % 100 == 0:
+                            self._write_progress()
                         continue
                     self.stats.bugs_found.append(bug)
                     seen = self.known_root_causes.get(bug.root_cause, 0)
@@ -542,17 +545,26 @@ class TileSmith:
                               f"{self._bucket_label(bucket)}")
                 else:
                     passed_path = self._save_passed(program, i)
-                    if not self._current_extension:
+                    if self._current_extension:
+                        self.dsl_stage.retain_target(program, passed_path, self._current_extension,
+                                                     self.oracle.last_compilation, compiler_novelty)
+                    else:
                         retained_as_dsl_source = False
                         if self.config.dsl_extend_prob and not self.config.compile_only:
                             retained_as_dsl_source = self.dsl_stage.add(program, passed_path)
                         retained_as_mutation_seed = ((self.config.structural_feedback and (novelty or compiler_novelty))
                                                      or random.random() < self.config.seed_add_prob)
                         if retained_as_mutation_seed:
+                            self.feedback.register_seed(program, self.oracle.last_compilation)
                             self.seed_pool.append(program)
                             if len(self.seed_pool) > self.config.seed_pool_max:
-                                self.seed_pool.pop(random.randint(0, len(self.seed_pool) - 1))
-                        if retained_as_dsl_source or retained_as_mutation_seed:
+                                if self.config.corpus_feedback:
+                                    from src.workflow.feedback import corpus_eviction
+                                    index = corpus_eviction([self.feedback.corpus_features(p) for p in self.seed_pool])
+                                else:
+                                    index = random.randint(0, len(self.seed_pool) - 1)
+                                self.seed_pool.pop(index)
+                        if retained_as_dsl_source and not retained_as_mutation_seed:
                             self.feedback.register_seed(program, self.oracle.last_compilation)
                     if verbose:
                         status = 'COMPILED' if self.config.compile_only else 'PASSED'
@@ -564,6 +576,7 @@ class TileSmith:
                     print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} categories={total_unique}")
                 if new_tested % 100 == 0:
                     self._prune_seed_feedback()
+                    self._write_progress()
 
         finally:
             bugs_total = sum(self.known_root_causes.values())
@@ -592,6 +605,10 @@ class TileSmith:
                 "generation_config": {
                     "extended_prob": self.config.extended_prob,
                     "dsl_extend_prob": self.config.dsl_extend_prob,
+                    "dsl_evolve_prob": self.config.dsl_evolve_prob,
+                    "dsl_max_depth": self.config.dsl_max_depth,
+                    "dsl_max_ops": self.config.dsl_max_ops,
+                    "corpus_feedback": self.config.corpus_feedback,
                     "extended_common_only": self.config.extended_common_only,
                     "extended_configuration_pair": self.config.extended_configuration_pair,
                     "extended_config_depth": self.config.extended_config_depth,
@@ -652,6 +669,9 @@ class TileSmith:
                 "structural_species": species(self.feedback.passed),
                 "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
                 "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
+                                  "evolution_actions": dict(self.dsl_stage.evolution_counts),
+                                  "target_pool": len(self.dsl_stage.targets),
+                                  "target_structural_features": len(self.dsl_stage.target_structural),
                                   "compiler_features": len(self.dsl_stage.compiler),
                                   "compiler_guided_sources": len(self.dsl_stage.source_compiler),
                                   "source_pool": len(self.dsl_stage.sources),
@@ -690,6 +710,7 @@ class TileSmith:
             self._save_seed_pool()
             if self.config.dsl_extend_prob:
                 (self.output_dir / 'dsl_stage.json').write_text(json.dumps(self.dsl_stage.snapshot()))
+            self._write_progress()
 
         if verbose:
             print()
@@ -699,6 +720,27 @@ class TileSmith:
             ))
 
         return self.stats
+
+    def _write_progress(self):
+        """Small live counters; IR features are proxies, not compiler edges."""
+        data = {
+            'timestamp': time.time(), 'elapsed_seconds': time.time() - self.stats.start_time,
+            'total_tested': self.stats.total_tested, 'passed': self.stats.programs_passed,
+            'compiled': self.stats.programs_compiled, 'oracle_unstable': self.stats.oracle_unstable,
+            'structural_features_passed': len(self.feedback.passed),
+            'compiler_ir_features': len(self.feedback.compiler),
+            'dsl_compiler_ir_features': len(self.dsl_stage.compiler),
+            'dsl_target_structural_features': len(self.dsl_stage.target_structural),
+            'dsl_evolution_actions': dict(self.dsl_stage.evolution_counts),
+            'dsl_target_pool': len(self.dsl_stage.targets),
+            'failure_buckets': dict(self.failure_buckets),
+        }
+        path = self.output_dir / 'coverage_progress.json'
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(data, sort_keys=True))
+        temporary.replace(path)
+        with (self.output_dir / 'coverage_progress.jsonl').open('a') as stream:
+            stream.write(json.dumps(data, sort_keys=True) + '\n')
 
     @staticmethod
     def _make_sig(program):
@@ -711,6 +753,7 @@ class TileSmith:
         from src.workflow.feedback import program_digest
         retained = {program_digest(program) for program in self.seed_pool}
         retained.update(entry[3] for entry in self.dsl_stage.sources)
+        retained.update(entry[3] for entry in self.dsl_stage.targets)
         self.feedback.retain_seeds(retained)
 
     @staticmethod

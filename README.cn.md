@@ -144,6 +144,12 @@ Extended 使用单独的 IR 和生成器，提供 `arithmetic`、`indexed_memory
 
 现在 `main.py` 可在同一实验中交替执行两条路线。新实验的 `--dsl-extend-prob` 默认为 0.35：存在执行通过的共用 Extended 样例后，每次生成有 35% 的概率从有界种子池派生目标 DSL 操作；其余仍走原本的 Region/Extended 生成路线（该路线的 `--extended-prob` 默认 0.25）。扩展池为空或“样例×操作”组合耗尽时继续生成共用程序。调度优先选择尝试次数最少的目标操作，且同一输入样例的同一操作只派生一次；在可选父样例间优先考虑实际编译产物中的稀有阶段、相邻 IR 操作与编译配置／操作组合。DSL 专属编译特征保存在独立的 `dsl_stage.json` 账本，不影响共用 IR 生成反馈。某个父样例反复触发人工确认过的具体失败签名时，其选择权重逐步降低但不会归零；未知签名和同目录的其它错误不受该惩罚，失败样例仍照常保存。`--no-structural-feedback` 可关闭这种种子引导。这些编译产物特征只是代理指标，并非实测编译 pass 或分支覆盖；Region 程序目前仅有结构反馈。`summary.json` 记录 `dsl_extension.by_op` 和 `confirmed_failure_signatures`；`dsl_stage.json` 支持恢复，恢复的共用样例复用前会重新验证。指定 `--dsl-extend-prob 0` 可关闭一体化阶段。
 
+通过测试的 DSL 扩展程序现在会进入独立的目标种子池。在 DSL 路线内，`--dsl-evolve-prob`（默认 0.5）选择继续组合目标操作、保留目标操作的局部变异，或将保持形状的目标操作放入有界循环。组合会使用前一步被检查的目标输出。`--dsl-max-depth` 默认 3；到达上限的程序仍保存，但不会挤占可继续变异的祖先种子。恢复的目标种子复用前重新验证。结果记录直接父程序与初始父程序的哈希、派生深度、动作和目标输出。`--dsl-evolve-prob 0` 恢复单步扩展。
+
+`--corpus-feedback` 默认开启，在共用和目标种子池满时优先淘汰覆盖冗余的种子，保留稀有特征代表；`--no-corpus-feedback` 恢复随机淘汰。旧 CLI campaign 恢复时默认不启用这两项新策略，除非已保存设置或显式参数启用。数值错误的诊断桶不会用于隔离或结构特征降权。`coverage_progress.json` 和 `coverage_progress.jsonl` 每 100 个测试及退出时记录进度；这些是结构／编译产物特征计数，不是编译器分支覆盖率或独立 bug 数。
+
+短时 GPU 对照可运行 `python tests/dsl_evolution_comparison.py --backend triton --passed-dir results/<campaign>/passed --output /tmp/dsl-comparison`。两组使用相同的已重新验证父程序和编译／oracle 设置，并在不同 seed 间交替执行顺序。默认短测不包含 precision、identity 和随机编译配置扫描，指定 `--full-oracle` 可启用；输出保留特征集合、失败与派生关系。判断 bug 收益仍需多 seed、固定硬件与时间预算的实验。
+
 ```bash
 # 第一阶段：生成、实例化并执行共用 Extended IR；仅通过的样例进入 passed/
 python main.py --backend triton --extended-prob 1 -n 10000
