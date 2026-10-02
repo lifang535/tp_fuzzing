@@ -30,19 +30,25 @@ class FuzzingStats:
         self.start_time = time.time()
 
     def summary(self, historical_bugs_total: int = 0, historical_bugs_unique: int = 0,
-                total_categories: int = None) -> str:
+                total_categories: int = None, discovery: dict = None) -> str:
         if total_categories is None:
             total_categories = historical_bugs_unique + len({b.root_cause for b in self.bugs_found})
         elapsed = time.time() - self.start_time
-        return (
+        # Triggers count failing tests and categories coarse labels; neither
+        # is a number of distinct bugs, and only confirmed signatures are.
+        text = (
             f"=== TileSmith Fuzzing Stats ===\n"
             f"Time: {elapsed:.1f}s\n"
             f"Generated: {self.total_generated}\n"
             f"Tested: {self.total_tested}\n"
-            f"Bugs (total): {historical_bugs_total + len(self.bugs_found)}\n"
+            f"Failure triggers: {historical_bugs_total + len(self.bugs_found)}\n"
             f"Failure categories: {total_categories}\n"
-            f"Throughput: {self.total_tested / max(elapsed, 1):.2f} tests/sec\n"
         )
+        if discovery:
+            text += (f"Diagnostic buckets: {discovery['diagnostic_buckets']}\n"
+                     f"Confirmed root causes: {len(discovery['confirmed_root_causes'])}\n")
+        return text + (f"Oracle unstable (not failures): {self.oracle_unstable}\n"
+                       f"Throughput: {self.total_tested / max(elapsed, 1):.2f} tests/sec\n")
 
 
 class TileSmith:
@@ -83,6 +89,13 @@ class TileSmith:
         # Failure bucket -> count, and bucket -> normalized diagnostic.
         self.failure_buckets = Counter()
         self.failure_bucket_keys = {}
+        # Bucket -> when it first appeared: the campaign's test count and
+        # running time since the timeline origin, summed over resumed
+        # segments. A campaign from before the timeline starts it when it
+        # resumes; its earlier buckets have no test count or time.
+        self.failure_bucket_first_seen = {}
+        self.timeline_origin = {'tested': 0, 'time': round(time.time(), 1)}
+        self._historical_seconds = 0.0
         if config.quarantine_retries < 0:
             raise ValueError('quarantine_retries must be non-negative')
         from src.workflow.triage import Quarantine
@@ -121,6 +134,8 @@ class TileSmith:
         """Load previous results from resume directory to avoid re-testing."""
         passed_count = 0
         failed_count = 0
+        report_times = {}  # bucket -> earliest timestamp among its saved reports
+        origin_restored = False
 
         for passed_dir in (self.output_dir / 'passed', self.output_dir / 'compiled'):
             for json_file in passed_dir.glob("*.json"):
@@ -148,13 +163,22 @@ class TileSmith:
                         self.tested_configs.add(sig)
                         failed_count += 1
                         dir_count += 1
-                        self.root_cause_locations.setdefault(root_cause, Counter())[d.get('location', '')] += 1
                         bucket, bucket_key = self._history_bucket(d, root_cause)
                         self.failure_buckets[bucket] += 1
                         self.failure_bucket_keys.setdefault(bucket, bucket_key)
+                        if root_cause != 'oracle_unstable':
+                            self.root_cause_locations.setdefault(root_cause, Counter())[d.get('location', '')] += 1
+                        timestamp = d.get('timestamp')
+                        if isinstance(timestamp, (int, float)):
+                            first = report_times.setdefault(bucket, timestamp)
+                            report_times[bucket] = min(first, timestamp)
                     except (json.JSONDecodeError, KeyError):
                         pass
-                if dir_count > 0:
+                # Skipped numeric checks are oracle noise, not a failure
+                # category: they never count as bugs, before or after resuming.
+                if root_cause == 'oracle_unstable':
+                    self.stats.oracle_unstable = dir_count
+                elif dir_count > 0:
                     self.known_root_causes[root_cause] = self.known_root_causes.get(root_cause, 0) + dir_count
 
         total_count = passed_count + failed_count
@@ -174,13 +198,21 @@ class TileSmith:
             self.stats.programs_compiled = summary.get('programs_compiled', 0)
             self.stats.programs_passed = summary.get('programs_passed', passed_count if not self.config.compile_only else 0)
             total_count = max(total_count, summary.get("total_tested", 0))
+            self.stats.oracle_unstable = max(self.stats.oracle_unstable, summary.get('oracle_unstable', 0))
             for cause, count in summary.get("root_causes", {}).items():
-                self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
+                if cause != 'oracle_unstable':
+                    self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
             for bucket, count in summary.get('failure_buckets', {}).items():
                 if type(count) is int:
                     self.failure_buckets[bucket] = max(self.failure_buckets[bucket], count)
             for bucket, bucket_key in summary.get('failure_bucket_keys', {}).items():
                 self.failure_bucket_keys.setdefault(bucket, bucket_key)
+            if isinstance(summary.get('timeline_origin'), dict):
+                self.timeline_origin, origin_restored = summary['timeline_origin'], True
+                self._historical_seconds = float(summary.get('campaign_seconds') or 0)
+            for bucket, first in summary.get('failure_bucket_first_seen', {}).items():
+                if isinstance(first, dict):
+                    self.failure_bucket_first_seen.setdefault(bucket, first)
             for cause, counts in summary.get("root_cause_locations", {}).items():
                 if isinstance(counts, dict) and counts:
                     current = self.root_cause_locations.get(cause, Counter())
@@ -203,6 +235,8 @@ class TileSmith:
 
         self.stats.total_tested = total_count
         self.stats.total_generated = self.stats.total_tested
+        if not self._backfill_timeline(report_times, origin_restored):
+            self.timeline_origin = {'tested': total_count, 'time': round(time.time(), 1)}
 
         # bugs_total = sum of all trigger counts; bugs_unique = distinct root cause categories
         self._historical_bugs_total = sum(self.known_root_causes.values())
@@ -213,6 +247,72 @@ class TileSmith:
         print(f"[resume] Known root causes: {self.known_root_causes}")
         print(f"[resume] Previous tests: {self.stats.total_tested}")
         print()
+
+    def _backfill_timeline(self, report_times, origin_restored):
+        """Complete first sightings the summary lacks, and say whether the
+        campaign already has a timeline. A summary older than the last
+        progress record (a killed segment) is completed from the first record
+        listing each bucket, an upper bound as progress is written every 100
+        tests. Buckets from before the timeline keep only their earliest
+        reproducer's wall-clock time. Every known bucket gets an entry, so
+        seeing one again after resuming is never a discovery."""
+        path = self.output_dir / 'coverage_progress.jsonl'
+        if path.exists():
+            with path.open() as stream:
+                for line in stream:
+                    try:
+                        record = json.loads(line)
+                        seconds = float(record['campaign_seconds'])
+                        origin = record['timeline_origin']
+                    except (KeyError, TypeError, ValueError):
+                        continue  # written before the timeline
+                    if not origin_restored and isinstance(origin, dict):
+                        self.timeline_origin, origin_restored = origin, True
+                    self._historical_seconds = max(self._historical_seconds, seconds)
+                    for bucket in record.get('failure_buckets') or {}:
+                        self.failure_bucket_first_seen.setdefault(bucket, {
+                            'tested': record.get('total_tested'), 'seconds': round(seconds, 1),
+                            'time': record.get('timestamp')})
+        for bucket in self.failure_buckets:
+            self.failure_bucket_first_seen.setdefault(
+                bucket, {'tested': None, 'seconds': None, 'time': report_times.get(bucket)})
+        return origin_restored
+
+    def _campaign_seconds(self):
+        return self._historical_seconds + time.time() - self.stats.start_time
+
+    def _discovery(self):
+        """Discovery over campaign time, oracle noise excluded. Failure
+        triggers count failing tests; diagnostic buckets are automatic
+        signatures (one defect may split, a coarse key merge several); only
+        the manually confirmed signatures are root causes."""
+        now = self._campaign_seconds()
+        seen = {bucket: first for bucket, first in self.failure_bucket_first_seen.items()
+                if not bucket.startswith('oracle_unstable:')}
+        confirmed = sorted(bucket for bucket in seen if ':' not in bucket)
+        # Rates count only sightings on the timeline's own clock.
+        timed = {bucket: first for bucket, first in seen.items()
+                 if first.get('tested') is not None and first.get('seconds') is not None}
+        last = max(timed, key=lambda bucket: timed[bucket]['tested'], default=None)
+        hours = now / 3600
+
+        def found(buckets, window=float('inf')):
+            return sum(1 for bucket in buckets if bucket in timed and timed[bucket]['seconds'] > now - window)
+        return {
+            'failure_triggers': sum(self.known_root_causes.values()),
+            'oracle_unstable': self.stats.oracle_unstable,
+            'diagnostic_buckets': len(seen),
+            'confirmed_root_causes': confirmed,
+            'last_new_bucket': dict(timed[last], bucket=last) if last else None,
+            # Since the origin when nothing new has appeared on the timeline.
+            'tests_since_new_bucket': self.stats.total_tested - (timed[last]['tested'] if last
+                                                                  else self.timeline_origin['tested']),
+            'seconds_since_new_bucket': round(now - (timed[last]['seconds'] if last else 0), 1),
+            'new_buckets_per_hour': round(found(seen) / hours, 3) if hours else None,
+            'new_confirmed_per_hour': round(found(confirmed) / hours, 3) if hours else None,
+            'new_buckets_last_hour': found(seen, 3600),
+            'new_confirmed_last_hour': found(confirmed, 3600),
+        }
 
     def _history_bucket(self, report, root_cause):
         """Bucket of a saved reproducer. Reports from before failure triage
@@ -664,6 +764,13 @@ class TileSmith:
                 "failure_buckets": dict(self.failure_buckets.most_common()),
                 "failure_bucket_keys": {bucket: self.failure_bucket_keys.get(bucket, '')
                                         for bucket, _ in self.failure_buckets.most_common()},
+                # In discovery order; sightings from before the timeline first.
+                "failure_bucket_first_seen": dict(sorted(
+                    self.failure_bucket_first_seen.items(),
+                    key=lambda item: (item[1].get('tested') is not None, item[1].get('tested') or 0))),
+                "campaign_seconds": round(self._campaign_seconds(), 1),
+                "timeline_origin": self.timeline_origin,
+                "discovery": self._discovery(),
                 # Distinct failure mechanisms, oracle noise excluded: the
                 # Good-Turing estimate is the chance that the next test shows
                 # an unseen bucket, Chao1 a lower bound on the bucket total.
@@ -720,7 +827,7 @@ class TileSmith:
             print()
             print(self.stats.summary(
                 max(0, bugs_total - len(self.stats.bugs_found)),
-                total_categories=bugs_unique,
+                total_categories=bugs_unique, discovery=self._discovery(),
             ))
 
         return self.stats
@@ -739,6 +846,9 @@ class TileSmith:
             'dsl_evolution_actions': dict(self.dsl_stage.evolution_counts),
             'dsl_target_pool': len(self.dsl_stage.targets),
             'failure_buckets': dict(self.failure_buckets),
+            'campaign_seconds': round(self._campaign_seconds(), 1),
+            'timeline_origin': self.timeline_origin,
+            'discovery': self._discovery(),
         }
         path = self.output_dir / 'coverage_progress.json'
         temporary = path.with_suffix('.tmp')
@@ -814,6 +924,10 @@ class TileSmith:
             bug.failure_bucket, bug.failure_key = failure_bucket(
                 bug.error_message, bug.root_cause,
                 bug.confirmed_signature or confirmed_failure(bug, self.backend), bug.location)
+        if bug.failure_bucket not in self.failure_bucket_first_seen:
+            self.failure_bucket_first_seen[bug.failure_bucket] = {
+                'tested': self.stats.total_tested, 'seconds': round(self._campaign_seconds(), 1),
+                'time': round(time.time(), 1)}
         self.failure_buckets[bug.failure_bucket] += 1
         self.failure_bucket_keys.setdefault(bug.failure_bucket, bug.failure_key)
         return bug.failure_bucket

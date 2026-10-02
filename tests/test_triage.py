@@ -664,6 +664,144 @@ class CampaignBucketTests(unittest.TestCase):
         self.assertEqual((fuzzer.quarantine.rules, fuzzer.quarantine.learned), ({}, 0))
 
 
+NOVEL = 'ValueError: a lowering check no earlier test failed'
+
+
+def later(index, program):
+    """cycle, except that the sixth test of this segment fails anew."""
+    if index == 5:
+        return BugReport(BugType.COMPILE_CRASH, NOVEL, params=program.params_dict,
+                         root_cause='other', generated_code='# novel\n')
+    return cycle(index, program)
+
+
+class DiscoveryTimelineTests(unittest.TestCase):
+    def summary(self, fuzzer):
+        return json.loads((fuzzer.output_dir / 'summary.json').read_text())
+
+    def test_discovery_keeps_triggers_buckets_and_confirmed_root_causes_apart(self):
+        other = failure_bucket(tvm_check(1), 'other')[0]
+        unstable = failure_bucket('ORACLE UNSTABLE: reference disagrees (case 3)', 'oracle_unstable')[0]
+        with tempfile.TemporaryDirectory() as directory:
+            fuzzer, _, _ = campaign(directory, 12, cycle, verbose=False)
+            summary = self.summary(fuzzer)
+            first = summary['failure_bucket_first_seen']
+            self.assertEqual([(bucket, seen['tested']) for bucket, seen in first.items()],
+                             [(other, 2), ('tilelang_bool_cuda_type', 3), (unstable, 4)])
+            self.assertEqual(summary['timeline_origin']['tested'], 0)
+            discovery = summary['discovery']
+            self.assertLessEqual({'failure_triggers': 6, 'oracle_unstable': 3, 'diagnostic_buckets': 2,
+                                  'confirmed_root_causes': ['tilelang_bool_cuda_type'],
+                                  'tests_since_new_bucket': 9, 'new_buckets_last_hour': 2,
+                                  'new_confirmed_last_hour': 1}.items(), discovery.items())
+            # Oracle noise seen later is not a discovery.
+            self.assertEqual(discovery['last_new_bucket'], dict(first['tilelang_bool_cuda_type'],
+                                                                bucket='tilelang_bool_cuda_type'))
+            self.assertGreater(discovery['new_confirmed_per_hour'], 0)
+            progress = json.loads((fuzzer.output_dir / 'coverage_progress.json').read_text())
+            self.assertEqual(progress['discovery']['diagnostic_buckets'], 2)
+
+    def test_closing_stats_and_features_name_what_they_count(self):
+        """Lowered IR of programs that then fail is counted apart from that of
+        passing programs, and the closing stats keep triggers, buckets and
+        confirmed root causes apart from each other and from oracle noise."""
+        with tempfile.TemporaryDirectory() as directory:
+            log = io.StringIO()
+            with contextlib.redirect_stdout(log):
+                fuzzer = TileSmith(Config(seed=42, output_dir=directory, dim_range=(1, 64), coverage_probe_prob=0,
+                                          region_typed_prob=0, extended_prob=0, structural_feedback=False,
+                                          backends=['tilelang'], quarantine=True, explained_feedback=True))
+                calls = []
+
+                def lowered_then_verdict(program):
+                    calls.append(program)
+                    # Every program lowers to an IR feature of its own.
+                    fuzzer.oracle.last_compilation = [{'features': [key('compiler_stage', f'test{len(calls)}')]}]
+                    fuzzer.oracle.compilation_complete = True
+                    return cycle(len(calls) - 1, program)
+                fuzzer.oracle.test = lowered_then_verdict
+                fuzzer.run(12, verbose=True)
+            summary = self.summary(fuzzer)
+            # Of twelve lowered programs, the first of every four passes.
+            self.assertEqual((summary['compiler_ir_features'], summary['compiler_ir_features_passed']), (12, 3))
+            progress = json.loads((fuzzer.output_dir / 'coverage_progress.json').read_text())
+            self.assertEqual(progress['compiler_ir_features_passed'], 3)
+            stats = log.getvalue().split('=== TileSmith Fuzzing Stats ===')[1]
+            for line in ('Failure triggers: 6', 'Failure categories: 2', 'Diagnostic buckets: 2',
+                         'Confirmed root causes: 1', 'Oracle unstable (not failures): 3'):
+                self.assertIn(line + '\n', stats)
+            self.assertNotIn('Bugs', stats)
+
+    def test_resumed_campaigns_continue_the_timeline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fuzzer, _, _ = campaign(directory, 12, cycle, verbose=False)
+            before = self.summary(fuzzer)
+            before['campaign_seconds'] = 1000.0  # the first segment ran that long
+            (fuzzer.output_dir / 'summary.json').write_text(json.dumps(before))
+            resumed, _, _ = campaign(directory, 8, later, resume=str(fuzzer.output_dir), verbose=False)
+            after = self.summary(resumed)
+            novel = failure_bucket(NOVEL, 'other')[0]
+            # Old buckets seen again keep their sighting; the new one is test 18.
+            first = after['failure_bucket_first_seen']
+            self.assertEqual(list(first), list(before['failure_bucket_first_seen']) + [novel])
+            self.assertEqual({bucket: first[bucket] for bucket in before['failure_bucket_first_seen']},
+                             before['failure_bucket_first_seen'])
+            self.assertEqual(first[novel]['tested'], 18)
+            self.assertGreaterEqual(first[novel]['seconds'], 1000)
+            self.assertGreaterEqual(after['campaign_seconds'], first[novel]['seconds'])
+            self.assertEqual(after['timeline_origin'], before['timeline_origin'])
+            self.assertEqual(after['discovery']['last_new_bucket']['bucket'], novel)
+            self.assertEqual(after['discovery']['tests_since_new_bucket'], 2)
+            # Oracle noise stays out of the bug counts across the resume.
+            self.assertEqual(after['oracle_unstable'], 5)
+            self.assertNotIn('oracle_unstable', after['root_causes'])
+            self.assertEqual(after['bugs_total'], sum(after['root_causes'].values()))
+            self.assertEqual(after['discovery']['failure_triggers'], after['bugs_total'])
+
+    def test_campaigns_from_before_the_timeline_start_it_when_resumed(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fuzzer, _, _ = campaign(directory, 12, cycle, verbose=False)
+            path = fuzzer.output_dir / 'summary.json'
+            summary = json.loads(path.read_text())
+            for name in ('failure_bucket_first_seen', 'campaign_seconds', 'timeline_origin', 'discovery'):
+                del summary[name]
+            # Resuming used to count the saved noise as a root cause.
+            summary['root_causes']['oracle_unstable'] = 3
+            path.write_text(json.dumps(summary))
+            (fuzzer.output_dir / 'coverage_progress.jsonl').unlink()
+            restored = resume(fuzzer)
+            self.assertEqual(restored.timeline_origin['tested'], 12)
+            times = {}
+            for report in (fuzzer.output_dir / 'failed').rglob('*.json'):
+                report = json.loads(report.read_text())
+                times[report['failure_bucket']] = min(times.get(report['failure_bucket'], report['timestamp']),
+                                                      report['timestamp'])
+            self.assertEqual(restored.failure_bucket_first_seen,
+                             {bucket: {'tested': None, 'seconds': None, 'time': time}
+                              for bucket, time in times.items()})
+            discovery = restored._discovery()
+            self.assertIsNone(discovery['last_new_bucket'])
+            self.assertEqual((discovery['diagnostic_buckets'], discovery['tests_since_new_bucket'],
+                              discovery['new_buckets_per_hour']), (2, 0, 0.0))
+            self.assertEqual(restored.known_root_causes, {'other': 3, 'tilelang_codegen_error': 3})
+            self.assertEqual(restored.stats.oracle_unstable, 3)
+            self.assertNotIn('oracle_unstable', restored.root_cause_locations)
+
+    def test_a_killed_segment_is_recovered_from_the_progress_log(self):
+        with tempfile.TemporaryDirectory() as directory:
+            fuzzer, _, _ = campaign(directory, 12, cycle, verbose=False)
+            path = fuzzer.output_dir / 'summary.json'
+            stale = path.read_text()
+            campaign(directory, 8, later, resume=str(fuzzer.output_dir), verbose=False)
+            seconds = json.loads(path.read_text())['campaign_seconds']
+            path.write_text(stale)  # as if the second segment died before its summary
+            restored = resume(fuzzer)
+            # Progress is written every 100 tests and at exit: an upper bound.
+            self.assertEqual(restored.failure_bucket_first_seen[failure_bucket(NOVEL, 'other')[0]]['tested'], 20)
+            self.assertAlmostEqual(restored._historical_seconds, seconds, delta=1)
+            self.assertEqual(restored.timeline_origin, json.loads(stale)['timeline_origin'])
+
+
 class MainDefaultsTests(unittest.TestCase):
     def configs(self, *argv):
         import main
