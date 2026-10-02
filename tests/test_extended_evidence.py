@@ -15,6 +15,7 @@ from src.config import Config
 from src.workflow.fuzzer.fuzzer import TileSmith
 from src.workflow.generator.extended import ExtendedGenerator
 from src.workflow.oracle import Oracle, BugType
+from src.workflow.triage import wrong_result_origin
 
 
 class ExtendedEvidenceTests(unittest.TestCase):
@@ -248,6 +249,39 @@ class ExtendedEvidenceTests(unittest.TestCase):
                 returncode=7, stdout='', progress=None)):
             report = self.oracle.test(self.program)
         self.assertEqual(report.location, '')
+
+    def test_wrong_result_bucket_follows_the_earliest_wrong_value(self):
+        """Every wrong value of a launch shares the failing check's message; the
+        bucket key adds the operation producing the earliest one. Other
+        failures carry no origin."""
+        program = self.program.to_dict()
+        order = [v['name'] for node in program['body']['operations'] for v in node['results']]
+        early, late = sorted(program['body']['returns'][:2], key=order.index)
+        progress = {'stage': 'execute', 'variant': 'triton_0'}
+        reports = {}
+        for names in ((late, early), (late,)):
+            stdout = ('Traceback (most recent call last):\n'
+                      '  File "/tmp/tilesmith_x.py", line 900, in <module>\n'
+                      f'RuntimeError: WRONG RESULT: triton_0:{late}:seed=0:steps=1:limit=15; max_abs=1.0\n'
+                      'WRONG VALUES: ' + ', '.join(names) + '\n')
+            with patch('src.workflow.oracle.process.run_isolated', self.launcher(
+                    returncode=1, stdout=stdout, progress=progress)):
+                reports[names] = self.oracle.test(self.program)
+        both, alone = reports[late, early], reports[late,]
+        self.assertEqual(both.bug_type, BugType.WRONG_RESULT)
+        check, origin = both.failure_key.rsplit(' | origin ', 1)
+        self.assertEqual(origin, wrong_result_origin(program, 'WRONG VALUES: ' + early))
+        self.assertEqual(alone.failure_key, check + ' | origin ' + wrong_result_origin(program, 'WRONG VALUES: ' + late))
+        self.assertNotEqual(both.failure_bucket, alone.failure_bucket)
+        self.assertEqual(both.to_dict()['failure_key'], both.failure_key)
+        for stdout in ('RuntimeError: CUDA error: an illegal memory access was encountered\n',
+                       f'RuntimeError: ORACLE UNSTABLE: triton_0:{late}:seed=0; 3 mismatched elements lie within '
+                       'the perturbed reference; numeric check skipped\n'):
+            with self.subTest(stdout=stdout), patch('src.workflow.oracle.process.run_isolated', self.launcher(
+                    returncode=1, stdout=stdout, progress=progress)):
+                report = self.oracle.test(self.program)
+            self.assertNotEqual(report.bug_type, BugType.WRONG_RESULT)
+            self.assertNotIn(' | origin ', report.failure_key)
 
     def test_campaign_summary_records_root_cause_locations(self):
         from src.workflow.oracle import BugReport

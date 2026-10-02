@@ -7,7 +7,8 @@ from src.workflow.generator.identities import (extended_variant_label, precision
 
 _RUNTIME = '\n\n'.join(inspect.getsource(getattr(runtime, name)) for name in (
     'extended_stage', 'record_extended_compilation', 'extended_inputs',
-    'extended_reference', 'extended_check', 'extended_check_atomic',
+    '_reference_nudge', 'extended_reference', 'extended_envelopes', 'extended_explained',
+    'extended_verdict', 'extended_check', 'extended_check_atomic',
     'extended_check_fma', '_atomic_kind', 'run_extended'))
 
 

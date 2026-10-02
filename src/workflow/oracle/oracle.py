@@ -209,7 +209,10 @@ class Oracle:
                     error_msg += f"\nProcess terminated by signal {signum} ({signame})"
                 bug_type = self._classify_error(error_msg)
                 if extended:
-                    if progress.get('stage') in ('execute', 'complete') and not self.config.compile_only and bug_type != BugType.WRONG_RESULT:
+                    # A skipped numeric check (the oracle trust gate) also
+                    # ends in the execute stage but is not a crash.
+                    if (progress.get('stage') in ('execute', 'complete') and not self.config.compile_only
+                            and bug_type not in (BugType.WRONG_RESULT, BugType.ORACLE_UNSTABLE)):
                         bug_type = BugType.RUNTIME_CRASH
                 params, dtype_str, compute_kind_str = self._get_meta(program)
                 params["input_seed"] = self.config.input_seed

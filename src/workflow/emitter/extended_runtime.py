@@ -113,13 +113,82 @@ def extended_inputs(program, seed=0, device='cpu'):
     return result
 
 
-def extended_reference(program, inputs, steps, limit):
+def _reference_nudge(op, attrs, args, value, direction):
+    """Move an inexact floating-point result by the error of a valid evaluation.
+
+    A kernel evaluates `op` in fp32 (or exactly) and rounds to the result
+    dtype, so a valid result differs from the reference by the op's fp32
+    error and at most one unit in the last place of the result: contracted
+    products, approximate division, roots and transcendentals (absolute
+    error for sin, cos and log), and reordered or TF32 accumulation.
+    Correctly rounded add/sub and exact operations (comparisons, selection,
+    data movement, floor/ceil/round, min/max, casts, integers) are not
+    moved; they only propagate the moves of their operands.
+    """
+    import math
+    import torch
+    if not value.dtype.is_floating_point:
+        return value
+    single = 2.0 ** -23
+    v = value.double()
+    if op in ('mul', 'div', 'sqrt', 'rsqrt'):
+        scale = 2 * single * v.abs()
+    elif op == 'fma':
+        # Unfused evaluation rounds the product first.
+        scale = torch.finfo(value.dtype).eps * (args[0].double() * args[1].double()).abs()
+    elif op in ('exp', 'exp2', 'tanh', 'erf', 'dsl_sigmoid'):
+        scale = 16 * single * v.abs()
+    elif op in ('sin', 'cos', 'log', 'log2'):
+        scale = 16 * single * v.abs() + 2.0 ** -19 * (args[0] != 0).double()
+    elif op == 'softmax':
+        scale = (2 * math.log2(max(args[0].shape[attrs.get('axis', -1)], 2)) + 16) * single * v.abs()
+    elif op == 'reduce_abssum' or (op == 'reduce' and attrs['kind'] == 'sum'):
+        axis = attrs.get('axis', -1)
+        terms = args[0].shape[axis]
+        scale = (2 * math.log2(max(terms, 2)) + 4) * single * args[0].double().abs().sum(axis)
+    elif op == 'scan_sum':
+        # Each prefix accumulates the magnitudes it has seen so far.
+        axis, reverse = attrs.get('axis', -1), attrs.get('reverse', False)
+        magnitude = args[0].double().abs()
+        magnitude = magnitude.flip(axis).cumsum(axis).flip(axis) if reverse else magnitude.cumsum(axis)
+        scale = (2 * math.log2(max(args[0].shape[axis], 2)) + 4) * single * magnitude
+    elif op == 'scan_product':
+        scale = (args[0].shape[attrs.get('axis', -1)] + 4) * single * v.abs()
+    elif op == 'matmul':
+        # fp16 accumulators round every step; the TF32 input-precision
+        # sweep rounds fp32 operands to 11 bits.
+        unit = max(torch.finfo(value.dtype).eps, 2.0 ** -11 if args[0].dtype == torch.float32 else 0.)
+        magnitude = args[0].double().abs() @ args[1].double().abs() + args[2].double().abs()
+        scale = (2 * math.log2(max(args[0].shape[-1], 2)) + 4) * unit * magnitude
+    else:
+        return value
+    info = torch.finfo(value.dtype)
+    _, exponent = torch.frexp(v)
+    ulp = torch.ldexp(torch.full_like(v, info.eps / 2), exponent).clamp_min(info.tiny * info.eps)
+    step = torch.maximum(scale.reshape(v.shape), ulp * (v != 0))
+    moved = v + direction(v.shape) * step
+    return torch.where(torch.isfinite(v), moved, v).to(value.dtype)
+
+
+def extended_reference(program, inputs, steps, limit, perturb=None):
+    """Interpret the program for every block; return watched values and memory.
+
+    `perturb` selects a pattern of rounding moves (_reference_nudge) for the
+    inexact results: 0 moves every element up, 1 down, larger patterns draw
+    seeded per-element signs. Unperturbed evaluation is the reference.
+    """
     import torch
     memory = {name: value.clone() for name, value in inputs.items()}
     buffers = {b['name']: b for b in program['buffers']}
     functions = {f['name']: f['body'] for f in program['functions']}
     device = next(iter(inputs.values())).device
     outputs = {}
+    signs = torch.Generator().manual_seed(perturb) if perturb is not None else None
+
+    def direction(shape):
+        if perturb in (0, 1):
+            return 1 - 2 * perturb
+        return (torch.randint(0, 2, tuple(shape), generator=signs) * 2 - 1).to(device)
 
     def run(body, inherited, arguments, bid):
         values = dict(inherited)
@@ -318,7 +387,10 @@ def extended_reference(program, inputs, steps, limit):
             elif op != 'barrier':
                 raise ValueError('Unsupported reference operation: ' + op)
             for result, value in zip(node['results'], out):
-                values[result['name']] = value.to(getattr(torch, result['type']['dtype'])).reshape(result['type']['shape'])
+                value = value.to(getattr(torch, result['type']['dtype'])).reshape(result['type']['shape'])
+                if perturb is not None:
+                    value = _reference_nudge(op, a, args, value, direction)
+                values[result['name']] = value
         return [values[v] for v in body['returns']], values
 
     wanted = list(dict.fromkeys(program['body']['returns'] + program['observations']))
@@ -329,66 +401,129 @@ def extended_reference(program, inputs, steps, limit):
     return {name: torch.stack(value) for name, value in outputs.items()}, memory
 
 
-def extended_check(actual, expected, label, matmul=False):
+def extended_envelopes(program, inputs, steps, limit, reference, patterns=8):
+    """Stack each reference value with its perturbed evaluations.
+
+    `reference` maps watched names and 'memory:'-prefixed buffers to the
+    unperturbed interpretation of `program`, which is index 0 of every stack.
+    A pattern whose interpretation fails (a perturbation can move an index
+    or a trip count) is left out.
+    """
+    import torch
+    stacks = {name: [value] for name, value in reference.items()}
+    for pattern in range(patterns):
+        try:
+            outputs, memory = extended_reference(program, inputs, steps, limit, pattern)
+        except Exception:
+            continue
+        outputs.update(('memory:' + name, value) for name, value in memory.items())
+        for name, values in stacks.items():
+            values.append(outputs[name].to(values[0].device))
+    return {name: torch.stack(values) for name, values in stacks.items()}
+
+
+def extended_explained(actual, expected, envelope, close):
+    """Mismatched elements that the reference itself cannot decide.
+
+    `envelope` stacks the reference with its perturbed evaluations. An
+    element is explained when a perturbation moves the reference beyond
+    `close` and both compared values lie in the range the evaluations span;
+    a NaN or an infinity must be one of the evaluations.
+    """
+    import torch
+    unstable = ~close(envelope[1:], envelope[:1]).all(0)
+    if not actual.dtype.is_floating_point:
+        low, high = envelope.long().amin(0), envelope.long().amax(0)
+
+        def inside(value):
+            return (low <= value.long()) & (value.long() <= high)
+    else:
+        finite = torch.isfinite(envelope)
+        low = torch.where(finite, envelope, float('inf')).amin(0)
+        high = torch.where(finite, envelope, -float('inf')).amax(0)
+
+        def inside(value):
+            within = finite.any(0) & torch.isfinite(value) & close(value, torch.minimum(torch.maximum(value, low), high))
+            special = ((envelope == value) | (torch.isnan(envelope) & torch.isnan(value))).any(0)
+            return within | (~torch.isfinite(value) & special)
+    return unstable & inside(actual) & inside(expected)
+
+
+def extended_verdict(actual, expected, label, close, envelope=None):
+    """(WRONG RESULT message or None, number of explained mismatches).
+
+    `close` decides each element. When some element mismatches, the
+    perturbed reference `envelope` (or a callable computing it) excuses the
+    elements extended_explained accepts; the message reports the largest
+    remaining difference.
+    """
+    import torch
+    mismatch = ~close(actual, expected)
+    if not bool(mismatch.any()):
+        return None, 0
+    if callable(envelope):
+        envelope = envelope()
+    real = mismatch
+    if envelope is not None and envelope.shape[1:] == actual.shape:
+        real = mismatch & ~extended_explained(actual, expected, envelope.to(actual.device), close)
+        if not bool(real.any()):
+            return None, int(mismatch.sum())
+    difference = (actual.to(torch.float64) - expected.to(torch.float64)).abs()
+    index = int(torch.where(real, torch.nan_to_num(difference, nan=float('inf')), -1.).reshape(-1).argmax())
+    return (f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '
+            f'index={index}; actual={actual.reshape(-1)[index].item()}; '
+            f'expected={expected.reshape(-1)[index].item()}\n'
+            f'mismatched={int(real.sum())}/{real.numel()}'), 0
+
+
+def extended_check(actual, expected, label, matmul=False, envelope=None):
+    """Integers and booleans compare exactly, floats within a relative
+    tolerance (2% when the program has a matmul) with matching NaN and
+    infinities. Returns how many mismatches `envelope` explains
+    (extended_verdict); any other mismatch raises."""
     import torch
     if actual.shape != expected.shape or actual.dtype != expected.dtype:
         raise RuntimeError('WRONG RESULT: type/shape mismatch: ' + label)
-    if not actual.dtype.is_floating_point:
-        equal = torch.equal(actual, expected)
+    tolerance = 0.02 if matmul else 0.002
+    if actual.dtype.is_floating_point:
+        def close(a, b):
+            return torch.isclose(a, b, rtol=tolerance, atol=tolerance * 0.125, equal_nan=True)
     else:
-        # Check exceptional values separately; never let NaNs hide a mismatch.
-        special = torch.isnan(expected) | torch.isinf(expected)
-        equal = (torch.equal(torch.isnan(actual), torch.isnan(expected)) and
-                 torch.equal(torch.isposinf(actual), torch.isposinf(expected)) and
-                 torch.equal(torch.isneginf(actual), torch.isneginf(expected)))
-        if equal:
-            finite_actual, finite_expected = actual[~special], expected[~special]
-            tolerance = 0.02 if matmul else 0.002
-            equal = torch.allclose(finite_actual, finite_expected, rtol=tolerance, atol=tolerance * 0.125)
-    if not equal:
-        difference = (actual.to(torch.float64) - expected.to(torch.float64)).abs()
-        if actual.dtype.is_floating_point:
-            matching_special = ((torch.isnan(actual) & torch.isnan(expected)) |
-                                (torch.isinf(actual) & (actual == expected)))
-            difference = torch.where(matching_special, 0., difference)
-        index = int(torch.nan_to_num(difference, nan=float('inf')).reshape(-1).argmax())
-        raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '
-                           f'index={index}; actual={actual.reshape(-1)[index].item()}; '
-                           f'expected={expected.reshape(-1)[index].item()}')
+        def close(a, b):
+            return a == b
+    message, explained = extended_verdict(actual, expected, label, close, envelope)
+    if message:
+        raise RuntimeError(message)
+    return explained
 
 
-def extended_check_atomic(actual, expected, label, kind):
+def extended_check_atomic(actual, expected, label, kind, envelope=None):
     """Race-aware scratch comparison. add races accumulate in an arbitrary
     order, so the fp64 reference differs by a few rounding ulps (tolerance),
-    while max/min races are order-independent and compare bitwise except for
-    signed zero (which both orderings may pick)."""
+    while max/min races are order-independent and compare exactly except for
+    signed zero (which both orderings may pick). `envelope` as in
+    extended_check."""
     import torch
     if actual.shape != expected.shape or actual.dtype != expected.dtype:
         raise RuntimeError('WRONG RESULT: type/shape mismatch: ' + label)
     if not actual.dtype.is_floating_point:
-        equal = torch.equal(actual, expected)
+        def close(a, b):
+            return a == b
+    elif kind in ('max', 'min'):
+        def close(a, b):
+            return (a == b) | (torch.isnan(a) & torch.isnan(b))
     else:
-        special = torch.isnan(expected) | torch.isinf(expected)
-        equal = (torch.equal(torch.isnan(actual), torch.isnan(expected)) and
-                 torch.equal(torch.isposinf(actual), torch.isposinf(expected)) and
-                 torch.equal(torch.isneginf(actual), torch.isneginf(expected)))
-        if equal and kind in ('max', 'min'):
-            zeros = lambda t: torch.where(t == 0, torch.zeros_like(t), t)
-            equal = torch.equal(zeros(actual), zeros(expected))
-        elif equal:
-            finite_actual, finite_expected = actual[~special], expected[~special]
-            # n <= 64 raced contributions per address differ by a few ulps of
-            # ordering; losing a contribution moves by an order of magnitude.
-            equal = torch.allclose(finite_actual, finite_expected, rtol=0.02, atol=0.02 * 0.125)
-    if not equal:
-        difference = (actual.to(torch.float64) - expected.to(torch.float64)).abs()
-        index = int(torch.nan_to_num(difference, nan=float('inf')).reshape(-1).argmax())
-        raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '
-                           f'index={index}; actual={actual.reshape(-1)[index].item()}; '
-                           f'expected={expected.reshape(-1)[index].item()}')
+        # n <= 64 raced contributions per address differ by a few ulps of
+        # ordering; losing a contribution moves by an order of magnitude.
+        def close(a, b):
+            return torch.isclose(a, b, rtol=0.02, atol=0.02 * 0.125, equal_nan=True)
+    message, explained = extended_verdict(actual, expected, label, close, envelope)
+    if message:
+        raise RuntimeError(message)
+    return explained
 
 
-def extended_check_fma(actual, expected, label, matmul=False):
+def extended_check_fma(actual, expected, label, matmul=False, envelope=None):
     """A fused and an unfused evaluation both round within ~1 ulp of the exact
     product-add; 4 ulps accepts either while rejecting operand mixups and
     exponent bugs. Exceptional values compare exactly like extended_check.
@@ -398,25 +533,16 @@ def extended_check_fma(actual, expected, label, matmul=False):
         raise RuntimeError('WRONG RESULT: type/shape mismatch: ' + label)
     if not actual.dtype.is_floating_point:
         raise RuntimeError('WRONG RESULT: fma on non-float: ' + label)
-    same_special = (torch.equal(torch.isnan(actual), torch.isnan(expected)) and
-                    torch.equal(torch.isposinf(actual), torch.isposinf(expected)) and
-                    torch.equal(torch.isneginf(actual), torch.isneginf(expected)))
-    if same_special:
-        info = torch.finfo(actual.dtype)
-        special = torch.isnan(expected) | torch.isinf(expected)
-        tolerance = 4 * torch.where(expected == 0, info.tiny, expected.abs()) * info.eps
-        equal = bool((((actual - expected).abs().le(tolerance)) | special).all())
-    else:
-        equal = False
-    if not equal:
-        difference = (actual.to(torch.float64) - expected.to(torch.float64)).abs()
-        matching_special = ((torch.isnan(actual) & torch.isnan(expected)) |
-                            (torch.isinf(actual) & (actual == expected)))
-        difference = torch.where(matching_special, 0., difference)
-        index = int(torch.nan_to_num(difference, nan=float('inf')).reshape(-1).argmax())
-        raise RuntimeError(f'WRONG RESULT: {label}; max_abs={difference.reshape(-1)[index].item()}; '
-                           f'index={index}; actual={actual.reshape(-1)[index].item()}; '
-                           f'expected={expected.reshape(-1)[index].item()}')
+    info = torch.finfo(actual.dtype)
+
+    def close(a, b):
+        tolerance = 4 * torch.where(b == 0, info.tiny, b.abs()) * info.eps
+        same = (torch.isnan(a) & torch.isnan(b)) | (torch.isinf(b) & (a == b))
+        return same | (torch.isfinite(b) & ((a - b).abs() <= tolerance))
+    message, explained = extended_verdict(actual, expected, label, close, envelope)
+    if message:
+        raise RuntimeError(message)
+    return explained
 
 
 def _atomic_kind(program):
@@ -438,6 +564,23 @@ def run_extended(program, prepare, input_seed=0, repeats=2, device='cuda', refer
     # Fused or unfused evaluation may differ per compile configuration, so the
     # checked fma outputs and the invariance baseline both use the fma check.
     check = lambda name: extended_check_fma if name in fma_names else extended_check
+    # Every check of one launch runs, so the report names all mismatching
+    # values; the first failure in check order is raised. Mismatches that
+    # the perturbed reference explains are reported only if nothing fails.
+    failures, unstable, unstable_label = [], 0, None
+
+    def judge(name, check_fn, *args):
+        nonlocal unstable, unstable_label
+        try:
+            explained = check_fn(*args)
+        except RuntimeError as error:
+            if not str(error).startswith('WRONG RESULT'):
+                raise
+            failures.append((name, error))
+            return
+        if explained and unstable_label is None:
+            unstable_label = args[2]
+        unstable += explained
     # Compile once, reuse each signature for all runtime shapes/bounds and seeds.
     variants = prepare()
     extended_stage('reference', 'cpu')
@@ -460,6 +603,18 @@ def run_extended(program, prepare, input_seed=0, repeats=2, device='cuda', refer
                     {name: value.to(device) for name, value in reference_expected.items()},
                     {name: value.to(device) for name, value in reference_memory.items()},
                     {v['name']: v['type'] for node in reference['body']['operations'] for v in node['results']})
+            # Perturbed references of the program (None) or of an alternate,
+            # computed for the first mismatch of this case that needs them.
+            envelopes = {}
+
+            def envelope(key, name):
+                if key not in envelopes:
+                    reference, outputs, memory = ((program, expected, expected_memory) if key is None
+                                                  else (reference_programs[key],) + alternates[key][:2])
+                    outputs = dict(outputs)
+                    outputs.update(('memory:' + n, value) for n, value in memory.items())
+                    envelopes[key] = extended_envelopes(reference, host_original, steps, limit, outputs)
+                return envelopes[key].get(name)
             baselines = {}
             for label, watched, launch in variants:
                 extended_stage('execute', label)
@@ -471,9 +626,10 @@ def run_extended(program, prepare, input_seed=0, repeats=2, device='cuda', refer
                     # distributivity (checked against its own interpretation,
                     # never against the cross-variant invariance baseline).
                     prefix = 'identity:' if label.endswith('_ident') else 'precision:'
+                    key = label
                 else:
                     variant_expected, variant_expected_memory, variant_types = expected, expected_memory, types
-                    prefix = ''
+                    prefix, key = '', None
                 previous = None
                 for repeat in range(repeats):
                     memories = {name: value.clone() for name, value in original.items()}
@@ -487,21 +643,23 @@ def run_extended(program, prepare, input_seed=0, repeats=2, device='cuda', refer
                     launch(memories, output_storage, steps, limit)
                     if device != 'cpu':
                         torch.cuda.synchronize()
-                    values = {}
+                    values, failures = {}, []
                     for name, storage in output_storage.items():
                         guard = True if storage.dtype == torch.bool else 23
                         if not torch.all(storage[:, :16] == guard) or not torch.all(storage[:, -16:] == guard):
-                            raise RuntimeError('WRONG RESULT: output canary: ' + label)
+                            failures.append((name, RuntimeError('WRONG RESULT: output canary: ' + label)))
                         actual = storage[:, 16:-16].reshape(variant_expected[name].shape)
+                        perturbed = lambda: envelope(key, name)
                         if name in fma_names:
-                            extended_check_fma(actual, variant_expected[name],
-                                               f'{prefix}fma:{label}:{name}:seed={seed}:steps={steps}:limit={limit}')
+                            judge(name, extended_check_fma, actual, variant_expected[name],
+                                  f'{prefix}fma:{label}:{name}:seed={seed}:steps={steps}:limit={limit}', False, perturbed)
                         else:
-                            extended_check(actual, variant_expected[name],
-                                           f'{prefix}{label}:{name}:seed={seed}:steps={steps}:limit={limit}', has_matmul)
+                            judge(name, extended_check, actual, variant_expected[name],
+                                  f'{prefix}{label}:{name}:seed={seed}:steps={steps}:limit={limit}', has_matmul, perturbed)
                         if alternate is None:
                             if name in baselines:
-                                check(name)(actual, baselines[name], 'configuration/observation invariance:' + name, has_matmul)
+                                judge(name, check(name), actual, baselines[name], 'configuration/observation invariance:' + name,
+                                      has_matmul, lambda: envelope(None, name))
                             else:
                                 baselines[name] = actual.clone()
                         values[name] = actual.clone()
@@ -511,18 +669,24 @@ def run_extended(program, prepare, input_seed=0, repeats=2, device='cuda', refer
                         name = buf['name']
                         if buf['role'] == 'input':
                             if not torch.equal(memories[name].view(torch.uint8), original[name].view(torch.uint8)):
-                                raise RuntimeError('WRONG RESULT: input storage modified: ' + name)
+                                failures.append(('memory:' + name, RuntimeError('WRONG RESULT: input storage modified: ' + name)))
                         else:
                             if not torch.equal(memories[name][:, :16], original[name][:, :16]) or not torch.equal(memories[name][:, -16:], original[name][:, -16:]):
-                                raise RuntimeError('WRONG RESULT: scratch canary: ' + name)
+                                failures.append(('memory:' + name, RuntimeError('WRONG RESULT: scratch canary: ' + name)))
                             # Full memory comparison includes aliases, untouched
                             # elements and both guards, not only the final output.
+                            perturbed = lambda: envelope(key, 'memory:' + name)
                             if atomic_kind is not None:
-                                extended_check_atomic(memories[name], variant_expected_memory[name],
-                                                      prefix + 'atomic:' + name, atomic_kind)
+                                judge('memory:' + name, extended_check_atomic, memories[name], variant_expected_memory[name],
+                                      prefix + 'atomic:' + name, atomic_kind, perturbed)
                             else:
-                                extended_check(memories[name], variant_expected_memory[name], prefix + 'scratch:' + name, has_matmul)
+                                judge('memory:' + name, extended_check, memories[name], variant_expected_memory[name],
+                                      prefix + 'scratch:' + name, has_matmul, perturbed)
                         values['memory:' + name] = memories[name].clone()
+                    if failures:
+                        failure = failures[0][1]
+                        failure.args = (f'{failure}\nWRONG VALUES: ' + ', '.join(dict.fromkeys(n for n, _ in failures)),)
+                        raise failure
                     if previous is not None:
                         for name, actual in values.items():
                             if name.startswith('memory:') and atomic_kind is not None:
@@ -534,3 +698,6 @@ def run_extended(program, prepare, input_seed=0, repeats=2, device='cuda', refer
                             elif not torch.equal(actual.contiguous().view(torch.uint8), previous[name].contiguous().view(torch.uint8)):
                                 raise RuntimeError('WRONG RESULT: repeat determinism:' + name)
                     previous = values
+    if unstable:
+        raise RuntimeError(f'ORACLE UNSTABLE: {unstable_label}; {unstable} mismatched elements lie within '
+                           'the perturbed reference; numeric check skipped')
