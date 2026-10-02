@@ -482,7 +482,8 @@ class TileSmith:
                     novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only,
                                                     features=features)
                     compiler_novelty = self.feedback.observe_compilation(
-                        program, self.oracle.last_compilation, self.oracle.compilation_complete)
+                        program, self.oracle.last_compilation, self.oracle.compilation_complete,
+                        passed=bug is None and not self.config.compile_only)
                     if (bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback
                             and bug.bug_type is not BugType.WRONG_RESULT):
                         self.feedback.explain(features)
@@ -652,6 +653,7 @@ class TileSmith:
                 "structural_features_passed": len(self.feedback.passed),
                 "structural_features_compiled": len(self.feedback.compiled),
                 "compiler_ir_features": len(self.feedback.compiler),
+                "compiler_ir_features_passed": len(self.feedback.compiler_passed),
                 "total_tested": self.stats.total_tested,
                 "oracle_unstable": self.stats.oracle_unstable,
                 "bugs_total": bugs_total,
@@ -731,6 +733,7 @@ class TileSmith:
             'compiled': self.stats.programs_compiled, 'oracle_unstable': self.stats.oracle_unstable,
             'structural_features_passed': len(self.feedback.passed),
             'compiler_ir_features': len(self.feedback.compiler),
+            'compiler_ir_features_passed': len(self.feedback.compiler_passed),
             'dsl_compiler_ir_features': len(self.dsl_stage.compiler),
             'dsl_target_structural_features': len(self.dsl_stage.target_structural),
             'dsl_evolution_actions': dict(self.dsl_stage.evolution_counts),

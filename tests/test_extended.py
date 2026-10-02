@@ -4,7 +4,10 @@ import contextlib
 import copy
 import io
 import json
+import os
 import random
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -403,6 +406,23 @@ class ExtendedTests(unittest.TestCase):
             ExtendedGenerator(config, 'triton').generate('mixed'))
         ast.parse(code)
         self.assertIn("'enable_fp_fusion': True", code)
+
+    def test_tilelang_extended_reproducers_bypass_the_kernel_cache(self):
+        """A kernel-cache hit records no lowered TIR, so the extended harness
+        turns the TileLang cache off before the import, overriding the caller;
+        Region harnesses and Triton (whose cache keeps every stage) keep it."""
+        code = Oracle(self.config, 'tilelang')._emit_code(self.program('mixed', 'tilelang'))
+        header = code.split('\n\n', 1)[0]
+        self.assertLess(header.index('TILELANG_DISABLE_CACHE'), header.index('import tilelang'))
+        probe = header + '\nfrom tilelang.env import is_cache_enabled\nprint(is_cache_enabled())\n'
+        result = subprocess.run([sys.executable, '-c', probe], capture_output=True, text=True, timeout=300,
+                                env=dict(os.environ, TILELANG_DISABLE_CACHE='0', CUDA_VISIBLE_DEVICES=''))
+        self.assertEqual(result.stdout.split()[-1:], ['False'], result.stderr[-2000:])
+        self.assertNotIn('TILELANG_DISABLE_CACHE', Oracle(self.config, 'triton')._emit_code(
+            self.program('mixed', 'triton')))
+        native = Config(extended_prob=0)
+        self.assertNotIn('TILELANG_DISABLE_CACHE', Oracle(native, 'tilelang')._emit_code(
+            ProgramGenerator(native, 'tilelang').generate()))
 
     def test_precision_emission_ships_the_transformed_reference(self):
         from src.backends import get_backend

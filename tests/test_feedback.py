@@ -88,6 +88,36 @@ class FeedbackTests(unittest.TestCase):
             restored.retain_seeds(set())
             self.assertNotIn(digest, restored.seed_compiler)
 
+    def test_compiler_features_of_passing_programs_are_measured_apart(self):
+        """The IR of programs that went on to pass is counted on its own: the
+        flag changes no weight, and a resume keeps the count."""
+        program = dataflow_program()
+        stage, lowered = key('compiler_stage', 'ttgir'), key('compiler_stage', 'llir')
+        crashed, passing = [{'features': [stage]}], [{'features': [stage, lowered]}]
+        measured, unmeasured = StructuralFeedback(), StructuralFeedback()
+        for feedback, passed in ((measured, True), (unmeasured, False)):
+            feedback.observe_compilation(program, crashed, complete=True)
+            feedback.observe_compilation(program, passing, complete=True, passed=passed)
+            feedback.register_seed(program, passing)
+        self.assertEqual(measured.seed_weight(program), unmeasured.seed_weight(program))
+        self.assertEqual(measured.compiler, unmeasured.compiler)
+        self.assertEqual(dict(measured.compiler_passed), {stage: 1, lowered: 1})
+        self.assertFalse(unmeasured.compiler_passed)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'feedback.json'
+            measured.save(path)
+            restored = StructuralFeedback()
+            restored.restore(path)
+            self.assertEqual(restored.compiler_passed, measured.compiler_passed)
+            # A campaign from before the measurement resumes without it.
+            data = json.loads(path.read_text())
+            del data['compiler_passed']
+            path.write_text(json.dumps(data))
+            older = StructuralFeedback()
+            older.restore(path)
+            self.assertFalse(older.compiler_passed)
+            self.assertEqual(older.compiler, measured.compiler)
+
     def test_failure_matching_does_not_use_coarse_category(self):
         def bug(message):
             return BugReport(BugType.COMPILE_CRASH, message, root_cause='triton_compile_error')

@@ -12,6 +12,8 @@ import sys
 class Backend(ABC):
     name = ''
     supports_extended = False
+    # Statements an extended reproducer runs before it imports the DSL.
+    extended_prologue = ''
 
     def extended_variants(self, program):
         raise NotImplementedError(f'{self.name} does not support extended programs')

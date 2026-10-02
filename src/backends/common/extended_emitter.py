@@ -32,7 +32,7 @@ def emit_extended(program, backend, config):
             if options.get('identity'):
                 reference_programs[extended_variant_label(backend, index, options)] = distributed.to_dict()
     return '\n\n'.join([
-        'import os\n' + adapter.imports,
+        'import os\n' + adapter.extended_prologue + adapter.imports,
         _RUNTIME,
         *(lower.emit() for lower, _ in entries),
         adapter.extended_compile_source(entries, program),

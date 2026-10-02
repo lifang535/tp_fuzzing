@@ -161,6 +161,10 @@ class StructuralFeedback:
         self.passed = Counter()
         self.compiled = Counter()
         self.compiler = Counter()
+        # Compiler features of programs that also ran and passed the oracle:
+        # a measurement only, never a weight. `compiler` counts every recorded
+        # lowering, including those of programs that then crashed or failed.
+        self.compiler_passed = Counter()
         self.seed_compiler = {}
         self.seed_structural = {}
         self.known_seed_failures = Counter()
@@ -187,12 +191,14 @@ class StructuralFeedback:
         """
         self.explained.update(features)
 
-    def observe_compilation(self, program, records, complete=False):
+    def observe_compilation(self, program, records, complete=False, passed=False):
         features = {f for r in records for f in r.get('features', [])}
         novel = features - self.compiler.keys()
         self.compiler.update(features)
         if complete:
             self.compiled.update(program_features(program))
+        if passed:
+            self.compiler_passed.update(features)
         return len(novel)
 
     def register_seed(self, program, records):
@@ -267,7 +273,7 @@ class StructuralFeedback:
                 'seed_compiler': self.seed_compiler,
                 'known_seed_failures': dict(self.known_seed_failures),
                 'known_signatures': dict(self.known_signatures),
-                'explained': dict(self.explained)}
+                'explained': dict(self.explained), 'compiler_passed': dict(self.compiler_passed)}
         temporary = path.with_suffix('.tmp')
         temporary.write_text(json.dumps(data, sort_keys=True))
         temporary.replace(path)
@@ -293,8 +299,9 @@ class StructuralFeedback:
                     for digest, values in features.items()):
                 raise ValueError('Invalid seed compiler features')
             self.seed_compiler = features
-            # 'explained' is absent from campaigns before duplicate damping.
-            for name in ('known_seed_failures', 'known_signatures', 'explained'):
+            # 'explained' is absent from campaigns before duplicate damping,
+            # 'compiler_passed' from those before it was measured.
+            for name in ('known_seed_failures', 'known_signatures', 'explained', 'compiler_passed'):
                 values = data.get(name, {})
                 if not isinstance(values, dict) or any(type(v) is not int or v < 0 for v in values.values()):
                     raise ValueError('Invalid known failure counts')

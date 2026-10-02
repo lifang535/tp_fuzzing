@@ -7,6 +7,12 @@ class TileLangBackend(CudaTileBackend):
     name = 'tilelang'
     params = params
     imports = 'import tilelang\nimport tilelang.language as T'
+    # A kernel-cache hit comes back without its lowering artifact, so the
+    # lowered TIR that carries nearly every compiler feature goes unrecorded
+    # (one program measured 3 features warm, 128 cold) and the feedback would
+    # follow whatever earlier tests left in ~/.tilelang. Set before the import
+    # so it holds on every release; a reproducer rerun by hand keeps it.
+    extended_prologue = "os.environ['TILELANG_DISABLE_CACHE'] = '1'\n"
     min_block_k = 8
 
     def extended_variants(self, program, config=None):
