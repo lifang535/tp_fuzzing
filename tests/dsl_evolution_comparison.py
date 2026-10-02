@@ -6,6 +6,7 @@ features, not compiler edge coverage or independently confirmed bug counts.
 Existing background workloads are not stopped; throughput is descriptive.
 """
 import argparse
+from collections import Counter
 from dataclasses import asdict
 import json
 import os
@@ -42,11 +43,23 @@ def main():
                     save_artifacts=False, region_repeat_count=2,
                     random_config_count=2 if args.full_oracle else 0,
                     extended_precision_pair=args.full_oracle, extended_identity_pair=args.full_oracle)
-    # Keep validation caches on the output filesystem, isolated from running campaigns.
-    os.environ['TRITON_CACHE_DIR'] = str((args.output / 'triton_cache').resolve())
-    os.environ['TILELANG_CACHE_DIR'] = str((args.output / 'tilelang_cache').resolve())
+    # TileLang 0.1.14 restores executable kernels without their lowered TIR.
+    # A warm-cache pass therefore exposes fewer features for the SAME input,
+    # changing both measurement and subsequent feedback-guided generation.
+    # Disable that cache only in this comparison process and its children.
+    if args.backend == 'tilelang':
+        os.environ['TILELANG_DISABLE_CACHE'] = '1'
+
+    def isolate_caches(name):
+        directory = (args.output / 'caches' / name).resolve()
+        os.environ['TRITON_CACHE_DIR'] = str(directory / 'triton')
+        os.environ['TILELANG_CACHE_DIR'] = str(directory / 'tilelang')
+
+    isolate_caches('parent_validation')
     report = {'backend': args.backend, 'environment': environment(), 'config': asdict(config),
               'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
+              'cache_policy': {'isolated_per_arm_and_seed': True,
+                               'tilelang_cache_disabled': args.backend == 'tilelang'},
               'limitations': ['Short matched-parent ablation, not whole-campaign bug-yield evidence',
                               'IR/source feature counts are not compiler edge coverage',
                               'Background campaigns may contend for resources; wall time is descriptive'],
@@ -92,6 +105,7 @@ def main():
     for index, seed in enumerate(args.seeds):
         # Alternate order to reduce a consistent first-arm cache/order advantage.
         for arm in (('baseline', 'candidate') if index % 2 == 0 else ('candidate', 'baseline')):
+            isolate_caches(f'{arm}_{seed}')
             arm_config = Config(**dict(asdict(config), seed=seed,
                                       dsl_evolve_prob=0 if arm == 'baseline' else 0.5,
                                       corpus_feedback=arm != 'baseline',
@@ -100,13 +114,25 @@ def main():
             for program, path in parents:
                 fuzzer.dsl_stage.add(program, path)
             observed_compiler, executed_compiler, executed_source = set(), set(), set()
-            entry = {'arm': arm, 'seed': seed, 'path': str(fuzzer.output_dir), 'cases': [], 'complete': False}
+            entry = {'arm': arm, 'seed': seed, 'path': str(fuzzer.output_dir), 'cases': [], 'complete': False,
+                     'compiler_feature_measurement_complete': True}
             report['runs'].append(entry)
             execute = fuzzer.oracle.test
             def test(program):
                 started = time.monotonic()
                 bug = execute(program)
+                records = fuzzer.oracle.last_compilation
                 features = {feature for record in fuzzer.oracle.last_compilation for feature in record.get('features', [])}
+                # Keep acquisition completeness separate from successful GPU
+                # execution: missing IR must never look like a coverage loss.
+                required_stages = ({'lowered_tir', 'cuda'} if args.backend == 'tilelang'
+                                   else {'ttir', 'ttgir', 'llir', 'ptx'})
+                missing_stages = {record['variant']: sorted(required_stages - record.get('stages', {}).keys())
+                                  for record in records
+                                  if required_stages - record.get('stages', {}).keys()}
+                measurement_complete = bool(records) and not missing_stages
+                if bug is None and not measurement_complete:
+                    entry['compiler_feature_measurement_complete'] = False
                 observed_compiler.update(features)
                 if bug is None:
                     executed_compiler.update(features)
@@ -117,7 +143,12 @@ def main():
                        'seconds': round(time.monotonic() - started, 3),
                        'depth': lineage.get('extension_depth', 0), 'action': lineage.get('extension_action'),
                        'op': lineage.get('extension_op'), 'category': bug.root_cause if bug else None,
-                       'bucket': bug.failure_bucket if bug else None}
+                       'bucket': bug.failure_bucket if bug else None,
+                       'compiler_feature_measurement_complete': measurement_complete,
+                       'missing_compiler_stages': missing_stages,
+                       'compiler_stages': {record['variant']: sorted(record.get('stages', {})) for record in records},
+                       'compiler_feature_count': len(features),
+                       'compiler_feature_kinds': dict(Counter(json.loads(feature)[0] for feature in features))}
                 entry['cases'].append(row)
                 entry.update(observed_compiler_features=sorted(observed_compiler),
                              executed_compiler_features=sorted(executed_compiler),
