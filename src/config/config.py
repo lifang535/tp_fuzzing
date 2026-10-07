@@ -81,6 +81,12 @@ class Config:
     dsl_evolve_prob: float = 0.5
     dsl_max_depth: int = 3
     dsl_max_ops: int = 256
+    # Adapt target actions to recent novelty/cost and audited repeat failures.
+    # Disable for a fixed-policy ablation; structural_feedback=False also disables it.
+    dsl_adaptive_schedule: bool = True
+    # Attempts per common parent / target operation. The CLI uses 4 for new
+    # campaigns; one preserves the historical single-derivative protocol.
+    dsl_source_variants: int = 1
     # Probability that a target call takes a rank-2 operand instead of the
     # historical 1-D fp32 vector, and whether target calls draw their axis,
     # direction, order and topk size. Off in the library; the CLI turns both

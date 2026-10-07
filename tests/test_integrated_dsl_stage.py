@@ -13,6 +13,7 @@ from src.workflow.fuzzer.fuzzer import TileSmith
 from src.workflow.feedback import StructuralFeedback, key
 from src.workflow.generator.dsl_extend import eligible_ops, is_common_seed
 from src.workflow.generator.extended import ExtendedGenerator
+from src.workflow.generator.grids import GridState
 from api_coverage import campaign_passes
 
 
@@ -88,6 +89,51 @@ class IntegratedDSLStageTests(unittest.TestCase):
         restored = DSLStage(self.config, 'tilelang', feedback=feedback)
         restored.restore(stage.snapshot())
         self.assertEqual(restored.source_compiler[digest], [feature])
+
+    def test_bounded_variants_continue_after_failure_and_restore_attempts(self):
+        self.config.dsl_source_variants = 4
+        self.config.dsl_attributes = True
+        parent = ExtendedGenerator(self.config, 'tilelang').generate('arithmetic')
+        grids = GridState()
+        stage = DSLStage(self.config, 'tilelang', grids=grids)
+        stage.add(parent, 'parent.json')
+        class Oracle:
+            def test(self, program):
+                return None
+        with patch('src.workflow.fuzzer.dsl_stage.eligible_ops', return_value=('scan_sum',)):
+            first, lineage = stage.generate(Oracle())
+            stage.observe_outcome(first, lineage, [], passed=False, seconds=1, known_repeat=True)
+            restored_grids = GridState()
+            restored_grids.load(grids.save())
+            restored = DSLStage(self.config, 'tilelang', grids=restored_grids)
+            restored.restore(json.loads(json.dumps(stage.snapshot())))
+            children = [first]
+            for trial in (2, 3, 4):
+                child, lineage = restored.generate(Oracle())
+                self.assertEqual(lineage['extension_variant'], trial)
+                children.append(child)
+            self.assertEqual(len({restored.digest(child) for child in children}), 4)
+            self.assertIsNone(restored.generate(Oracle()))
+            # Old snapshots recorded one attempt for every tried pair.
+            old = stage.snapshot()
+            old.pop('source_attempts')
+            legacy = DSLStage(self.config, 'tilelang')
+            legacy.restore(old)
+            self.assertEqual(legacy.generate(Oracle())[1]['extension_variant'], 2)
+
+    def test_duplicate_derivatives_are_rejected_with_a_bounded_retry(self):
+        self.config.dsl_source_variants = 4
+        self.config.dsl_attributes = True
+        parent = ExtendedGenerator(self.config, 'tilelang').generate('arithmetic')
+        stage = DSLStage(self.config, 'tilelang', grids=GridState())
+        stage.add(parent, 'parent.json')
+        with patch('src.workflow.fuzzer.dsl_stage.eligible_ops', return_value=('scan_sum',)):
+            self.assertIsNone(stage.generate(None, accept=lambda p: False))
+            self.assertEqual(stage.duplicate_derivatives, 2)
+            self.assertIsNone(stage.generate(None, accept=lambda p: False))
+            self.assertEqual(stage.duplicate_derivatives, 4)
+            self.assertIsNone(stage.generate(None, accept=lambda p: False))
+            self.assertEqual(stage.schedule.total.tested, 0)
 
     def test_restored_source_is_revalidated_and_rejected_if_stale(self):
         parent = ExtendedGenerator(self.config, 'tilelang').generate('arithmetic')

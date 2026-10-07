@@ -15,8 +15,9 @@ from src.workflow.emitter.extended_runtime import extended_inputs, extended_refe
 from src.workflow.extended_feedback import extended_features
 from src.workflow.generator import dsl_extend
 from src.workflow.generator.dsl_extend import (MATRIX_OPS, eligible_ops, extend_passed, loop_target,
-                                               respell_target, target_attributes)
+                                               respell_target, target_attributes, target_attribute_cells)
 from src.workflow.generator.extended import Builder, ExtendedGenerator
+from src.workflow.generator.grids import GridState
 
 
 def loaded(backend, dtype, shape):
@@ -267,13 +268,45 @@ class AttributeDrawTests(unittest.TestCase):
             child = extend_passed(parent, 'tilelang', op, config)
             types = child.validate()[0]
             spellings = set()
+            current = child
             for _ in range(24):
-                respelled = respell_target(child, 'tilelang')
+                respelled = respell_target(current, 'tilelang')
                 self.assertEqual(respelled.validate()[0], types)
+                self.assertNotEqual(respelled.to_dict(), current.to_dict())
                 spellings.add(json.dumps(respelled.body.operations[-1].attrs, sort_keys=True))
+                current = respelled
             self.assertGreater(len(spellings), 1, op)
         with self.assertRaises(ValueError):
             respell_target(parent, 'tilelang')
+
+    def test_attribute_grid_visits_every_legal_cell_and_resumes(self):
+        ty = Ty('float32', (4, 8))
+        grids = GridState()
+        with patch.object(dsl_extend, '_accepts', return_value=True):
+            for op in ('scan_sum', 'softmax', 'topk'):
+                cells = target_attribute_cells(op, ty, 'triton')
+                first = target_attributes(op, ty, 'triton', grids=grids)
+                restored = GridState()
+                restored.load(json.loads(json.dumps(grids.save())))
+                rest = [target_attributes(op, ty, 'triton', grids=restored) for _ in range(len(cells) - 1)]
+                encode = lambda values: {json.dumps(value, sort_keys=True) for value in values}
+                self.assertEqual(encode([first, *rest]), encode(cells))
+                self.assertEqual(target_attributes(op, ty, 'triton', grids=restored), first)
+        with patch.object(dsl_extend, '_accepts', return_value=False):
+            self.assertEqual(target_attributes('softmax', ty, 'triton', grids=grids), {'axis': 0})
+            self.assertNotIn('reverse', target_attributes('scan_sum', ty, 'triton', grids=grids))
+
+    def test_grid_respelling_preserves_topk_shape_and_changes_the_program(self):
+        program, _, _, _ = target_program('triton', 'float32', [
+            ('topk', Ty('float32', (4, 4)), {'k': 4, 'descending': True})])
+        types = program.validate()[0]
+        grids = GridState()
+        with patch.object(dsl_extend, '_accepts', return_value=True):
+            for _ in range(8):
+                changed = respell_target(program, 'triton', grids)
+                self.assertEqual(changed.validate()[0], types)
+                self.assertNotEqual(changed.to_dict(), program.to_dict())
+                program = changed
 
     def test_loop_repeats_the_scan_as_spelled(self):
         config = Config(extended_prob=1, dsl_matrix_prob=1, dsl_attributes=True)

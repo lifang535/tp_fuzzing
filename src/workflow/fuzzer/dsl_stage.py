@@ -6,9 +6,10 @@ import json
 import random
 
 from src.ir.serialization import program_from_dict
-from src.workflow.generator.dsl_extend import (DSL_OPS, eligible_ops, extend_passed, loop_target,
+from src.workflow.generator.dsl_extend import (DSL_OPS, MATRIX_OPS, eligible_ops, extend_passed, loop_target,
                                                respell_target)
 from src.workflow.feedback import corpus_eviction, program_features
+from .dsl_schedule import DSLSchedule
 
 
 class DSLStage:
@@ -17,8 +18,12 @@ class DSLStage:
         self.feedback = feedback
         self.sources = []  # (program, saved source path, verified, source digest)
         self.tried = set()  # source digest and op pairs already derived
+        self.source_attempts = Counter()
+        self.duplicate_derivatives = 0
         self.counts = Counter()
         self.compiler = Counter()  # Target-only features; never update common feedback.
+        self.compiler_passed = Counter()
+        self.schedule = DSLSchedule()
         self.source_compiler = {}
         self.baseline_rejected = 0
         self.invalid_extension = 0
@@ -32,6 +37,8 @@ class DSLStage:
         if (not 0 <= config.dsl_evolve_prob <= 1 or not 1 <= config.dsl_max_depth <= 8
                 or config.dsl_max_ops < 1):
             raise ValueError('Invalid DSL evolution probability, depth or operation limit')
+        if type(config.dsl_source_variants) is not int or not 1 <= config.dsl_source_variants <= 32:
+            raise ValueError('DSL source variants must be an integer in [1, 32]')
 
     @staticmethod
     def digest(program):
@@ -48,6 +55,18 @@ class DSLStage:
         self.source_compiler = {d: f for d, f in self.source_compiler.items() if d in digests}
         self.target_meta = {d: m for d, m in self.target_meta.items() if d in digests}
         self.tried = {(d, op) for d, op in self.tried if d in digests}
+        self.source_attempts = Counter({pair: count for pair, count in self.source_attempts.items()
+                                        if pair[0] in digests})
+        self.schedule.prune(digests)
+
+    @property
+    def adaptive(self):
+        return self.config.dsl_adaptive_schedule and self.config.structural_feedback
+
+    def _choose(self, values, weights):
+        if self.adaptive:
+            return self.schedule.choose(values, weights)
+        return random.choices(values, weights=weights, k=1)[0]
 
     def _bound(self, pool):
         if len(pool) <= self.config.dsl_seed_pool_max:
@@ -75,11 +94,11 @@ class DSLStage:
         return any(entry[3] == digest for entry in self.sources)
 
     def retain_target(self, program, source_file, lineage, records, compiler_novelty=0):
-        if not self.config.dsl_evolve_prob:
-            return False
         features = program_features(program)
         novel = features - self.target_structural.keys()
         self.target_structural.update(features)
+        if not self.config.dsl_evolve_prob:
+            return False
         # Terminal descendants remain saved reproducers, but must not crowd
         # mutable ancestors out of the bounded exploration corpus.
         if lineage.get('extension_depth', 1) >= self.config.dsl_max_depth:
@@ -96,28 +115,39 @@ class DSLStage:
         self._bound(self.targets)
         return any(entry[3] == digest for entry in self.targets)
 
-    def generate(self, oracle):
+    def _source_limit(self, op):
+        variable = (op in ('join', 'split', 'interleave')
+                    or op in MATRIX_OPS and (self.config.dsl_attributes or self.config.dsl_matrix_prob > 0))
+        return self.config.dsl_source_variants if variable else 1
+
+    def generate(self, oracle, accept=None):
         """Return a derivative and lineage; a restored baseline is rechecked."""
         if self.targets and self.config.dsl_evolve_prob and random.random() < self.config.dsl_evolve_prob:
-            derivative = self._evolve(oracle)
+            derivative = self._evolve(oracle, accept)
             if derivative is not None:
                 return derivative
         for _ in range(max(1, len(self.sources) * 2)):
             candidates = {op: [] for op in DSL_OPS[self.backend]}
             for index, (parent, _, _, digest) in enumerate(self.sources):
                 for op in eligible_ops(parent, self.backend):
-                    if (digest, op) not in self.tried:
+                    if self.source_attempts[digest, op] < self._source_limit(op):
                         candidates[op].append(index)
             available = [op for op, indices in candidates.items() if indices]
             if not available:
                 return None
             least = min(self.counts[op + ':attempted'] for op in available)
-            op = random.choice([op for op in available if self.counts[op + ':attempted'] == least])
+            if not self.adaptive or least == 0:
+                # Cover eligible operations once before exploiting past outcomes.
+                op = random.choice([op for op in available if self.counts[op + ':attempted'] == least])
+            else:
+                op = self._choose(available, [self.schedule.weight('extend', op) for op in available])
             indices = candidates[op]
             if self.feedback is not None and self.config.structural_feedback:
-                index = random.choices(indices, weights=[self.source_weight(self.sources[i][0],
-                                                                            self.sources[i][3])
-                                                         for i in indices], k=1)[0]
+                weights = [self.source_weight(self.sources[i][0], self.sources[i][3]) for i in indices]
+                if self.adaptive:
+                    weights = [weight * self.schedule.weight('extend', op, self.sources[i][3])
+                               for i, weight in zip(indices, weights)]
+                index = self._choose(indices, weights)
             else:
                 index = random.choice(indices)
             parent, source_file, verified, digest = self.sources[index]
@@ -130,19 +160,24 @@ class DSLStage:
                 self.sources[index] = (parent, source_file, True, digest)
             self.counts[op + ':attempted'] += 1
             self.tried.add((digest, op))
+            self.source_attempts[digest, op] += 1
             try:
                 child = extend_passed(parent, self.backend, op, self.config, self.grids)
             except ValueError:
                 self.invalid_extension += 1
                 continue
+            if accept is not None and not accept(child):
+                self.duplicate_derivatives += 1
+                continue
             return child, {'extension_op': op, 'source_file': source_file,
                            'source_sha256': digest, 'baseline_revalidated': True,
                            'extension_depth': 1, 'extension_action': 'extend',
+                           'extension_variant': self.source_attempts[digest, op],
                            'extension_output': self.checked_output(parent, child),
                            'root_source_sha256': digest}
         return None
 
-    def _evolve(self, oracle):
+    def _evolve(self, oracle, accept=None):
         from src.workflow.generator.extended import mutate_extended
         for _ in range(16):
             entries = [entry for entry in self.targets
@@ -151,7 +186,7 @@ class DSLStage:
                 return None
             weights = ([self.source_weight(entry[0], entry[3]) for entry in entries]
                        if self.config.structural_feedback else None)
-            parent, source_file, verified, digest = random.choices(entries, weights=weights, k=1)[0]
+            parent, source_file, verified, digest = self._choose(entries, weights)
             if not verified:
                 index = next(i for i, entry in enumerate(self.targets) if entry[3] == digest)
                 if oracle.test(parent) is not None:
@@ -163,16 +198,22 @@ class DSLStage:
             meta = self.target_meta[digest]
             # Respelling target attributes takes half of the mutation share.
             respell = .125 if self.config.dsl_attributes else 0
-            action = random.choices(('compose', 'mutate', 'loop', 'respell'),
-                                    weights=(0.55, 0.25 - respell, 0.20, respell), k=1)[0]
+            actions = ('compose', 'mutate', 'loop', 'respell')
+            weights = (0.55, 0.25 - respell, 0.20, respell)
+            if self.adaptive:
+                weights = [weight * self.schedule.weight(action, digest=digest)
+                           for action, weight in zip(actions, weights)]
+            action = self._choose(actions, weights)
             op = meta['extension_op']
             try:
                 if action == 'compose':
                     ops = eligible_ops(parent, self.backend, allow_target=True)
                     if not ops:
                         continue
-                    op = random.choices(ops, weights=[1 / (1 + self.evolution_counts['compose:' + name])
-                                                     for name in ops], k=1)[0]
+                    weights = ([self.schedule.weight('compose', name, digest) for name in ops]
+                               if self.adaptive else
+                               [1 / (1 + self.evolution_counts['compose:' + name]) for name in ops])
+                    op = self._choose(ops, weights)
                     # Follow the target result, not an unrelated auxiliary
                     # output that happened to be last in the common program.
                     child = extend_passed(parent, self.backend, op, self.config, self.grids,
@@ -181,7 +222,7 @@ class DSLStage:
                 elif action == 'loop':
                     child = loop_target(parent, self.backend)
                 elif action == 'respell':
-                    child = respell_target(parent, self.backend)
+                    child = respell_target(parent, self.backend, self.grids)
                 else:
                     child = mutate_extended(parent, self.config, self.backend, regenerate=False)
                 if sum(1 for _ in child.all_operations()) > self.config.dsl_max_ops:
@@ -190,6 +231,9 @@ class DSLStage:
                     continue
             except ValueError:
                 self.invalid_extension += 1
+                continue
+            if accept is not None and not accept(child):
+                self.duplicate_derivatives += 1
                 continue
             self.evolution_counts[action + ':' + op] += 1
             self.counts[op + ':attempted'] += 1
@@ -205,21 +249,38 @@ class DSLStage:
         self.counts[op + (':passed' if passed else ':failed')] += 1
 
     def observe_compilation(self, digest, records, passed):
-        if not passed:
-            return 0
         features = {feature for record in records for feature in record.get('features', [])}
         novel = features - self.compiler.keys()
         self.compiler.update(features)
-        if features:
-            self.source_compiler[digest] = sorted(set(self.source_compiler.get(digest, ())) | features)
+        if passed:
+            # A feature first observed before a failure still deserves a passing
+            # representative when it later becomes executable and checkable.
+            novel |= features - self.compiler_passed.keys()
+            self.compiler_passed.update(features)
+            if features:
+                self.source_compiler[digest] = sorted(set(self.source_compiler.get(digest, ())) | features)
         return len(novel)
+
+    def observe_outcome(self, program, lineage, records, *, passed, seconds, known_repeat=False):
+        self.record(lineage['extension_op'], passed)
+        compiler_novelty = self.observe_compilation(lineage['source_sha256'], records, passed)
+        structural_novelty = bool(program_features(program) - self.target_structural.keys()) if passed else False
+        self.schedule.observe(lineage['source_sha256'], lineage.get('extension_action', 'extend'),
+                              lineage['extension_op'], structural_novelty=structural_novelty,
+                              compiler_novelty=compiler_novelty, seconds=seconds,
+                              known_repeat=known_repeat)
+        return compiler_novelty
 
     def source_weight(self, program, digest):
         if digest in self.target_meta:
             features = self.structures[digest]
             base = 1 + 4 * sum(1 / (1 + self.target_structural[f]) for f in sorted(features)) / max(1, len(features))
+            if self.feedback is not None:
+                base *= self.feedback.known_failure_weight(digest)
         else:
             base = self.feedback.seed_weight(program) if self.feedback is not None else 1.0
+        if self.adaptive:
+            base *= self.schedule.parent_weight(digest)
         features = self.source_compiler.get(digest, ())
         if not features:
             return base
@@ -227,11 +288,15 @@ class DSLStage:
         return base * (1.0 + rarity)
 
     def snapshot(self):
-        return {'version': 2, 'backend': self.backend, 'counts': dict(self.counts),
+        return {'version': 4, 'backend': self.backend, 'counts': dict(self.counts),
                 'compiler': dict(self.compiler), 'source_compiler': self.source_compiler,
+                'compiler_passed': dict(self.compiler_passed), 'schedule': self.schedule.snapshot(),
                 'baseline_rejected': self.baseline_rejected,
                 'invalid_extension': self.invalid_extension, 'seen': self._seen,
                 'tried': [list(pair) for pair in sorted(self.tried)],
+                'source_attempts': [[digest, op, count] for (digest, op), count
+                                    in sorted(self.source_attempts.items())],
+                'duplicate_derivatives': self.duplicate_derivatives,
                 'target_structural': dict(self.target_structural),
                 'evolution_counts': dict(self.evolution_counts),
                 'targets': [{'program': program.to_dict(), 'source_file': path,
@@ -249,6 +314,13 @@ class DSLStage:
                                                   for value in compiler.values()):
             raise ValueError('Invalid DSL compiler feedback')
         self.compiler = Counter(compiler)
+        # Before v3 only passing DSL compilation features were recorded.
+        compiler_passed = state.get('compiler_passed', compiler)
+        if (not isinstance(compiler_passed, dict)
+                or any(type(value) is not int or not 0 <= value <= self.compiler[feature]
+                       for feature, value in compiler_passed.items())):
+            raise ValueError('Invalid passing DSL compiler feedback')
+        self.compiler_passed = Counter(compiler_passed)
         self.baseline_rejected = state.get('baseline_rejected', 0)
         self.invalid_extension = state.get('invalid_extension', 0)
         for entry in state.get('sources', [])[:self.config.dsl_seed_pool_max]:
@@ -288,4 +360,18 @@ class DSLStage:
         self.source_compiler = {digest: features for digest, features in source_compiler.items()
                                 if digest in digests}
         self.tried = {(digest, op) for digest, op in state.get('tried', []) if digest in digests}
+        attempts = state.get('source_attempts', [[digest, op, 1] for digest, op in self.tried])
+        self.source_attempts = Counter()
+        for digest, op, count in attempts:
+            if not isinstance(digest, str) or op not in DSL_OPS[self.backend] or type(count) is not int or count < 0:
+                raise ValueError('Invalid DSL source attempt feedback')
+            if digest in digests:
+                self.source_attempts[digest, op] = count
+        duplicates = state.get('duplicate_derivatives', 0)
+        if type(duplicates) is not int or duplicates < 0:
+            raise ValueError('Invalid DSL duplicate count')
+        self.duplicate_derivatives = duplicates
         self._seen = max(state.get('seen', 0), len(self.sources))
+        if 'schedule' in state:
+            self.schedule.restore(state['schedule'])
+        self.schedule.prune(digests)

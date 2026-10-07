@@ -54,6 +54,12 @@ def main():
                              '(default 0.5; old campaigns resume with 0)')
     parser.add_argument('--dsl-max-depth', type=int, default=None,
                         help='Maximum number of DSL derivation steps (default 3)')
+    parser.add_argument('--dsl-source-variants', type=int, default=None,
+                        help='Bounded attempts per common parent / target operation '
+                             '(default 4; old campaigns resume with 1)')
+    parser.add_argument('--dsl-adaptive-schedule', action=argparse.BooleanOptionalAction, default=None,
+                        help='Adapt DSL actions to recent novelty, cost and audited repeats '
+                             '(default on; old campaigns resume with off unless explicitly enabled)')
     parser.add_argument('--dsl-matrix-prob', type=float, default=None,
                         help='Probability that a DSL target call takes a rank-2 operand '
                              '(default 0.5; old campaigns resume with 0)')
@@ -203,6 +209,12 @@ def main():
         args.dsl_evolve_prob = saved_generation.get('dsl_evolve_prob', 0.0) if args.resume else 0.5
     if args.dsl_max_depth is None:
         args.dsl_max_depth = saved_generation.get('dsl_max_depth', 3)
+    if args.dsl_source_variants is None:
+        args.dsl_source_variants = saved_generation.get('dsl_source_variants', 1) if args.resume else 4
+    if not 1 <= args.dsl_source_variants <= 32:
+        parser.error('--dsl-source-variants must be in [1, 32]')
+    if args.dsl_adaptive_schedule is None:
+        args.dsl_adaptive_schedule = saved_generation.get('dsl_adaptive_schedule', False) if args.resume else True
     if args.dsl_matrix_prob is None:
         args.dsl_matrix_prob = saved_generation.get('dsl_matrix_prob', 0.0) if args.resume else 0.5
     if args.dsl_attributes is None:
@@ -295,6 +307,8 @@ def main():
         dsl_extend_prob=args.dsl_extend_prob,
         dsl_evolve_prob=args.dsl_evolve_prob,
         dsl_max_depth=args.dsl_max_depth,
+        dsl_source_variants=args.dsl_source_variants,
+        dsl_adaptive_schedule=args.dsl_adaptive_schedule,
         dsl_matrix_prob=args.dsl_matrix_prob,
         dsl_attributes=args.dsl_attributes,
         corpus_feedback=args.corpus_feedback,

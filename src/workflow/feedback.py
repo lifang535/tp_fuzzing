@@ -241,9 +241,12 @@ class StructuralFeedback:
         compiler = self.seed_compiler.get(digest, ())
         # Only actually retained compiler features guide this component.
         rare = sum(1 / (1 + self.compiler[f]) for f in compiler) / max(1, len(compiler))
+        return (structural + 4.0 * rare) * self.known_failure_weight(digest)
+
+    def known_failure_weight(self, digest):
+        # Shared by common and target seeds. One early failure cannot ban a seed.
         repeats = max(0, self.known_seed_failures[digest] - 1)
-        # Keep a nonzero exploration floor so one early failure cannot ban a seed.
-        return (structural + 4.0 * rare) / (1.0 + min(repeats, 12) * 0.5)
+        return 1.0 / (1.0 + min(repeats, 12) * 0.5)
 
     def weight(self, feature, base=1.0, passed_decay=2.0, uncovered_boost=0.0):
         """Selection weight for one structural feature.

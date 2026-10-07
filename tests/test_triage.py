@@ -1004,6 +1004,33 @@ class MainDefaultsTests(unittest.TestCase):
                     contextlib.redirect_stderr(io.StringIO()):
                 self.configs(*argv)
 
+    def test_adaptive_dsl_schedule_defaults_resume_and_override(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertTrue(self.configs('-o', directory).dsl_adaptive_schedule)
+            self.assertFalse(self.configs('-o', directory, '--no-dsl-adaptive-schedule').dsl_adaptive_schedule)
+            old = Path(directory) / 'old'
+            old.mkdir()
+            (old / 'summary.json').write_text(json.dumps({'generation_config': {}}))
+            self.assertFalse(self.configs('-o', directory, '--resume', 'old').dsl_adaptive_schedule)
+            self.assertTrue(self.configs('-o', directory, '--resume', 'old',
+                                         '--dsl-adaptive-schedule').dsl_adaptive_schedule)
+            (old / 'summary.json').write_text(json.dumps({
+                'generation_config': {'dsl_adaptive_schedule': True}}))
+            self.assertTrue(self.configs('-o', directory, '--resume', 'old').dsl_adaptive_schedule)
+
+    def test_dsl_source_variants_defaults_resume_and_validation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(self.configs('-o', directory).dsl_source_variants, 4)
+            old = Path(directory) / 'old'
+            old.mkdir()
+            (old / 'summary.json').write_text(json.dumps({'generation_config': {}}))
+            self.assertEqual(self.configs('-o', directory, '--resume', 'old').dsl_source_variants, 1)
+            self.assertEqual(self.configs('-o', directory, '--resume', 'old',
+                                          '--dsl-source-variants', '8').dsl_source_variants, 8)
+            for value in ('0', '33'):
+                with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                    self.configs('-o', directory, '--dsl-source-variants', value)
+
 
 if __name__ == '__main__':
     unittest.main()

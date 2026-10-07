@@ -142,13 +142,19 @@ Extended 使用单独的 IR 和生成器，提供 `arithmetic`、`indexed_memory
 
 新 campaign 的 Extended 生成默认只产生两种 DSL 共用的 IR 结构：Triton 专属的 `join/split/interleave` 和流水化 `for` 不再混入共用种子；两后端的 `mixed` 骨架也采用相同的结构。`--legacy-extended-mix` 可恢复旧生成行为，以便继续原先的实验设置。这里的“共用”指同一 IR 的语义和结构，不表示两种编译器生成相同代码。
 
-现在 `main.py` 可在同一实验中交替执行两条路线。新实验的 `--dsl-extend-prob` 默认为 0.35：存在执行通过的共用 Extended 样例后，每次生成有 35% 的概率从有界种子池派生目标 DSL 操作；其余仍走原本的 Region/Extended 生成路线（该路线的 `--extended-prob` 默认 0.25）。扩展池为空或“样例×操作”组合耗尽时继续生成共用程序。调度优先选择尝试次数最少的目标操作，且同一输入样例的同一操作只派生一次；在可选父样例间优先考虑实际编译产物中的稀有阶段、相邻 IR 操作与编译配置／操作组合。DSL 专属编译特征保存在独立的 `dsl_stage.json` 账本，不影响共用 IR 生成反馈。某个父样例反复触发人工确认过的具体失败签名时，其选择权重逐步降低但不会归零；未知签名和同目录的其它错误不受该惩罚，失败样例仍照常保存。`--no-structural-feedback` 可关闭这种种子引导。这些编译产物特征只是代理指标，并非实测编译 pass 或分支覆盖；Region 程序目前仅有结构反馈。`summary.json` 记录 `dsl_extension.by_op` 和 `confirmed_failure_signatures`；`dsl_stage.json` 支持恢复，恢复的共用样例复用前会重新验证。指定 `--dsl-extend-prob 0` 可关闭一体化阶段。
+现在 `main.py` 可在同一实验中交替执行两条路线。新实验的 `--dsl-extend-prob` 默认为 0.35：存在执行通过的共用 Extended 样例后，每次生成有 35% 的概率从有界种子池派生目标 DSL 操作；其余仍走原本的 Region/Extended 生成路线（该路线的 `--extended-prob` 默认 0.25）。扩展池为空或“样例×操作”组合耗尽时继续生成共用程序。首次探索优先选择尚未尝试的目标操作，同一输入样例与操作的派生次数由 `--dsl-source-variants` 限制；开启自适应调度后，已尝试操作根据近期收益分配预算，否则继续优先选择尝试次数最少的操作；在可选父样例间优先考虑实际编译产物中的稀有阶段、相邻 IR 操作与编译配置／操作组合。DSL 专属编译特征保存在独立的 `dsl_stage.json` 账本，不影响共用 IR 生成反馈。某个父样例反复触发人工确认过的具体失败签名时，其选择权重逐步降低但不会归零；未知签名和同目录的其它错误不受该惩罚，失败样例仍照常保存。`--no-structural-feedback` 可关闭这种种子引导。这些编译产物特征只是代理指标，并非实测编译 pass 或分支覆盖；Region 程序目前仅有结构反馈。`summary.json` 记录 `dsl_extension.by_op` 和 `confirmed_failure_signatures`；`dsl_stage.json` 支持恢复，恢复的共用样例复用前会重新验证。指定 `--dsl-extend-prob 0` 可关闭一体化阶段。
 
 通过测试的 DSL 扩展程序现在会进入独立的目标种子池。在 DSL 路线内，`--dsl-evolve-prob`（默认 0.5）选择继续组合目标操作、保留目标操作的局部变异，或将保持形状的目标操作放入有界循环。组合会使用前一步被检查的目标输出。`--dsl-max-depth` 默认 3；到达上限的程序仍保存，但不会挤占可继续变异的祖先种子。恢复的目标种子复用前重新验证。结果记录直接父程序与初始父程序的哈希、派生深度、动作和目标输出。`--dsl-evolve-prob 0` 恢复单步扩展。
 
 `--corpus-feedback` 默认开启，在共用和目标种子池满时优先淘汰覆盖冗余的种子，保留稀有特征代表；`--no-corpus-feedback` 恢复随机淘汰。旧 CLI campaign 恢复时默认不启用这两项新策略，除非已保存设置或显式参数启用。数值错误的诊断桶不会用于隔离或结构特征降权。`coverage_progress.json` 和 `coverage_progress.jsonl` 每 100 个测试及退出时记录进度；这些是结构／编译产物特征计数，不是编译器分支覆盖率或独立 bug 数。
 
-短时 GPU 对照可运行 `python tests/dsl_evolution_comparison.py --backend triton --passed-dir results/<campaign>/passed --output /tmp/dsl-comparison`。两组使用相同的已重新验证父程序和编译／oracle 设置，并在不同 seed 间交替执行顺序。默认短测不包含 precision、identity 和随机编译配置扫描，指定 `--full-oracle` 可启用；输出保留特征集合、失败与派生关系。判断 bug 收益仍需多 seed、固定硬件与时间预算的实验。
+`--dsl-adaptive-schedule` 在新 CLI 实验中默认开启，旧实验恢复时保留原设置；要启用它，在原恢复命令中追加 `--dsl-adaptive-schedule`。`--no-dsl-adaptive-schedule` 关闭动作自适应，`--no-structural-feedback` 同时关闭种子与动作引导。调度按动作、操作和直接父种子记录近期新增的通过程序结构特征、实际编译产物特征、测试耗时及人工确认签名的重复命中。奖励和重复率使用移动平均，耗时修正有上下界，每次自适应选择保留 10% 均匀探索概率；未知诊断和数值错误不按重复已知缺陷惩罚。共用种子和目标种子均应用已有的已确认失败降权，失败保存策略保持不变。
+
+`--dsl-source-variants` 在新 CLI 实验中默认为 4，旧实验恢复时默认为 1；它为同一通过的共用父程序保留有限的重试机会，即使第一个派生程序失败，仍可探索不同轴、方向或形状。只对可能变化的操作重复派生，确定性的操作仍只尝试一次。开启 `--dsl-attributes` 和 instance grids 时，属性组合按操作、输入类型与合法属性域轮换；`--no-instance-grids` 保留随机属性采样。目标属性变异会排除原属性，并保持结果类型与 top-k 大小，避免返回未改变的程序。已测试的完整程序在 DSL 生成阶段即被过滤，重试次数有界，耗尽后回到共用生成；`duplicate_derivatives` 单独计数，不计作新测试或新缺陷。变体尝试次数与属性游标均支持断点恢复。
+
+DSL 编译账本现在记录失败前实际获得的中间产物；`compiler_passed` 单独记录最终执行通过的证据，失败程序不会进入通过种子池。首次通过的编译特征仍可保留种子，即使此前曾在失败程序中出现。`dsl_stage.json` 保存父种子与动作反馈并兼容旧状态；`summary.json` 的 `dsl_extension.schedule` 和进度文件的 `dsl_schedule` 记录 `tested`、`novel`、`known_repeats` 及近期收益/耗时。`novel` 表示获得上述代理特征的测试数，不能作为独立 bug 数；按动作及“动作:操作”同时聚合的计数不能相加，使用 `total` 查看总数。`seconds` 是 oracle 测试耗时的移动平均，不包含生成和父种子重新验证耗时。
+
+短时 GPU 对照可运行 `python tests/dsl_evolution_comparison.py --backend triton --passed-dir results/<campaign>/passed --output /tmp/dsl-comparison`。两组使用相同的已重新验证父程序和编译／oracle 设置，并在不同 seed 间交替执行顺序。默认短测不包含 precision、identity 和随机编译配置扫描，指定 `--full-oracle` 可启用；输出保留特征集合、失败与派生关系。增加 `--comparison schedule` 可在相同演化概率、种子保留规则和 oracle 设置下，仅比较固定与自适应调度；默认 `evolution` 对照的两组均关闭动作自适应。短测按测试数运行，判断 bug 收益仍需多 seed、固定硬件与时间预算的实验。
 
 ```bash
 # 第一阶段：生成、实例化并执行共用 Extended IR；仅通过的样例进入 passed/

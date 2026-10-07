@@ -34,12 +34,20 @@ def main():
     parser.add_argument('--iterations', type=int, default=24)
     parser.add_argument('--seeds', type=int, nargs='+', default=[101, 202])
     parser.add_argument('--parents', type=int, default=5)
+    parser.add_argument('--source-variants', type=int, default=4,
+                        help='Common-parent target variants in both arms (default 4)')
+    parser.add_argument('--comparison', choices=('evolution', 'schedule'), default='evolution',
+                        help='Compare one-step/evolving corpora, or fixed/adaptive DSL scheduling '
+                             'with identical evolving corpora and oracle settings')
     parser.add_argument('--full-oracle', action='store_true', help='Include precision/identity and random configuration sweeps')
     args = parser.parse_args()
     if min(args.iterations, args.parents) < 1:
         parser.error('iterations and parents must be positive')
+    if not 1 <= args.source_variants <= 32:
+        parser.error('source-variants must be in [1, 32]')
     args.output.mkdir(parents=True, exist_ok=False)
     config = Config(backends=[args.backend], extended_prob=1, dsl_extend_prob=1,
+                    dsl_source_variants=args.source_variants, dsl_matrix_prob=0.5, dsl_attributes=True,
                     save_artifacts=False, region_repeat_count=2,
                     random_config_count=2 if args.full_oracle else 0,
                     extended_precision_pair=args.full_oracle, extended_identity_pair=args.full_oracle)
@@ -56,7 +64,8 @@ def main():
         os.environ['TILELANG_CACHE_DIR'] = str(directory / 'tilelang')
 
     isolate_caches('parent_validation')
-    report = {'backend': args.backend, 'environment': environment(), 'config': asdict(config),
+    report = {'backend': args.backend, 'comparison': args.comparison,
+              'environment': environment(), 'config': asdict(config),
               'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
               'cache_policy': {'isolated_per_arm_and_seed': True,
                                'tilelang_cache_disabled': args.backend == 'tilelang'},
@@ -107,14 +116,16 @@ def main():
         for arm in (('baseline', 'candidate') if index % 2 == 0 else ('candidate', 'baseline')):
             isolate_caches(f'{arm}_{seed}')
             arm_config = Config(**dict(asdict(config), seed=seed,
-                                      dsl_evolve_prob=0 if arm == 'baseline' else 0.5,
-                                      corpus_feedback=arm != 'baseline',
+                                      dsl_evolve_prob=0 if args.comparison == 'evolution' and arm == 'baseline' else 0.5,
+                                      corpus_feedback=args.comparison == 'schedule' or arm != 'baseline',
+                                      dsl_adaptive_schedule=args.comparison == 'schedule' and arm == 'candidate',
                                       output_dir=str(args.output / f'{arm}_{seed}')))
             fuzzer = TileSmith(arm_config)
             for program, path in parents:
                 fuzzer.dsl_stage.add(program, path)
             observed_compiler, executed_compiler, executed_source = set(), set(), set()
-            entry = {'arm': arm, 'seed': seed, 'path': str(fuzzer.output_dir), 'cases': [], 'complete': False,
+            entry = {'arm': arm, 'seed': seed, 'config': asdict(arm_config),
+                     'path': str(fuzzer.output_dir), 'cases': [], 'complete': False,
                      'compiler_feature_measurement_complete': True}
             report['runs'].append(entry)
             execute = fuzzer.oracle.test
@@ -163,6 +174,7 @@ def main():
             entry.update(complete=True, seconds=round(time.monotonic() - started, 3),
                          tested=fuzzer.stats.total_tested, passed=fuzzer.stats.programs_passed,
                          compiled=fuzzer.stats.programs_compiled,
+                         dsl_schedule=fuzzer.dsl_stage.schedule.snapshot(include_parents=False),
                          failure_buckets=dict(fuzzer.failure_buckets))
             save()
     report['complete'] = True

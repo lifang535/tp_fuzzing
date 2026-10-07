@@ -566,12 +566,16 @@ class TileSmith:
 
                 # Test — track inflight program so interrupt can resume it
                 _inflight_i, _inflight_program = i, program
+                test_started = time.monotonic()
                 bug = self.oracle.test(program)
+                test_seconds = time.monotonic() - test_started
                 _inflight_i, _inflight_program = None, None
                 self.stats.total_tested += 1
                 new_tested += 1
 
                 bucket = self._record_bucket(bug) if bug else None
+                from src.workflow.feedback import confirmed_failure
+                signature = (bug.confirmed_signature or confirmed_failure(bug, self.backend)) if bug else None
                 # Target-only operations have their own coverage accounting;
                 # they must not steer the common-IR generator's feedback.
                 if self._current_extension:
@@ -600,13 +604,11 @@ class TileSmith:
                 if bug is None and not self.config.compile_only:
                     self.stats.programs_passed += 1
                 if self._current_extension:
-                    self.dsl_stage.record(self._current_extension['extension_op'], bug is None)
-                    compiler_novelty = self.dsl_stage.observe_compilation(
-                        self._current_extension['source_sha256'], self.oracle.last_compilation,
-                        passed=bug is None and not self.config.compile_only)
+                    compiler_novelty = self.dsl_stage.observe_outcome(
+                        program, self._current_extension, self.oracle.last_compilation,
+                        passed=bug is None and not self.config.compile_only, seconds=test_seconds,
+                        known_repeat=bool(signature and self.failure_buckets[bucket] > 1))
                 if bug:
-                    from src.workflow.feedback import confirmed_failure
-                    signature = bug.confirmed_signature or confirmed_failure(bug, self.backend)
                     source_digest = ((self._current_origin or {}).get('seed_digest')
                                      or (self._current_extension or {}).get('source_sha256'))
                     self.feedback.observe_known_failure(source_digest, signature)
@@ -712,6 +714,8 @@ class TileSmith:
                     "dsl_evolve_prob": self.config.dsl_evolve_prob,
                     "dsl_max_depth": self.config.dsl_max_depth,
                     "dsl_max_ops": self.config.dsl_max_ops,
+                    "dsl_adaptive_schedule": self.config.dsl_adaptive_schedule,
+                    "dsl_source_variants": self.config.dsl_source_variants,
                     "dsl_matrix_prob": self.config.dsl_matrix_prob,
                     "dsl_attributes": self.config.dsl_attributes,
                     "corpus_feedback": self.config.corpus_feedback,
@@ -787,10 +791,14 @@ class TileSmith:
                                   "target_pool": len(self.dsl_stage.targets),
                                   "target_structural_features": len(self.dsl_stage.target_structural),
                                   "compiler_features": len(self.dsl_stage.compiler),
+                                  "compiler_features_passed": len(self.dsl_stage.compiler_passed),
+                                  "adaptive_schedule": self.dsl_stage.adaptive,
+                                  "schedule": self.dsl_stage.schedule.snapshot(include_parents=False),
                                   "compiler_guided_sources": len(self.dsl_stage.source_compiler),
                                   "source_pool": len(self.dsl_stage.sources),
                                   "baseline_rejected": self.dsl_stage.baseline_rejected,
-                                  "invalid_extension": self.dsl_stage.invalid_extension},
+                                  "invalid_extension": self.dsl_stage.invalid_extension,
+                                  "duplicate_derivatives": self.dsl_stage.duplicate_derivatives},
             }
             with open(self.output_dir / "summary.json", "w") as f:
                 json.dump(summary, f, indent=2)
@@ -845,9 +853,12 @@ class TileSmith:
             'compiler_ir_features': len(self.feedback.compiler),
             'compiler_ir_features_passed': len(self.feedback.compiler_passed),
             'dsl_compiler_ir_features': len(self.dsl_stage.compiler),
+            'dsl_compiler_ir_features_passed': len(self.dsl_stage.compiler_passed),
+            'dsl_schedule': self.dsl_stage.schedule.snapshot(include_parents=False),
             'dsl_target_structural_features': len(self.dsl_stage.target_structural),
             'dsl_evolution_actions': dict(self.dsl_stage.evolution_counts),
             'dsl_target_pool': len(self.dsl_stage.targets),
+            'dsl_duplicate_derivatives': self.dsl_stage.duplicate_derivatives,
             'failure_buckets': dict(self.failure_buckets),
             'campaign_seconds': round(self._campaign_seconds(), 1),
             'timeline_origin': self.timeline_origin,
@@ -882,7 +893,7 @@ class TileSmith:
     def _generate_test_case(self):
         if (self.config.dsl_extend_prob and self.dsl_stage.sources
                 and random.random() < self.config.dsl_extend_prob):
-            derivative = self.dsl_stage.generate(self.oracle)
+            derivative = self.dsl_stage.generate(self.oracle, accept=lambda p: self._make_sig(p) not in self.tested_configs)
             if derivative is not None:
                 program, self._current_extension = derivative
                 self._current_origin = {'strategy': 'dsl_extend',

@@ -7,6 +7,7 @@ is substituted at execution time.
 """
 import copy
 import inspect
+import itertools
 import random
 from functools import lru_cache
 
@@ -65,12 +66,54 @@ def _accepts(backend, api, parameter):
         return False
 
 
-def target_attributes(op, ty, backend, axes=None):
+def target_attribute_cells(op, ty, backend, axes=None):
+    """Finite, legal attribute spellings for the installed target API."""
+    rank = len(ty.shape)
+    domains = {}
+    if op in SCAN_OPS or op in REDUCTION_OPS or op == 'softmax':
+        spelled = op != 'softmax' or _accepts(backend, 'softmax', 'dim')
+        choices = [axis for axis in (range(rank) if axes is None else axes) if spelled or axis == 0]
+        if not choices:
+            raise ValueError(f'No {op} axis keeps the result type')
+        domains['axis'] = choices + [axis - rank for axis in choices] if spelled else choices
+    if op in SCAN_OPS and _accepts(backend, TRITON_API[op], 'reverse'):
+        domains['reverse'] = [False, True]
+    if op == 'sort' or (op == 'topk' and _accepts(backend, 'topk', 'descending')):
+        domains['descending'] = [False, True]
+    if op == 'softmax' and _accepts(backend, 'softmax', 'keep_dims'):
+        domains['keep_dims'] = [True, False]
+    if op == 'topk':
+        domains['k'] = [1 << i for i in range(1, ty.shape[-1].bit_length())]
+        if not domains['k']:
+            raise ValueError('topk needs at least two candidates')
+    return [dict(zip(domains, values)) for values in itertools.product(*domains.values())]
+
+
+def _attribute_cell(op, ty, backend, cells, grids, exclude=None):
+    available = [cell for cell in cells if cell != exclude]
+    if not available:
+        raise ValueError('No different target attribute spelling')
+    if grids is None:
+        return dict(random.choice(available))
+    # Separate domains by operand type and legal cells (e.g. a reduction whose
+    # users constrain its axis). GridState already persists these cursors.
+    domain = repr(tuple(tuple(sorted(cell.items())) for cell in cells))
+    grid_key = f'target_{op}_{ty.dtype}_{ty.shape}_{domain}'
+    for _ in cells:
+        cell = grids.next_cell(grid_key, backend, cells)
+        if cell != exclude:
+            return dict(cell)
+    raise AssertionError('A legal target attribute cell was not visited')
+
+
+def target_attributes(op, ty, backend, axes=None, grids=None):
     """Draw how target call `op` spells its attributes for operand type `ty`.
 
     `axes` restricts the normalized axis, so that a mutation keeps the result
     type of a reduction. Both spellings of an axis name the same dimension.
     """
+    if grids is not None:
+        return _attribute_cell(op, ty, backend, target_attribute_cells(op, ty, backend, axes), grids)
     rank = len(ty.shape)
     attrs = {}
     if op in SCAN_OPS or op in REDUCTION_OPS or op == 'softmax':
@@ -302,7 +345,7 @@ def extend_passed(program, backend, op, config, grids=None, *, allow_target=Fals
                 if operand is None:
                     operand = _vector_input(builder, answer)
             if config.dsl_attributes:
-                attrs = target_attributes(op, operand.type, backend)
+                attrs = target_attributes(op, operand.type, backend, grids=grids)
             else:
                 # The historical spelling: minor axis, forward, ascending
                 # sort, descending top-4, and tl.softmax(x, 0), which every
@@ -322,7 +365,7 @@ def extend_passed(program, backend, op, config, grids=None, *, allow_target=Fals
     return result
 
 
-def respell_target(program, backend):
+def respell_target(program, backend, grids=None):
     """Re-draw the attributes of one target call, keeping its result type.
 
     A reduction keeps an axis of the same extent and topk keeps k, so every
@@ -330,20 +373,24 @@ def respell_target(program, backend):
     """
     result = copy.deepcopy(program)
     types, _ = result.validate()
-    candidates = [n for n in result.all_operations() if n.op in TARGET_ATTRIBUTE_OPS]
+    candidates = []
+    for node in result.all_operations():
+        if node.op not in TARGET_ATTRIBUTE_OPS:
+            continue
+        ty = next(t for (_, name), t in types.items() if name == node.operands[0])
+        axes = None
+        if node.op in REDUCTION_OPS:
+            axes = [axis for axis in range(len(ty.shape))
+                    if reduced_shape(ty, axis) == node.results[0].type.shape]
+        cells = target_attribute_cells(node.op, ty, backend, axes)
+        if node.op == 'topk':
+            cells = [cell for cell in cells if cell['k'] == node.attrs['k']]
+        if any(cell != node.attrs for cell in cells):
+            candidates.append((node, ty, cells))
     if not candidates:
-        raise ValueError('No target operation to respell')
-    node = random.choice(candidates)
-    # SSA names are program-unique, so the scoped type table resolves them.
-    ty = next(t for (_, name), t in types.items() if name == node.operands[0])
-    axes = None
-    if node.op in REDUCTION_OPS:
-        axes = [axis for axis in range(len(ty.shape))
-                if reduced_shape(ty, axis) == node.results[0].type.shape]
-    attrs = target_attributes(node.op, ty, backend, axes)
-    if node.op == 'topk':
-        attrs['k'] = node.attrs['k']
-    node.attrs = attrs
+        raise ValueError('No target operation with a different legal spelling')
+    node, ty, cells = random.choice(candidates)
+    node.attrs = _attribute_cell(node.op, ty, backend, cells, grids, exclude=node.attrs)
     from src.backends import get_backend
     get_backend(backend).validate_program(result)
     return result
