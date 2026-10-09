@@ -18,6 +18,27 @@ from src.workflow.oracle import BugReport, BugType
 
 
 class DSLScheduleTests(unittest.TestCase):
+    def test_repeat_artifact_novelty_does_not_reward_or_end_plateau(self):
+        schedule = DSLSchedule()
+        for _ in range(schedule.PLATEAU_WINDOW):
+            self.observe(schedule, 'seed', 'compose', novel=True, repeat=True)
+        self.assertEqual(schedule.total.novel, 0)
+        self.assertEqual(schedule.total.reward, 0)
+        self.assertEqual(schedule.exploration, 0.5)
+        restored = DSLSchedule()
+        restored.restore(json.loads(json.dumps(schedule.snapshot())))
+        self.assertEqual(restored.stagnant, schedule.PLATEAU_WINDOW)
+        self.assertEqual(restored.exploration, 0.5)
+        # Unknown failures with new compiler evidence remain eligible for credit.
+        restored.observe('seed', 'mutate', 'scan_sum', structural_novelty=False,
+                         compiler_novelty=True, seconds=1)
+        self.assertEqual(restored.stagnant, 0)
+        self.assertEqual(restored.exploration, restored.EXPLORATION)
+        legacy = schedule.snapshot()
+        del legacy['stagnant'], legacy['exploration']
+        restored.restore(legacy)
+        self.assertEqual(restored.stagnant, 0)
+
     def setUp(self):
         state = random.getstate()
         self.addCleanup(random.setstate, state)
@@ -85,6 +106,20 @@ class DSLScheduleTests(unittest.TestCase):
 
 
 class DSLFeedbackIntegrationTests(unittest.TestCase):
+    def test_dsl_candidates_use_quarantine_and_bounded_forced_retry(self):
+        self.config.quarantine = True
+        self.config.quarantine_retries = 2
+        fuzzer = TileSmith(self.config)
+        fuzzer.dsl_stage.add(self.parent, 'parent.json')
+        child = extend_passed(self.parent, 'tilelang', 'scan_sum', self.config)
+        lineage = {'source_sha256': fuzzer.dsl_stage.digest(self.parent)}
+        with patch.object(fuzzer.dsl_stage, 'generate', return_value=(child, lineage)) as generate, \
+                patch.object(fuzzer.quarantine, 'admit', side_effect=[False, False, True]) as admit:
+            self.assertIs(fuzzer._generate_test_case(), child)
+        self.assertEqual(generate.call_count, 3)
+        self.assertEqual([call.kwargs['force'] for call in admit.call_args_list], [False, False, True])
+        self.assertEqual(fuzzer._current_extension, lineage)
+
     def setUp(self):
         state = random.getstate()
         self.addCleanup(random.setstate, state)
@@ -150,6 +185,7 @@ class DSLFeedbackIntegrationTests(unittest.TestCase):
         self.assertTrue(stage.target_structural)
 
     def test_campaign_records_audited_repeats_saves_all_failures_and_resumes(self):
+        self.config.quarantine = True
         fuzzer = TileSmith(self.config)
         calls = 0
         def oracle(program):
@@ -166,6 +202,8 @@ class DSLFeedbackIntegrationTests(unittest.TestCase):
             fuzzer.run(6, verbose=False)
         self.assertEqual(fuzzer.dsl_stage.schedule.total.tested, 5)
         self.assertEqual(fuzzer.dsl_stage.schedule.total.known_repeats, 3)
+        self.assertEqual(len(fuzzer.quarantine.samples), 6)
+        self.assertEqual(sum(fuzzer.quarantine.hits.values()), 4)
         self.assertEqual(len(list((fuzzer.output_dir / 'failed/tilelang_codegen_error').glob('*.json'))), 4)
         progress = json.loads((fuzzer.output_dir / 'coverage_progress.json').read_text())
         self.assertEqual(progress['dsl_schedule']['total']['known_repeats'], 3)
@@ -174,6 +212,7 @@ class DSLFeedbackIntegrationTests(unittest.TestCase):
         self.assertEqual(restored.dsl_stage.schedule.snapshot(), fuzzer.dsl_stage.schedule.snapshot())
 
     def test_wrong_result_candidates_are_saved_without_known_repeat_penalty(self):
+        self.config.quarantine = True
         fuzzer = TileSmith(self.config)
         calls = 0
         def oracle(program):
@@ -189,6 +228,8 @@ class DSLFeedbackIntegrationTests(unittest.TestCase):
         self.assertEqual(fuzzer.dsl_stage.schedule.total.tested, 4)
         self.assertEqual(fuzzer.dsl_stage.schedule.total.known_repeats, 0)
         self.assertFalse(fuzzer.feedback.known_seed_failures)
+        self.assertFalse(fuzzer.quarantine.rules)
+        self.assertEqual(sum(fuzzer.quarantine.hits.values()), 3)
         self.assertEqual(len(list((fuzzer.output_dir / 'failed/wrong_result').glob('*.json'))), 3)
 
     def test_disabled_adaptation_does_not_consume_schedule_choices(self):

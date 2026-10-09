@@ -576,16 +576,13 @@ class TileSmith:
                 bucket = self._record_bucket(bug) if bug else None
                 from src.workflow.feedback import confirmed_failure
                 signature = (bug.confirmed_signature or confirmed_failure(bug, self.backend)) if bug else None
+                from src.workflow.feedback import program_features
+                features = self._current_features or program_features(program)
                 # Target-only operations have their own coverage accounting;
                 # they must not steer the common-IR generator's feedback.
                 if self._current_extension:
                     novelty = compiler_novelty = False
-                    if bucket and self.quarantine is not None:
-                        # How well sampled a bucket is counts every reproducer.
-                        self.quarantine.hits[bucket] += 1
                 else:
-                    from src.workflow.feedback import program_features
-                    features = self._current_features or program_features(program)
                     novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only,
                                                     features=features)
                     compiler_novelty = self.feedback.observe_compilation(
@@ -594,11 +591,13 @@ class TileSmith:
                     if (bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback
                             and bug.bug_type is not BugType.WRONG_RESULT):
                         self.feedback.explain(features)
-                    if self.quarantine is not None:
-                        # Wrong results share the oracle's message, not a
-                        # compiler diagnostic: never quarantined.
-                        self.quarantine.observe(features, bucket,
-                                                learn=bug is None or bug.bug_type is not BugType.WRONG_RESULT)
+                if self.quarantine is not None:
+                    # Both generation paths supply evidence. Unknown wrong
+                    # results and unstable oracles cannot teach exclusion rules.
+                    self.quarantine.observe(
+                        features, bucket, learn=bug is None or (
+                            bug.bug_type is not BugType.WRONG_RESULT
+                            and bug.root_cause != 'oracle_unstable'))
                 if self.oracle.compilation_complete:
                     self.stats.programs_compiled += 1
                 if bug is None and not self.config.compile_only:
@@ -891,22 +890,26 @@ class TileSmith:
         return TileSmith._make_sig(program_from_dict(data))
 
     def _generate_test_case(self):
-        if (self.config.dsl_extend_prob and self.dsl_stage.sources
-                and random.random() < self.config.dsl_extend_prob):
-            derivative = self.dsl_stage.generate(self.oracle, accept=lambda p: self._make_sig(p) not in self.tested_configs)
-            if derivative is not None:
-                program, self._current_extension = derivative
-                self._current_origin = {'strategy': 'dsl_extend',
-                                        'seed_digest': self._current_extension['source_sha256']}
-                return program
-        if self.quarantine is None:
-            return self._generate_native()
-        # Redraw candidates in a learned known-bug region; the last retry is
-        # tested regardless, so a generator confined to such regions still runs.
+        # Apply the same admission policy to native and DSL candidates. Force
+        # the final retry so a learned region never becomes unreachable.
         from src.workflow.feedback import program_features
         attempt = 0
         while True:
-            program = self._generate_native()
+            self._current_extension = None
+            self._current_features = None
+            program = None
+            if (self.config.dsl_extend_prob and self.dsl_stage.sources
+                    and random.random() < self.config.dsl_extend_prob):
+                derivative = self.dsl_stage.generate(
+                    self.oracle, accept=lambda p: self._make_sig(p) not in self.tested_configs)
+                if derivative is not None:
+                    program, self._current_extension = derivative
+                    self._current_origin = {'strategy': 'dsl_extend',
+                                            'seed_digest': self._current_extension['source_sha256']}
+            if program is None:
+                program = self._generate_native()
+            if self.quarantine is None:
+                return program
             features = program_features(program)
             if self.quarantine.admit(features, force=attempt >= self.config.quarantine_retries):
                 self._current_features = features

@@ -86,7 +86,11 @@ def target_attribute_cells(op, ty, backend, axes=None):
         domains['k'] = [1 << i for i in range(1, ty.shape[-1].bit_length())]
         if not domains['k']:
             raise ValueError('topk needs at least two candidates')
-    return [dict(zip(domains, values)) for values in itertools.product(*domains.values())]
+    cells = [dict(zip(domains, values)) for values in itertools.product(*domains.values())]
+    if backend == 'triton' and op == 'softmax' and rank == 2:
+        cells = [cell for cell in cells
+                 if cell['axis'] % rank == 0 or cell.get('keep_dims', True)]
+    return cells
 
 
 def _attribute_cell(op, ty, backend, cells, grids, exclude=None):
@@ -128,10 +132,9 @@ def target_attributes(op, ty, backend, axes=None, grids=None):
     if op == 'sort' or (op == 'topk' and _accepts(backend, 'topk', 'descending')):
         attrs['descending'] = random.random() < .5
     if op == 'softmax' and _accepts(backend, 'softmax', 'keep_dims'):
-        # Triton 3.8 subtracts a dim=1 row maximum without keep_dims along
-        # the wrong axis (main ignores keep_dims); keep that spelling rare.
-        known = rank == 2 and attrs['axis'] % rank == 1
-        attrs['keep_dims'] = random.random() < (.875 if known else .5)
+        # A row reduction needs a singleton dimension for correct broadcasting.
+        row = backend == 'triton' and rank == 2 and attrs['axis'] % rank == 1
+        attrs['keep_dims'] = row or random.random() < .5
     if op == 'topk':
         # Every power of two from 2 to the extent: k = extent is a full sort,
         # smaller k adds the bitonic top-k reductions.

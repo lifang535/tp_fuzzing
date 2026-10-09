@@ -62,6 +62,31 @@ def attribute_features(program):
 
 
 class AttributeContractTests(unittest.TestCase):
+    def test_softmax_row_cells_and_saved_program_broadcast(self):
+        ty = Ty('float32', (4, 8))
+        with patch.object(dsl_extend, '_accepts', return_value=True):
+            cells = target_attribute_cells('softmax', ty, 'triton')
+            self.assertEqual({cell['axis'] for cell in cells}, {-2, -1, 0, 1})
+            self.assertTrue(all(cell['keep_dims'] for cell in cells if cell['axis'] % 2 == 1))
+            for _ in range(100):
+                self.assertTrue(target_attributes('softmax', ty, 'triton', axes=[1])['keep_dims'])
+        for shape in ((4, 8), (8, 8)):
+            for axis in (1, -1):
+                program, _, source, _ = target_program('triton', 'float32', [
+                    ('softmax', Ty('float32', shape), {'axis': axis, 'keep_dims': False})], shape)
+                self.assertIn(f'tl.softmax({source.name}, dim={axis}, keep_dims=True)', emit('triton', program))
+
+    def test_histogram_reference_drops_out_of_range_values(self):
+        program, buf, _, out = target_program('triton', 'int32', [
+            ('histogram', Ty('int32', (16,)), {})], shape=(8,))
+        data = encoded(program)
+        for values in ([-7, -1, 0, 1, 15, 16, 480, 0], [-1] * 8):
+            memory = extended_inputs(data, seed=3)
+            memory[buf.name][:, 16:24] = torch.tensor(values)
+            outputs, _ = extended_reference(data, memory, 0, 1)
+            expected = torch.tensor([values.count(i) for i in range(16)], dtype=torch.int32)
+            self.assertTrue(torch.equal(outputs[out[0].name][0], expected))
+
     def test_ir_accepts_axis_spellings_and_rejects_invalid_attributes(self):
         target_program('triton', 'float32', [
             ('scan_sum', Ty('float32', (4, 8)), {'axis': -2, 'reverse': True}),

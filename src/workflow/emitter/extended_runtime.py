@@ -317,7 +317,11 @@ def extended_reference(program, inputs, steps, limit, perturb=None):
                 axis = a.get('axis', -1)
                 out = [args[0].abs().sum(axis) if op == 'reduce_abssum' else args[0].abs().amax(axis)]
             elif op == 'histogram':
-                out = [torch.bincount(args[0].long(), minlength=16).to(torch.int32)]
+                # tl.histogram drops values outside [0, num_bins). Mutations
+                # can legitimately produce negative or large input values.
+                bins = args[0].long().flatten()
+                bins = bins[(bins >= 0) & (bins < 16)]
+                out = [torch.bincount(bins, minlength=16).to(torch.int32)]
             elif op in ('reduce_bitand', 'reduce_bitor', 'reduce_bitxor', 'xor_sum'):
                 items = args[0].unbind(a.get('axis', -1))
                 acc = items[0]

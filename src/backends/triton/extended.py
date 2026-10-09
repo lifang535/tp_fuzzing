@@ -154,12 +154,15 @@ class ExtendedLowering:
                 expression = f'tl.clamp({args[0]}, -0.5, 0.5)'
             elif op == 'softmax':
                 axis = spelled_axis(a, t)
+                # Keep the reduced dimension when broadcasting a row reduction.
+                # Also repair older saved programs that requested keep_dims=False.
+                keep = a.get('keep_dims') or (len(t.shape) == 2 and axis % 2 == 1)
                 if axis == 0 and not a.get('keep_dims'):
                     # Also valid on Triton 3.0, whose only softmax positional
                     # is ieee_rounding and which always normalizes axis 0.
                     expression = f'tl.softmax({args[0]}, 0)'
                 else:
-                    keep_dims = ', keep_dims=True' if a.get('keep_dims') else ''
+                    keep_dims = ', keep_dims=True' if keep else ''
                     expression = f'tl.softmax({args[0]}, dim={axis}{keep_dims})'
             elif op == 'topk':
                 # Only the minor dimension; descending=True is the default.

@@ -37,11 +37,13 @@ class Outcome:
 
 class DSLSchedule:
     EXPLORATION = 0.10
+    PLATEAU_WINDOW = 256
 
     def __init__(self):
         self.actions = {}
         self.parents = {}
         self.total = Outcome()
+        self.stagnant = 0
 
     @staticmethod
     def keys(action, op):
@@ -53,6 +55,11 @@ class DSLSchedule:
             raise ValueError('Invalid DSL outcome duration')
         seconds = max(0.001, seconds)
         reward = 0.5 * bool(structural_novelty) + 0.5 * bool(compiler_novelty)
+        # New lexical artifacts inside an audited repeat do not constitute
+        # progress toward a new mechanism. Keep accounting, but give no reward.
+        if known_repeat:
+            reward = 0.0
+        self.stagnant = 0 if reward else self.stagnant + 1
         self.total.observe(reward, seconds, known_repeat)
         local = self.parents.setdefault(digest, {})
         local.setdefault('*', Outcome()).observe(reward, seconds, known_repeat)
@@ -81,15 +88,21 @@ class DSLSchedule:
         values, weights = zip(*available)
         # An explicit mixture guarantees every eligible action remains reachable,
         # including after an unlucky run of failures or an old campaign restart.
-        if random.random() < self.EXPLORATION:
+        if random.random() < self.exploration:
             return random.choice(values)
         return random.choices(values, weights=weights, k=1)[0]
+
+    @property
+    def exploration(self):
+        # Ramp up exploration after a plateau; reset on useful novelty.
+        return min(0.5, self.EXPLORATION + 0.4 * self.stagnant / self.PLATEAU_WINDOW)
 
     def prune(self, digests):
         self.parents = {d: outcomes for d, outcomes in self.parents.items() if d in digests}
 
     def snapshot(self, include_parents=True):
         state = {'version': 1, 'total': asdict(self.total),
+                 'stagnant': self.stagnant, 'exploration': self.exploration,
                  'actions': {k: asdict(v) for k, v in self.actions.items()}}
         if include_parents:
             state['parents'] = {d: {k: asdict(v) for k, v in outcomes.items()}
@@ -129,4 +142,8 @@ class DSLSchedule:
         if not isinstance(parents, dict) or any(not isinstance(d, str) for d in parents):
             raise ValueError('Invalid DSL schedule parents')
         parents = {d: mapping(outcomes) for d, outcomes in parents.items()}
+        stagnant = state.get('stagnant', 0)
+        if type(stagnant) is not int or not 0 <= stagnant <= total.tested:
+            raise ValueError('Invalid DSL plateau count')
         self.total, self.actions, self.parents = total, actions, parents
+        self.stagnant = stagnant
