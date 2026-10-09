@@ -120,6 +120,11 @@ class BugClassReachabilityTests(unittest.TestCase):
         fp16 preference, pipelined."""
         from src.backends import get_backend
         adapter = get_backend('tilelang')
+        # Sampling draws from the global generator; earlier tests leave it in
+        # an arbitrary state, and about 1 in 150 states misses a threshold.
+        state = random.getstate()
+        self.addCleanup(random.setstate, state)
+        random.seed(21)
         gen = ProgramGenerator(Config(boundary_shape_prob=1.0, unchecked_spec_prob=0.0,
                                        seed=21), 'tilelang')
         body = typed_gemm().body
