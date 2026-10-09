@@ -88,6 +88,9 @@ class TileSmith:
         self._current_origin = None
         self.slice_scheduler = None
         self.slice_reduction_tests = 0
+        # Generation route -> tests and oracle seconds, the cost side of
+        # per-route discovery (first sightings record their route).
+        self.route_stats = {}
         if config.slice_prob:
             from src.workflow.slices.scheduler import SliceScheduler
             self.slice_scheduler = SliceScheduler(self.backend, config.slice_names or None,
@@ -226,6 +229,9 @@ class TileSmith:
                     current = self.root_cause_locations.get(cause, Counter())
                     if sum(counts.values()) > sum(current.values()):
                         self.root_cause_locations[cause] = Counter(counts)
+            routes = summary.get('route_stats')
+            if isinstance(routes, dict):
+                self.route_stats = {route: dict(values) for route, values in routes.items()}
             # DSL drift between segments: the harness adapts to both pairs, so
             # this is a warning, not a refusal. The counting matters though —
             # a root cause that vanished after an upgrade reads as "fixed"
@@ -585,6 +591,7 @@ class TileSmith:
                 _inflight_i, _inflight_program = None, None
                 self.stats.total_tested += 1
                 new_tested += 1
+                self._count_route(self._route(), test_seconds)
 
                 from src.ir.slice import SliceProgram
                 sliced = isinstance(program, SliceProgram)
@@ -814,6 +821,7 @@ class TileSmith:
                 "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
                 "slices": self.slice_scheduler.stats() if self.slice_scheduler is not None else None,
                 "slice_reduction_tests": self.slice_reduction_tests,
+                "route_stats": self.route_stats,
                 "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
                                   "evolution_actions": dict(self.dsl_stage.evolution_counts),
                                   "target_pool": len(self.dsl_stage.targets),
@@ -900,6 +908,7 @@ class TileSmith:
             'campaign_seconds': round(self._campaign_seconds(), 1),
             'timeline_origin': self.timeline_origin,
             'discovery': self._discovery(),
+            'route_stats': self.route_stats,
         }
         path = self.output_dir / 'coverage_progress.json'
         temporary = path.with_suffix('.tmp')
@@ -977,6 +986,15 @@ class TileSmith:
         self._current_origin = {'strategy': 'fresh'}
         return self.generator.generate()
 
+    def _route(self):
+        origin = self._current_origin or {}
+        return 'resumed' if not origin else origin.get('strategy', 'fresh')
+
+    def _count_route(self, route, seconds, tests=1):
+        stats = self.route_stats.setdefault(route, {'tests': 0, 'seconds': 0.0})
+        stats['tests'] += tests
+        stats['seconds'] = round(stats['seconds'] + seconds, 1)
+
     def _minimize_slice(self, program, bug):
         """Reduce a slice failure to its core. A wrong result is bucketed by
         the core: its message is the checker's and names no mechanism. A
@@ -1006,6 +1024,7 @@ class TileSmith:
         if self.slice_reduction_tests > 0.5 * tested + 4 * self.config.slice_minimize_budget:
             return
         saved = self.oracle.last_compilation, self.oracle.compilation_complete
+        started = time.monotonic()
 
         def still_fails(candidate):
             self.slice_reduction_tests += 1
@@ -1019,6 +1038,7 @@ class TileSmith:
             reduced, kept, used = minimize(program, still_fails, self.config.slice_minimize_budget)
         finally:
             self.oracle.last_compilation, self.oracle.compilation_complete = saved
+        self._count_route('slice_reduction', time.monotonic() - started, used)
         if wrong:
             rebucket(signature(reduced))
         scheduler.add_core(program, kept, bug.failure_bucket, bug.root_cause)
@@ -1038,7 +1058,7 @@ class TileSmith:
         if bug.failure_bucket not in self.failure_bucket_first_seen:
             self.failure_bucket_first_seen[bug.failure_bucket] = {
                 'tested': self.stats.total_tested, 'seconds': round(self._campaign_seconds(), 1),
-                'time': round(time.time(), 1)}
+                'time': round(time.time(), 1), 'route': self._route()}
         self.failure_buckets[bug.failure_bucket] += 1
         self.failure_bucket_keys.setdefault(bug.failure_bucket, bug.failure_key)
         return bug.failure_bucket

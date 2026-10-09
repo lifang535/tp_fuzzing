@@ -344,11 +344,14 @@ class CampaignTests(unittest.TestCase):
         self.assertEqual((len(passed), len(failed)), (6, 3))
         summary = json.loads((fuzzer.output_dir / 'summary.json').read_text())
         self.assertEqual(sum(s['tests'] for s in summary['slices'].values()), 9)
+        self.assertEqual(summary['route_stats']['slice']['tests'], 9)
+        self.assertTrue(all(first['route'] == 'slice' for first in summary['failure_bucket_first_seen'].values()))
         self.assertEqual(summary['generation_config']['slice_prob'], 1.0)
         self.assertTrue((fuzzer.output_dir / 'slice_state.json').exists())
         restored = TileSmith(config, resume_dir=str(fuzzer.output_dir))
         self.assertEqual(sum(s.tests for s in restored.slice_scheduler.states.values()), 9)
         self.assertEqual(len(restored.tested_configs), 9)
+        self.assertEqual(restored.route_stats['slice']['tests'], 9)
 
     def test_wrong_results_are_bucketed_by_their_reduced_core(self):
         config = Config(backends=['triton'], output_dir=self.temp.name, seed=8, slice_prob=1.0,
@@ -381,6 +384,7 @@ class CampaignTests(unittest.TestCase):
         self.assertIn('origin cast f32 | >i8', ' '.join(keys))
         self.assertLessEqual(len(wrong), 4)
         self.assertGreater(fuzzer.slice_reduction_tests, 0)
+        self.assertEqual(fuzzer.route_stats['slice_reduction']['tests'], fuzzer.slice_reduction_tests)
         self.assertGreater(len(calls), 60)
         minimized = [json.loads(p.read_text()) for p in (fuzzer.output_dir / 'failed').rglob('*.json')]
         self.assertTrue(any('minimized' in record for record in minimized))
