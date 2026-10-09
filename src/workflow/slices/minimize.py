@@ -19,7 +19,7 @@ SIMPLEST = {
     'kloop': 1, 'stages': 1, 'acc_mode': 'ret', 'prec': 'ieee', 'bm': 64, 'bn': 64, 'bk': 32,
     'gm': 1, 'gn': 1, 'gk': 1, 'areg': 0, 'kpack': 1, 'policy': 'Square', 'loop': 'pipelined',
     'clear_accum': 0, 'op': 'add', 'blocks': 1, 'slots': 16, 'contention': 'mod', 'mask': 0,
-    'sem': 'relaxed', 'in_dt': 'f32',
+    'sem': 'relaxed', 'in_dt': 'f32', 'via': 'none', 'mix': 'wide', 'rows': 1, 'mode': 'rtne', 'block': 128,
 }
 # Cheap, rarely essential knobs first; the operation-defining ones last.
 # Conversions are reset front to back: a reset step's conversion moves to
@@ -28,6 +28,7 @@ ORDER = ('pair', 'warps2', 'threads2', 'tail', 'dynamic', 'operand', 'values', '
          'post2_op', 'post1_op', 'pre3_op', 'pre2_op', 'pre1_op', 'pre1_dt', 'pre2_dt', 'pre3_dt',
          'post1_dt', 'post2_dt', 'out_dt', 'stage', 'scope', 'batch', 'nanprop', 'dst', 'keep', 'clear',
          'shape', 'axis', 'reverse', 'sem', 'mask', 'contention', 'slots', 'blocks', 'n',
+         'via', 'rows', 'block', 'mix', 'mode',
          'acc_mode', 'kloop', 'stages', 'loop', 'kpack', 'areg', 'policy', 'clear_accum', 'gm', 'gn',
          'gk', 'm', 'k', 'bm', 'bn', 'bk', 'trans_a', 'trans_b', 'prec', 'acc', 'kind', 'core_dt',
          'op', 'in_dt', 'mma_dt')
@@ -89,7 +90,10 @@ def minimize(program, still_fails, budget=24):
 
 
 def core(program):
-    """Knobs of a (reduced) program away from their simplest values."""
+    """Knobs of a (reduced) program that it could not do without: those away
+    from their simplest value whose reset changes the legalized program. A
+    knob that legalization forces (a TileLang thread count the tile size
+    dictates, a stage the slice fixes) is not part of the core."""
     slice_ = SLICES[program.slice]
     params = dict(program.params)
     plan = slice_.legalize(dict(params), program.backend)
@@ -98,8 +102,13 @@ def core(program):
         simple = simplest(slice_, knob, params, plan)
         if knob in ('warps2', 'threads2') and not params.get('pair'):
             continue
-        if simple is None or simple != value:
+        if simple is None:
             kept[knob] = value
+        elif simple != value:
+            reset = dict(params, **{knob: simple})
+            slice_.legalize(reset, program.backend)
+            if reset != params:
+                kept[knob] = value
     return kept
 
 
@@ -111,6 +120,8 @@ def signature(program):
     slice_ = SLICES[program.slice]
     params = dict(program.params)
     plan = slice_.legalize(dict(params), program.backend)
+    if 'pre' not in plan:  # a slice without an elementwise chain
+        return f"{program.slice} " + ' '.join(f'{k}={v}' for k, v in sorted(core(program).items()))
     path = [plan['in_dt']]
 
     def steps(chain):

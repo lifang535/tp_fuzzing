@@ -9,8 +9,9 @@ from .reduce import ReduceSlice
 from .scan import ScanSlice
 from .gemm import GemmSlice
 from .atomic import AtomicSlice
+from .round import RoundSlice
 
-SLICES = {s.name: s for s in (CastSlice(), ReduceSlice(), ScanSlice(), GemmSlice(), AtomicSlice())}
+SLICES = {s.name: s for s in (CastSlice(), ReduceSlice(), ScanSlice(), GemmSlice(), AtomicSlice(), RoundSlice())}
 
 
 def available(backend, names=None):
@@ -53,6 +54,8 @@ def slice_origin(program):
         return f"gemm {p['mma_dt']}>{p['acc']} tA{p['trans_a']} tB{p['trans_b']}"
     if program.slice == 'atomic':
         return f"atomic {p['op']} {p['in_dt']} {p['contention']} slots{p['slots']}"
+    if program.slice == 'round':
+        return f"round {p['src']}>{p['via']}>{p['dst']} {p.get('mode', 'rtne')}"
     path = '>'.join([p['in_dt']] + [p[f'pre{i}_dt'] for i in (1, 2, 3) if f'pre{i}_dt' in p])
     ops = ','.join(p[f'pre{i}_op'] for i in (1, 2, 3) if p.get(f'pre{i}_op', 'none') != 'none')
     if program.slice in ('reduce', 'scan'):

@@ -22,11 +22,18 @@ class SliceProgram:
 
     @classmethod
     def from_dict(cls, data):
+        """Restore a saved program, legalized under the current knob space.
+
+        A knob added since the program was saved takes its default and a
+        removed one is dropped, so campaigns written by an earlier slice
+        version still resume; the executed program may then differ from the
+        saved one, and its signature with it."""
         if data.get('version') != 1:
             raise ValueError('Unsupported slice IR version')
-        program = cls(data['slice'], dict(data['params']), data.get('backend', ''))
-        program.validate()
-        return program
+        from src.workflow.slices import SLICES, make_program
+        if data['slice'] not in SLICES:
+            raise ValueError('Unknown slice: ' + str(data['slice']))
+        return make_program(data['slice'], dict(data['params']), data.get('backend', ''))
 
     @property
     def params_dict(self):

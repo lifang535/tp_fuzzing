@@ -85,6 +85,8 @@ class LegalizationTests(unittest.TestCase):
         for program in programs(16, seed=1):
             params = dict(program.params)
             plan = SLICES[program.slice].legalize(params, program.backend)
+            if 'pre' not in plan:
+                continue
             for op, dtype, target, source, constant in plan['pre'] + plan['post']:
                 self.assertIn(dtype, DTYPES)
                 self.assertIn(target, DTYPES)
@@ -95,7 +97,7 @@ class LegalizationTests(unittest.TestCase):
     def test_backend_restrictions(self):
         for program in programs(16, seed=2):
             params = program.params
-            if program.backend == 'triton':
+            if program.backend == 'triton' and program.slice != 'round':
                 plan = SLICES[program.slice].legalize(dict(params), 'triton')
                 for op, dtype, *_ in plan['pre'] + plan['post']:
                     if op in ('floor', 'ceil'):
@@ -122,6 +124,8 @@ class HarnessTests(unittest.TestCase):
 
     def test_references_are_exact_and_representable(self):
         for program in programs(10, seed=5):
+            if program.slice == 'round':
+                continue  # inexact by design; see RoundTests
             with self.subTest(slice=program.slice, backend=program.backend, params=program.params):
                 ns = harness_namespace(program)
                 params = dict(program.params)
@@ -164,6 +168,52 @@ class HarnessTests(unittest.TestCase):
             ns['_slice_reject'](ValueError('atomic_max does not support fp16'))
             ns['_slice_reject'](RuntimeError('PassManager::run failed'))
         self.assertEqual(stream.getvalue().count('TILESMITH_REJECTED='), 1)
+
+
+class RoundTests(unittest.TestCase):
+    def test_rounding_matches_correct_single_rounding(self):
+        import numpy as np
+        from src.workflow.slices.runtime import _slice_round, _slice_round_values
+        g = torch.Generator().manual_seed(1)
+        x = torch.randn(20000, generator=g, dtype=torch.float64) * torch.pow(2.0, torch.randint(-30, 20, (20000,), generator=g)).double()
+        self.assertTrue(torch.equal(_slice_round(x, 'f16'), torch.from_numpy(x.numpy().astype(np.float16).astype(np.float64))))
+        x32 = x.float()
+        for fmt, dtype in (('bf16', torch.bfloat16), ('f16', torch.float16)):
+            ref = _slice_round(x32.double(), fmt)
+            got = x32.to(dtype).double()
+            self.assertTrue(bool(((ref == got) | (torch.isnan(ref) & torch.isnan(got))).all()), fmt)
+        small = x32[x32.abs() <= 448]
+        self.assertTrue(torch.equal(_slice_round(small.double(), 'f8e4'), small.to(torch.float8_e4m3fn).double()))
+        # toward zero never increases a magnitude and stays on the grid
+        rtz = _slice_round(x, 'f16', 'rtz')
+        self.assertTrue(bool((rtz.abs() <= x.abs()).all()))
+        self.assertTrue(torch.equal(_slice_round(rtz, 'f16'), rtz))
+        # generated inputs are exact in their own format and inside both ranges
+        for src, dst, mix in (('f32', 'f8e4', 'ties'), ('f64', 'f16', 'edges'), ('i32', 'bf16', 'ties'),
+                              ('f32', 'i32', 'wide'), ('u8', 'f16', 'ties'), ('bf16', 'i8', 'wide')):
+            values = _slice_round_values(src, dst, 512, 3, mix)
+            self.assertEqual(len(values), 512)
+            self.assertTrue(bool(torch.isfinite(values).all()))
+            if src[0] in 'iu':
+                self.assertTrue(torch.equal(values, torch.trunc(values)))
+            else:
+                self.assertTrue(torch.equal(_slice_round(values, src), values), (src, dst))
+            if dst[0] in 'iu':
+                bits = int(dst[1:])
+                self.assertTrue(bool((values.abs() < 2.0 ** (bits - 1)).all()))
+
+    def test_legalization_keeps_conversions_meaningful(self):
+        rng = random.Random(6)
+        for backend in BACKENDS:
+            for _ in range(200):
+                program = make_program('round', SLICES['round'].sample(rng, backend), backend)
+                p = program.params
+                self.assertNotEqual(p['src'], p['dst'])
+                self.assertFalse(p['src'][0] in 'iu' and p['dst'][0] in 'iu')
+                if p.get('mode') == 'rtz':
+                    self.assertTrue(p['src'].startswith(('f', 'b')) and p['dst'].startswith(('f', 'b')))
+                if p['via'] != 'none':
+                    self.assertNotEqual(p['via'], p['dst'])
 
 
 class TriageTests(unittest.TestCase):
