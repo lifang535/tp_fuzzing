@@ -44,5 +44,8 @@ class SliceProgram:
         validate_program(self)
 
     def features(self):
-        """Every knob assignment, prefixed by the slice name."""
-        return {f'slice={self.slice}'} | {f'{self.slice}.{k}={v}' for k, v in self.params.items()}
+        """Every knob assignment, prefixed by the slice name, and the
+        position-free operations and conversions the program executes."""
+        from src.workflow.slices import path_features
+        return ({f'slice={self.slice}'} | {f'{self.slice}.{k}={v}' for k, v in self.params.items()}
+                | path_features(self))

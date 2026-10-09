@@ -61,3 +61,45 @@ def slice_origin(program):
     if program.slice in ('reduce', 'scan'):
         return f"{program.slice} {p['kind']} {p['core_dt']} ax{p['axis']} from {path} {ops}".strip()
     return f"cast {path}>{p['out_dt']} {ops}".strip()
+
+
+def path_features(program):
+    """Position-free features of the executed program: every operation with
+    the dtype it computes in, every conversion as a source>target pair and
+    the core operation, wherever in the chain they occur. A defect in one
+    conversion is reached from any chain position; knob features name the
+    position and cannot generalize across them."""
+    slice_ = SLICES[program.slice]
+    params = dict(program.params)
+    plan = slice_.legalize(params, program.backend)
+    features = set()
+
+    def conversion(source, target):
+        if source != target:
+            features.add(f'path:conv {source}>{target}')
+
+    def chain(steps):
+        for op, dtype, target, _, _ in steps:
+            if op != 'none':
+                features.add(f'path:op {op}@{dtype}')
+            conversion(dtype, target)
+    if program.slice == 'round':
+        via = params['via']
+        if via != 'none':
+            conversion(params['src'], via)
+        conversion(via if via != 'none' else params['src'], params['dst'])
+        features.add(f"path:round {params.get('mode', 'rtne')}>{params['dst']}")
+        return features
+    chain(plan.get('pre', []))
+    current = plan['pre'][-1][2] if plan.get('pre') else plan.get('in_dt')
+    if program.slice in ('reduce', 'scan'):
+        conversion(current, plan['core_dt'])
+        features.add(f"path:{program.slice} {plan['kind']}@{plan['core_dt']}")
+    elif program.slice == 'gemm':
+        features.add(f"path:dot {params['mma_dt']}>{params['acc']}")
+    elif program.slice == 'atomic':
+        features.add(f"path:atomic {params['op']}@{params['in_dt']}")
+    chain(plan.get('post', []))
+    final = plan.get('final_dt', plan['post'][-1][2] if plan.get('post') else current)
+    conversion(final, plan['out_dt'])
+    return features

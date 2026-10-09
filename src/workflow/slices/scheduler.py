@@ -133,7 +133,7 @@ class SliceScheduler:
         for kept, bucket, _ in state.cores:
             hits = state.buckets[bucket]
             if hits >= 3 and matches(program.params, kept) and rng.random() >= max(self.min_explore, 3 / hits):
-                self.avoided[bucket] += 1
+                self.avoided[program.slice, bucket] += 1
                 return True
         return False
 
@@ -195,13 +195,14 @@ class SliceScheduler:
                        'chosen': self.choices[name],
                        'cores': [{'bucket': bucket, 'root_cause': cause, 'core': kept}
                                  for kept, bucket, cause in s.cores],
-                       'avoided': {b: n for b, n in self.avoided.items() if b in s.buckets}}
+                       'avoided': {b: n for (slice_name, b), n in self.avoided.items() if slice_name == name}}
                 for name, s in self.states.items()}
 
     def snapshot(self):
         return {'version': 1, 'backend': self.backend, 'names': self.names,
                 'states': {name: s.snapshot() for name, s in self.states.items()},
-                'choices': dict(self.choices), 'avoided': dict(self.avoided)}
+                'choices': dict(self.choices),
+                'avoided': [[slice_name, bucket, n] for (slice_name, bucket), n in self.avoided.items()]}
 
     def restore(self, data):
         if data.get('version') != 1 or data.get('backend') != self.backend:
@@ -210,4 +211,6 @@ class SliceScheduler:
             if name in self.states:
                 self.states[name] = SliceState.restore(state)
         self.choices = Counter(data.get('choices', {}))
-        self.avoided = Counter(data.get('avoided', {}))
+        avoided = data.get('avoided', [])
+        # Earlier snapshots kept one global count per bucket.
+        self.avoided = Counter({(entry[0], entry[1]): entry[2] for entry in avoided} if isinstance(avoided, list) else {})

@@ -302,7 +302,11 @@ class SchedulerTests(unittest.TestCase):
         for _ in range(30):
             scheduler.observe(program, 'wrong_result', 'b', 1.0)
         self.assertTrue(scheduler.known(program, always))
-        self.assertEqual(scheduler.avoided['b'], 1)
+        self.assertEqual(scheduler.avoided['cast', 'b'], 1)
+        self.assertEqual(scheduler.stats()['cast']['avoided'], {'b': 1})
+        restored = SliceScheduler('triton', ['cast'])
+        restored.restore(json.loads(json.dumps(scheduler.snapshot())))
+        self.assertEqual(restored.avoided, scheduler.avoided)
 
     def test_greedy_candidates_prefer_uncovered_pairs(self):
         scheduler = SliceScheduler('tilelang', ['cast'], candidates=8, mutate_prob=0)
@@ -336,6 +340,28 @@ class SchedulerTests(unittest.TestCase):
             SliceScheduler('tilelang', ['reduce']).restore(snapshot)
         stats = scheduler.stats()
         self.assertEqual(set(stats), {'reduce', 'gemm'})
+
+
+class PathFeatureTests(unittest.TestCase):
+    def test_conversions_are_position_free(self):
+        from src.workflow.slices import path_features
+        rng = random.Random(14)
+        base = SLICES['cast'].sample(rng, 'triton')
+        chain = dict(base, in_dt='f32', values='small', operand='const', out_dt='f32',
+                     pre1_op='none', pre2_op='none', pre3_op='none', pre1_dt='f32', pre2_dt='f32', pre3_dt='f32')
+        early = make_program('cast', dict(chain, pre1_dt='f64', pre2_dt='f16', pre3_dt='f16', out_dt='f16'), 'triton')
+        late = make_program('cast', dict(chain, pre3_dt='f64', out_dt='f16'), 'triton')
+        for program in (early, late):
+            self.assertIn('path:conv f64>f16', path_features(program), program.params)
+            self.assertIn('path:conv f64>f16', program.features())
+        reduce_ = make_program('reduce', dict(SLICES['reduce'].sample(rng, 'triton'), in_dt='f32', core_dt='bf16',
+                                              kind='cmax', pre1_op='none', pre2_op='none', pre1_dt='f32',
+                                              pre2_dt='f32'), 'triton')
+        features = path_features(reduce_)
+        self.assertIn('path:conv f32>bf16', features)
+        self.assertIn('path:reduce cmax@bf16', features)
+        for program in programs(4, seed=15):
+            self.assertTrue(path_features(program), program.slice)
 
 
 class MinimizeTests(unittest.TestCase):
