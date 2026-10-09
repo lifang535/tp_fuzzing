@@ -44,6 +44,10 @@ def classify_root_cause(error_message):
     # kernel, so its failure is oracle noise, never a compiler bug.
     if 'oracle unstable' in err:
         return 'oracle_unstable'
+    # Slice harnesses mark a clean front-end rejection of a feature the
+    # installed DSL does not support; it is invalid input, not a bug.
+    if 'tilesmith_rejected=' in err:
+        return 'unsupported_feature'
     if 'wrong result' in err and 'repeat determinism' in err:
         return 'nondeterminism'
     if 'wrong result' in err and 'schedule invariance' in err:

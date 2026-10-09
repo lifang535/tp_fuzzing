@@ -86,6 +86,13 @@ class TileSmith:
         self.dsl_stage = DSLStage(config, self.backend, self.generator.grids, self.feedback)
         self._current_extension = None
         self._current_origin = None
+        self.slice_scheduler = None
+        self.slice_reduction_tests = 0
+        if config.slice_prob:
+            from src.workflow.slices.scheduler import SliceScheduler
+            self.slice_scheduler = SliceScheduler(self.backend, config.slice_names or None,
+                                                  candidates=config.slice_candidates,
+                                                  adaptive=config.slice_adaptive)
         # Failure bucket -> count, and bucket -> normalized diagnostic.
         self.failure_buckets = Counter()
         self.failure_bucket_keys = {}
@@ -118,6 +125,7 @@ class TileSmith:
             self._restore_dim_pool()
             self._restore_seed_pool()
             self._restore_dsl_stage()
+            self._restore_slice_state()
             self.feedback.restore(self.output_dir / "structural_feedback.json")
             self._restore_quarantine()
         else:
@@ -288,7 +296,7 @@ class TileSmith:
         the manually confirmed signatures are root causes."""
         now = self._campaign_seconds()
         seen = {bucket: first for bucket, first in self.failure_bucket_first_seen.items()
-                if not bucket.startswith('oracle_unstable:')}
+                if not bucket.startswith(('oracle_unstable:', 'unsupported_feature:'))}
         confirmed = sorted(bucket for bucket in seen if ':' not in bucket)
         # Rates count only sightings on the timeline's own clock.
         timed = {bucket: first for bucket, first in seen.items()
@@ -427,6 +435,11 @@ class TileSmith:
             print(f"[resume] Restored seed_pool with {len(self.seed_pool)} entries")
         except Exception as error:
             raise ValueError(f'Cannot resume seed pool {pool_path}: {error}') from error
+
+    def _restore_slice_state(self):
+        path = self.output_dir / 'slice_state.json'
+        if self.slice_scheduler is not None and path.exists():
+            self.slice_scheduler.restore(json.loads(path.read_text()))
 
     def _restore_dsl_stage(self):
         path = self.output_dir / 'dsl_stage.json'
@@ -573,14 +586,20 @@ class TileSmith:
                 self.stats.total_tested += 1
                 new_tested += 1
 
+                from src.ir.slice import SliceProgram
+                sliced = isinstance(program, SliceProgram)
+                if bug and sliced and self.slice_scheduler is not None:
+                    self._minimize_slice(program, bug)
                 bucket = self._record_bucket(bug) if bug else None
+                if sliced and self.slice_scheduler is not None:
+                    self.slice_scheduler.observe(program, bug.root_cause if bug else None, bucket, test_seconds)
                 from src.workflow.feedback import confirmed_failure
                 signature = (bug.confirmed_signature or confirmed_failure(bug, self.backend)) if bug else None
                 from src.workflow.feedback import program_features
                 features = self._current_features or program_features(program)
-                # Target-only operations have their own coverage accounting;
-                # they must not steer the common-IR generator's feedback.
-                if self._current_extension:
+                # Target-only operations and slices have their own coverage
+                # accounting; they must not steer the common-IR generator.
+                if self._current_extension or sliced:
                     novelty = compiler_novelty = False
                 else:
                     novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only,
@@ -653,7 +672,7 @@ class TileSmith:
                     if self._current_extension:
                         self.dsl_stage.retain_target(program, passed_path, self._current_extension,
                                                      self.oracle.last_compilation, compiler_novelty)
-                    else:
+                    elif not sliced:
                         retained_as_dsl_source = False
                         if self.config.dsl_extend_prob and not self.config.compile_only:
                             retained_as_dsl_source = self.dsl_stage.add(program, passed_path)
@@ -754,6 +773,13 @@ class TileSmith:
                     "quarantine_min_explore": self.config.quarantine_min_explore,
                     "explained_feedback": self.config.explained_feedback,
                     "swarm_prob": self.config.swarm_prob,
+                    "slice_prob": self.config.slice_prob,
+                    "slice_names": list(self.config.slice_names),
+                    "slice_adaptive": self.config.slice_adaptive,
+                    "slice_candidates": self.config.slice_candidates,
+                    "slice_minimize": self.config.slice_minimize,
+                    "slice_minimize_budget": self.config.slice_minimize_budget,
+                    "slice_max_cores": self.config.slice_max_cores,
                 },
                 "structural_features_attempted": len(self.feedback.attempted),
                 "structural_features_passed": len(self.feedback.passed),
@@ -781,10 +807,13 @@ class TileSmith:
                 # Good-Turing estimate is the chance that the next test shows
                 # an unseen bucket, Chao1 a lower bound on the bucket total.
                 "failure_species": species(Counter({bucket: count for bucket, count in self.failure_buckets.items()
-                                                    if not bucket.startswith('oracle_unstable:')}),
+                                                    if not bucket.startswith(('oracle_unstable:',
+                                                                              'unsupported_feature:'))}),
                                            samples=self.stats.total_tested),
                 "structural_species": species(self.feedback.passed),
                 "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
+                "slices": self.slice_scheduler.stats() if self.slice_scheduler is not None else None,
+                "slice_reduction_tests": self.slice_reduction_tests,
                 "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
                                   "evolution_actions": dict(self.dsl_stage.evolution_counts),
                                   "target_pool": len(self.dsl_stage.targets),
@@ -831,6 +860,11 @@ class TileSmith:
             self._save_seed_pool()
             if self.config.dsl_extend_prob:
                 (self.output_dir / 'dsl_stage.json').write_text(json.dumps(self.dsl_stage.snapshot()))
+            if self.slice_scheduler is not None:
+                path = self.output_dir / 'slice_state.json'
+                temporary = path.with_suffix('.tmp')
+                temporary.write_text(json.dumps(self.slice_scheduler.snapshot()))
+                temporary.replace(path)
             self._write_progress()
 
         if verbose:
@@ -859,6 +893,10 @@ class TileSmith:
             'dsl_target_pool': len(self.dsl_stage.targets),
             'dsl_duplicate_derivatives': self.dsl_stage.duplicate_derivatives,
             'failure_buckets': dict(self.failure_buckets),
+            'slices': ({name: {'tests': s.tests, 'passed': s.passed, 'rejected': s.rejected,
+                               'buckets': len(s.buckets), 'pair_cells': len(s.covered)}
+                        for name, s in self.slice_scheduler.states.items()}
+                       if self.slice_scheduler is not None else None),
             'campaign_seconds': round(self._campaign_seconds(), 1),
             'timeline_origin': self.timeline_origin,
             'discovery': self._discovery(),
@@ -898,7 +936,12 @@ class TileSmith:
             self._current_extension = None
             self._current_features = None
             program = None
-            if (self.config.dsl_extend_prob and self.dsl_stage.sources
+            if self.slice_scheduler is not None and random.random() < self.config.slice_prob:
+                program = self.slice_scheduler.next(
+                    random, accept=lambda p: self._make_sig(p) not in self.tested_configs)
+                if program is not None:
+                    self._current_origin = {'strategy': 'slice', 'slice': program.slice}
+            if (program is None and self.config.dsl_extend_prob and self.dsl_stage.sources
                     and random.random() < self.config.dsl_extend_prob):
                 derivative = self.dsl_stage.generate(
                     self.oracle, accept=lambda p: self._make_sig(p) not in self.tested_configs)
@@ -934,6 +977,54 @@ class TileSmith:
         self._current_origin = {'strategy': 'fresh'}
         return self.generator.generate()
 
+    def _minimize_slice(self, program, bug):
+        """Reduce a slice failure to its core. A wrong result is bucketed by
+        the core: its message is the checker's and names no mechanism. A
+        crash bucket keeps the core for scheduling and a minimal reproducer."""
+        from src.workflow.slices.minimize import minimize, signature
+        from src.workflow.slices.scheduler import NOISE_ROOTS
+        from src.workflow.triage import failure_bucket
+        scheduler = self.slice_scheduler
+        if not self.config.slice_minimize or bug.root_cause in NOISE_ROOTS:
+            return
+        wrong = bug.bug_type is BugType.WRONG_RESULT
+
+        def rebucket(name):
+            bug.failure_bucket, bug.failure_key = failure_bucket(
+                bug.error_message, bug.root_cause, bug.confirmed_signature, bug.location, name)
+
+        known = scheduler.find_core(program, bug.root_cause, None if wrong else bug.failure_bucket)
+        if known is not None:
+            if wrong:
+                bug.failure_bucket = known[1]
+                bug.failure_key = self.failure_bucket_keys.get(known[1], bug.failure_key)
+            return
+        if not wrong and scheduler.cores_of(program, bug.failure_bucket) >= self.config.slice_max_cores:
+            return
+        # Reduction never takes more than about a third of the slice tests.
+        tested = sum(state.tests for state in scheduler.states.values())
+        if self.slice_reduction_tests > 0.5 * tested + 4 * self.config.slice_minimize_budget:
+            return
+        saved = self.oracle.last_compilation, self.oracle.compilation_complete
+
+        def still_fails(candidate):
+            self.slice_reduction_tests += 1
+            result = self.oracle.test(candidate)
+            if result is None:
+                return False
+            if wrong:
+                return result.bug_type is BugType.WRONG_RESULT and result.root_cause == bug.root_cause
+            return result.failure_bucket == bug.failure_bucket
+        try:
+            reduced, kept, used = minimize(program, still_fails, self.config.slice_minimize_budget)
+        finally:
+            self.oracle.last_compilation, self.oracle.compilation_complete = saved
+        if wrong:
+            rebucket(signature(reduced))
+        scheduler.add_core(program, kept, bug.failure_bucket, bug.root_cause)
+        bug.minimized = {'program': reduced.to_dict(), 'core': kept, 'tests': used,
+                         'code': self.oracle._emit_code(reduced)}
+
     def _record_bucket(self, bug):
         if not bug.failure_bucket:  # a report not produced by Oracle.test
             from src.workflow.feedback import confirmed_failure
@@ -963,9 +1054,13 @@ class TileSmith:
         """
         from src.ir.region import RegionProgram
         from src.ir.extended import ExtendedProgram
+        from src.ir.slice import SliceProgram
         if isinstance(program, ExtendedProgram):
             digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
             return f'extended_{program.family}_{digest}'
+        if isinstance(program, SliceProgram):
+            digest = hashlib.sha256(repr(self._make_sig(program)).encode()).hexdigest()[:16]
+            return f'slice_{program.slice}_{digest}'
         if isinstance(program, RegionProgram):
             calls = program.call_label()
             if len(calls) > 190:
@@ -991,10 +1086,16 @@ class TileSmith:
             report.update(self._current_extension)
         if self._current_origin:
             report['generation_origin'] = self._current_origin
+        minimized = getattr(bug, 'minimized', None)
+        if minimized:
+            report['minimized'] = {k: v for k, v in minimized.items() if k != 'code'}
         with open(failed_dir / f"{name}.json", "w") as f:
             json.dump(report, f, indent=2)
         with open(failed_dir / f"{name}.py", "w") as f:
             f.write(bug.generated_code)
+        if minimized:
+            with open(failed_dir / f"{name}.min.py", "w") as f:
+                f.write(minimized['code'])
 
     def _save_passed(self, program, iteration: int):
         """

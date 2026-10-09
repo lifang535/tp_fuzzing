@@ -18,8 +18,9 @@ src/
     region_ops.py                 普通及 typed 操作契约
     region_types.py               类型推导、作用域和值池
     extended.py                   Extended 的类型、节点、多值区域和验证
+    slice.py                      特征切片程序（参数在 src/workflow/slices 中展开）
     layout.py                     输入布局及物理地址描述
-    serialization.py              Region / Extended 的保存和恢复
+    serialization.py              Region / Extended / 切片程序的保存和恢复
   backends/
     base.py                       后端接口
     common/                       共用调度策略、probe、程序分发和测试脚本组装
@@ -31,6 +32,7 @@ src/
     emitter/                      嵌入独立脚本的参考解释器和运行检查
     oracle/                       子进程执行、超时、诊断和编译证据
     fuzzer/                       主循环、种子池、去重、持久化和恢复
+    slices/                       特征切片生成器、精确参考、失败约简与调度
     feedback.py                   Region/probe 的结构反馈
     extended_feedback.py          Extended 结构及编译特征
     coverage_audit.py              覆盖证据审计
@@ -125,6 +127,9 @@ python main.py --backend triton --seed 42 -n 100 --no-save-artifacts
 | `--uncovered-boost` | 50.0 | 从未尝试的结构特征的权重加成（MLIRSmith 式多样性优先；0 恢复旧权重） |
 | `--no-structural-feedback` | 关闭 | 指定后禁用结构反馈引导 |
 | `--compile-only` | 关闭 | 指定后仅编译，并强制 Extended 概率为 1 |
+| `--slice-prob` | 新 CLI：0.4 | 每个测试为特征切片程序的概率（恢复无切片的旧 campaign 时为 0） |
+| `--slices` | 全部 | 逗号分隔的切片子集：`cast,reduce,scan,gemm,atomic` |
+| `--no-slice-adaptive` | 关闭 | 切片与参数均匀采样，不按发现估计和未覆盖参数对选择 |
 
 更多参数通过 `--help` 查看；未开放 CLI 的配置在 `src/config/config.py`，包括尺寸池、模板深度、操作数量、scratch 预算及数值阈值。
 
@@ -182,6 +187,22 @@ extend 的输入是**已实例化且执行通过的 ExtendedProgram JSON**，不
 MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Extended 程序加入全局内存原子操作（在刻意竞态的地址上做可交换 add/max/min）、带数据依赖操作数的标量 FMA 链、triton 形状原语（flip/interleave/join/split）以及 int32 累加的 int8 × int8 matmul。普通 Region 加入超越函数元素操作（tanh/erf/log/log2/exp2/rsqrt/sin/cos/floor/ceil）和 int8 GEMM-only 程序（规格来自预校验网格：block_K ∈ {32, 64}、int32 累加、精确整数参考）。fp32 GEMM 永不与边界台阶 op（ceil/floor/round/cast）组合：TF32 张量核计算相对精确 fp32 参考会翻动取整边界，使 oracle 淹没在无法与 bug 区分的噪声里。
 
 新 op 的属性取自**有界实例网格**（`src/workflow/generator/grids.py`）：per-(op, backend) 轮转游标保证每轮扫掠每个角落实例恰好出现一次（MLIRSmith 穷举实例思想在新 op 面上的针对性版本；老 op 保持随机采样）。网格游标随 campaign 的 rng 状态持久化；`--no-instance-grids` 恢复纯随机采样。
+
+## 特征切片
+
+运行数周后，Region/Extended 路线反复命中少数几种机制（Chao1 ≈ 已观测桶数）：调度只能重排生成器能表达的程序，而两种 IR 只覆盖 fp16/fp32/int8/int32/bool、秩不超过 2 和内置归约组合函数。参照特征聚焦测试生成（FFTG，Zamudio Amaya 等，ASE'26）与 tile 程序 bug 实证研究（Rathnasuriya 等，ISSTA'26：301 个代码生成 bug 中类型与算子处理占 49%），`src/workflow/slices/` 为每个 bug 密集特征提供聚焦生成器；每个切片有离散参数空间，其他维度保持简单：
+
+| 切片 | 聚焦 | 参数（节选） |
+|---|---|---|
+| `cast` | 转换/逐元素链 | 三步（操作，dtype），覆盖 bf16、f16、f32、f64、fp8 e4m3/e5m2、i8–i64、u8–u32；秩 1–3；不整齐尾部；动态尺寸 |
+| `reduce` | 归约 | Triton：sum/max/min/argmax/argmin/xor_sum 及自定义 `tl.reduce` 组合（含 (值, 下标)、(min, max) 元组）；TileLang：`T.reduce_*` 的 clear/batch/nan_propagate/共享内存源 |
+| `scan` | 扫描 | cumsum/cumprod、自定义 `associative_scan`（含不可交换的线性递推）、reverse；`T.cumsum/T.cummax` 原地或写入另一缓冲 |
+| `gemm` | 矩阵乘 | MMA dtype（f16、bf16、fp8、i8，f32 的 ieee/tf32/tf32x3）、累加器、转置、批量（三维）`tl.dot`、K 循环与 stages；TileLang 寄存器操作数、k_pack、warp policy、clear_accum、串行/流水循环 |
+| `atomic` | 全局原子 | dtype × add/max/min/and/or/xor/xchg（Triton 的 sem/scope）或 addx2/addx4（TileLang）× 槽位竞争 × 掩码 |
+
+输入是小整数分子的二进分数 k·2^-f，每一步传递静态取值域；结果不能精确表示的参数值在合法化阶段被替换（YARPGen 式范围追踪）。因此 float64/int64 参考是精确的，输出逐位比较，不一致不可能来自舍入噪声。每个测试还检查带保护区的输出、重复执行确定性和第二组启动配置。安装版本不支持的特征在前端被拒绝时会打标记并归为 `unsupported_feature`，不计为失败。
+
+调度器（`slices/scheduler.py`）在轮转预热后，按每秒新失败桶与新参数对的 incidence Good-Turing 估计选择切片（STADS，Böhme TOSEM'18）；切片内从若干合法候选中选覆盖最多未覆盖参数对的一个（AETG 式两两覆盖），或对先前有意义的程序变异 1–2 个参数。失败会逐个参数约简到核心（`slices/minimize.py`，每次最多 24 个额外测试，总量不超过切片测试的三分之一）：错误结果按约简后的 dtype 路径分桶（错误值共用检查器消息），之后包含高频桶核心的候选以 1 − max(0.02, 3/命中数) 的概率跳过。约简后的程序与失败一起保存为 `*.min.py`，JSON 记录核心。`summary.json` 的 `slices` 项按切片记录测试数、桶、核心、Good-Turing/Chao1 与跳过数；`slice_state.json` 用于恢复。失败键现在保留失败的 MLIR pass 及其首个诊断、首个 nvcc 错误，`PassManager::run failed` 与 TileLang CUDA 编译失败按机制分开。
 
 ## 多样性机制与 oracle 维度
 

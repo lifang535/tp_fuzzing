@@ -49,6 +49,15 @@ def main():
     parser.add_argument('--dsl-extend-prob', type=float, default=None,
                         help='Probability of deriving a target-DSL test from a passing common Extended case; '
                              'default 0.35 for new campaigns, 0 for old campaigns on resume')
+    parser.add_argument('--slice-prob', type=float, default=None,
+                        help='Probability that a test is a feature-slice program (dtype chains, reductions, '
+                             'scans, GEMM over bf16/fp8/fp64/int16/int64/unsigned dtypes); default 0.4 for '
+                             'new campaigns, 0 when resuming a campaign that predates slices')
+    parser.add_argument('--slices', default=None,
+                        help='Comma-separated slice names (default: every slice the backend supports)')
+    parser.add_argument('--slice-adaptive', action=argparse.BooleanOptionalAction, default=None,
+                        help='Choose slices by Good-Turing discovery per second and candidates by uncovered '
+                             'knob pairs (default on); off samples slices and knobs uniformly')
     parser.add_argument('--dsl-evolve-prob', type=float, default=None,
                         help='Within DSL tests, probability of evolving a passing target-specific seed '
                              '(default 0.5; old campaigns resume with 0)')
@@ -207,6 +216,25 @@ def main():
                                 else 0.0 if args.compile_only or args.extended_prob == 0 else 0.35)
     if args.dsl_evolve_prob is None:
         args.dsl_evolve_prob = saved_generation.get('dsl_evolve_prob', 0.0) if args.resume else 0.5
+    if args.slice_prob is None:
+        from src.workflow.slices import available
+        args.slice_prob = (saved_generation.get('slice_prob', 0.0) if args.resume
+                           else 0.0 if args.compile_only or not available(args.backend) else 0.4)
+    if args.slices is None:
+        args.slices = ','.join(saved_generation.get('slice_names', ())) if args.resume else ''
+    if args.slice_adaptive is None:
+        args.slice_adaptive = saved_generation.get('slice_adaptive', True)
+    if not 0 <= args.slice_prob <= 1:
+        parser.error('--slice-prob must be between 0 and 1')
+    if args.compile_only and args.slice_prob:
+        parser.error('--slice-prob requires execution mode')
+    slice_names = tuple(n for n in args.slices.split(',') if n)
+    if args.slice_prob:
+        from src.workflow.slices import available
+        try:
+            available(args.backend, slice_names)
+        except ValueError as exc:
+            parser.error(str(exc))
     if args.dsl_max_depth is None:
         args.dsl_max_depth = saved_generation.get('dsl_max_depth', 3)
     if args.dsl_source_variants is None:
@@ -305,6 +333,9 @@ def main():
         region_typed_prob=args.typed_op_prob,
         extended_prob=args.extended_prob,
         dsl_extend_prob=args.dsl_extend_prob,
+        slice_prob=args.slice_prob,
+        slice_names=slice_names,
+        slice_adaptive=args.slice_adaptive,
         dsl_evolve_prob=args.dsl_evolve_prob,
         dsl_max_depth=args.dsl_max_depth,
         dsl_source_variants=args.dsl_source_variants,

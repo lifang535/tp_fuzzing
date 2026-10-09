@@ -28,6 +28,12 @@ def _region_timeout_multiplier(program, config, backend_impl):
     return len(backend_impl.region_variants(program, config)) * max(1, len(_layout_sweep_pairs(program)))
 
 
+def _slice_timeout_multiplier(program):
+    """A slice harness compiles one kernel per launch configuration."""
+    from src.workflow.slices import SLICES
+    return len(SLICES[program.slice].variants(program.params, program.backend))
+
+
 class BugType(Enum):
     COMPILE_CRASH = "compile_crash"
     RUNTIME_CRASH = "runtime_crash"
@@ -112,6 +118,10 @@ class Oracle:
             return program.params_dict, '+'.join(dtypes), 'extended:' + program.family
         if isinstance(program, RegionProgram):
             return program.params_dict, program.spec.dtype.value, "region:" + "->".join(o.kind for o in program.all_operations())
+        from src.ir.slice import SliceProgram
+        if isinstance(program, SliceProgram):
+            dtypes = sorted({str(v) for k, v in program.params.items() if k.endswith('_dt')})
+            return program.params_dict, '+'.join(dtypes), 'slice:' + program.slice
         raise TypeError(f'Unsupported program: {type(program).__name__}')
 
     def _read_extended_evidence(self, program, directory):
@@ -129,7 +139,9 @@ class Oracle:
         self.compilation_complete = False
         self.last_artifact_dir = None
         from src.ir.extended import ExtendedProgram
+        from src.ir.slice import SliceProgram
         extended = isinstance(program, ExtendedProgram)
+        sliced = isinstance(program, SliceProgram)
         if self.config.compile_only and not extended:
             raise ValueError('compile_only requires an extended program')
         temporary_artifacts = None
@@ -167,6 +179,7 @@ class Oracle:
             result = execute(
                 self.backend_impl.execution_command(tmp_path),
                 timeout=self.config.compile_timeout * (len(self.backend_impl.extended_variants(program, self.config)) if extended
+                                                      else _slice_timeout_multiplier(program) if sliced
                                                       else _region_timeout_multiplier(program, self.config, self.backend_impl))
                         + self.config.execute_timeout,
                 **options,
@@ -243,6 +256,9 @@ class Oracle:
                 # producing the earliest one separates the mechanisms.
                 origin = (wrong_result_origin(params['extended_program'], error_msg)
                           if extended and bug_type is BugType.WRONG_RESULT else '')
+                if sliced and bug_type is BugType.WRONG_RESULT:
+                    from src.workflow.slices import slice_origin
+                    origin = slice_origin(program)
                 report.failure_bucket, report.failure_key = failure_bucket(
                     error_msg, report.root_cause, report.confirmed_signature, report.location, origin)
                 return report

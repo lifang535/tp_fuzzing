@@ -51,6 +51,48 @@ def _frame(lines):
     return ''
 
 
+# MLIR element types keep their digits: f64 -> f8E5M2 and f32 -> f8E4M3FN
+# conversions are different mechanisms.
+_MLIR_TYPE = re.compile(r'\b(?:bf16|[fi]\d+(?:E\d+M\d+(?:FNUZ|FN|B\d+)?)?|ui\d+)\b')
+_PASS = re.compile(r'Pipeline failed while executing \[`(\w+)`')
+_MLIR_DETAIL = re.compile(r'^(?:LLVM ERROR: .*|Unsupported .*|.*Assertion `.*|.*\berror: (?!Failures have been detected).*)$',
+                          re.MULTILINE)
+# The first nvcc error and the header it is reported in (atomic.h, common.h
+# or the generated tvm_kernels.cu name different template mechanisms).
+_NVCC = re.compile(r'([\w.]+)\.(cu|h|hpp|cuh)\(\d+\): error: (.*)')
+
+
+def _protected(text):
+    """Normalize a backend diagnostic but keep MLIR element types."""
+    kept = []
+    text = _MLIR_TYPE.sub(lambda m: kept.append(m.group()) or f'TYPE{len(kept) - 1}T', text)
+    text = _normalize(text)
+    return re.sub(r'TYPE#T', lambda m: kept.pop(0) if kept else 'TYPE', text)
+
+
+def _backend_detail(message):
+    """The compiler's own diagnosis behind a generic final exception: the
+    failing MLIR pass and its first error, or the first nvcc error of a
+    TileLang CUDA compilation; both final exceptions read the same for every
+    mechanism behind them."""
+    detail = []
+    if 'PassManager::run failed' in message:
+        failed = _PASS.search(message)
+        if failed:
+            detail.append('pass ' + failed.group(1))
+        first = _MLIR_DETAIL.search(message)
+        if first:
+            line = first.group()
+            if 'Assertion `' in line:
+                line = 'Assertion ' + line.split('Assertion `', 1)[1]
+            detail.append(_protected(line.split(': error: ')[-1]))
+    nvcc = _NVCC.search(message)
+    if nvcc:
+        where = '' if nvcc.group(1) == 'tvm_kernels' else f'{nvcc.group(1)}.{nvcc.group(2)}: '
+        detail.append('nvcc ' + where + _normalize(nvcc.group(3)))
+    return detail
+
+
 def failure_key(message, location=''):
     """Normalized diagnostic: the final exception (a TVM check reduced to its
     condition) and its innermost frame, the root of a chained traceback, the
@@ -78,6 +120,7 @@ def failure_key(message, location=''):
         detail = next((line for line in lines[caret + 1:] if line.strip()), '')
         if detail:
             parts.append(_normalize(detail))
+    parts += _backend_detail(message)
     signal = _SIGNAL.search(message)
     if signal and signal.group(1) not in text:
         parts.append('signal ' + signal.group(1))

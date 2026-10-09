@@ -95,6 +95,25 @@ class Config:
     dsl_attributes: bool = False
     # Preserve rare-feature representatives when bounded corpora fill up.
     corpus_feedback: bool = True
+    # Feature-slice generation (src/workflow/slices): focused generators for
+    # dtype conversion chains, reductions, scans and GEMM over the dtype and
+    # rank lattice the shared IRs cannot express (bf16, fp8, fp64, 16/64-bit
+    # and unsigned integers, rank 3, user combine functions, MMA operand
+    # layouts). Probability per generated test; 0 disables (library default,
+    # the CLI turns it on for new campaigns). slice_names restricts the
+    # slices; slice_adaptive chooses slices by Good-Turing discovery per
+    # second and candidates by uncovered knob pairs (off: uniform sampling).
+    slice_prob: float = 0.0
+    slice_names: tuple = ()
+    slice_adaptive: bool = True
+    slice_candidates: int = 16
+    # Reduce a slice failure knob by knob to its core: a wrong result is
+    # bucketed by its core, a crash bucket records up to slice_max_cores
+    # cores, and the scheduler steers away from well-sampled cores. Each
+    # reduction runs at most slice_minimize_budget extra tests.
+    slice_minimize: bool = True
+    slice_minimize_budget: int = 24
+    slice_max_cores: int = 3
     # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong
     # to the separate extend-from-passed stage.
     extended_common_only: bool = True

@@ -66,6 +66,9 @@ def program_features(program):
     if isinstance(program, ExtendedProgram):
         from .extended_feedback import extended_features
         return extended_features(program)
+    from src.ir.slice import SliceProgram
+    if isinstance(program, SliceProgram):
+        return program.features()
     from src.ir.region import RegionProgram, walk
     if not isinstance(program, RegionProgram):
         raise TypeError(f'Unsupported program: {type(program).__name__}')

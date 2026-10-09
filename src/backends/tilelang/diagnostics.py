@@ -7,6 +7,9 @@ message falls through to `other` and the bug class silently disappears from
 the campaign's root-cause counts, so tests/test_classifier.py pins the live
 wording of every reworded diagnostic.
 """
+import re
+
+
 def classify(message):
     err = message.lower()
     # 0.1.11: "Check failed: m_warp * n_warp == num_warps".
@@ -38,3 +41,10 @@ def classify(message):
         return 'ptx_async_boundary'
     if 'internalerror' in err and ('check failed' in err or 'codegen' in err):
         return 'tilelang_codegen_error'
+    # nvcc rejected the CUDA source TileLang generated (e.g. an ambiguous
+    # half_t conversion from int64): a code generation defect, reported
+    # after the whole kernel source. The stored message keeps only its tail,
+    # which still names the failed compilation of tvm_kernels.cu.
+    if 'tvm_kernels.cu' in err and ('detected in the compilation of' in err
+                                    or re.search(r'\.(?:cu|h|hpp|cuh)\(\d+\): error', err)):
+        return 'tilelang_cuda_compile_error'

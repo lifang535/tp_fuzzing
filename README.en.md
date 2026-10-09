@@ -16,6 +16,7 @@ The executable representations are **RegionProgram** and **ExtendedProgram**. Di
 | `src/ir/region.py` | Operations, lexical regions, functions and RegionProgram |
 | `src/ir/region_ops.py`, `region_types.py` | Operation contracts, type inference and value pools |
 | `src/ir/extended.py` | Extended types, operations, multi-result regions and validation |
+| `src/ir/slice.py`, `src/workflow/slices/` | Feature-slice programs, their generators, exact references, reduction and scheduler |
 | `src/ir/layout.py`, `serialization.py` | Physical layouts and current-format persistence |
 | `src/backends/common/` | Shared policies, probe generation and standalone script assembly |
 | `src/backends/tilelang/`, `triton/` | Target constraints, lowering and launch conventions |
@@ -110,6 +111,9 @@ Library `Config()` defaults to `extended_prob=0`. CLI resume reads the saved Ext
 | `--uncovered-boost` | 50.0 | Additive weight boost for never-attempted structural features (MLIRSmith-style diversity first; 0 restores legacy weighting) |
 | `--no-structural-feedback` | Off | Disable structural feedback guidance |
 | `--compile-only` | Off | Compile without execution; forces Extended probability to 1 |
+| `--slice-prob` | New CLI: 0.4 | Probability that a test is a feature-slice program (0 when resuming a campaign without slices) |
+| `--slices` | All | Comma-separated subset of `cast,reduce,scan,gemm,atomic` |
+| `--no-slice-adaptive` | Off | Draw slices and knob assignments uniformly instead of by discovery estimate and uncovered knob pairs |
 
 See `--help` for other options and `src/config/config.py` for dimension pools, template limits, scratch budgets and tolerances.
 
@@ -160,6 +164,22 @@ To track the full installed CUDA language facade without conflating a name with 
 The MLIRSmith-style op-surface expansion adds new compiler code paths on top of both IRs. Extended programs gain global-memory atomics (commutative add/max/min over deliberately raced addresses), scalar FMA chains with data-dependent operands, triton shape primitives (flip/interleave/join/split) and int8 x int8 matmul with an int32 accumulator. Native regions gain transcendental elementwise ops (tanh/erf/log/log2/exp2/rsqrt/sin/cos/floor/ceil) and int8 GEMM-only programs whose spec comes from a pre-validated grid (block_K ∈ {32, 64}, int32 accumulator, exact integer reference). fp32 GEMMs are never combined with boundary step ops (ceil/floor/round/cast): TF32 tensor-core math flips rounding boundaries against the exact-fp32 reference and drowns the oracle in indistinguishable noise.
 
 New-op attributes are sampled from bounded instance grids (`src/workflow/generator/grids.py`): per (op, backend) round-robin cursors make every corner cell appear exactly once per sweep (MLIRSmith exhaustive-instance philosophy applied to the new surfaces; legacy ops keep random sampling). Grid cursors persist in the campaign RNG state; `--no-instance-grids` restores pure random sampling.
+
+## Feature slices
+
+After weeks of campaigns the Region/Extended routes kept re-finding the same few mechanisms (Chao1 ≈ observed buckets): their scheduler can only reorder programs the generators can express, and both IRs stop at fp16/fp32/int8/int32/bool, rank ≤ 2 and built-in combine functions. Following feature-focused test generation (FFTG, Zamudio Amaya et al., ASE'26) and the tile-program bug study (Rathnasuriya et al., ISSTA'26: type and operator handling are 49% of the 301 studied codegen bugs), `src/workflow/slices/` adds focused generators, one per bug-dense feature. Each owns a discrete knob space whose other dimensions stay simple:
+
+| Slice | Focus | Knobs (abridged) |
+|---|---|---|
+| `cast` | conversion/elementwise chains | three steps of (op, dtype) over bf16, f16, f32, f64, fp8 e4m3/e5m2, i8–i64, u8–u32; rank 1–3; ragged tails; dynamic extents |
+| `reduce` | reductions | sum/max/min/argmax/argmin/xor_sum and user `tl.reduce` combines incl. tuple (value, index) and (min, max) pairs on Triton; `T.reduce_*` with clear/batch/nan_propagate/shared sources on TileLang |
+| `scan` | scans | cumsum/cumprod, user `associative_scan` combines incl. a non-commutative linear recurrence; reverse; `T.cumsum/T.cummax` in place or into a separate buffer |
+| `gemm` | matrix multiply | MMA dtype (f16, bf16, fp8, i8, f32 with ieee/tf32/tf32x3), accumulator, transposed operands, batched (3-D) `tl.dot`, K loop and stages; TileLang register operand, k_pack, warp policy, clear_accum, serial/pipelined loop |
+| `atomic` | global atomics | dtype × add/max/min/and/or/xor/xchg (Triton sem/scope) or addx2/addx4 (TileLang) × slot contention × masking |
+
+Inputs are dyadic rationals k·2^-f with small |k|, and every step transfers a static value domain; a knob value whose result would not be exactly representable is legalized away (YARPGen-style range tracking). The float64/int64 reference is therefore exact and outputs are compared bit for bit, so a mismatch is never rounding noise. Each harness also checks a guarded output allocation, run-to-run determinism and a second launch configuration. Front-end rejections of features the installed DSL does not support are marked and classified `unsupported_feature`, not as failures.
+
+The scheduler (`slices/scheduler.py`) draws slices by an incidence Good-Turing estimate of new failure buckets and new knob-pair cells per second (STADS, Böhme TOSEM'18) after a round-robin warm-up, and picks within a slice the candidate covering the most uncovered knob pairs (AETG-style 2-wise coverage) or a 1–2 knob mutation of an interesting earlier program. A failure is reduced knob by knob to its core (`slices/minimize.py`, at most 24 extra tests, capped at a third of slice tests): a wrong result is bucketed by its reduced dtype path, since every wrong value shares the checker's message, and later candidates containing the core of a well-sampled bucket are skipped with probability 1 − max(0.02, 3/hits). The reduced program is saved next to the failure as `*.min.py`; its JSON records the core. `summary.json` reports per-slice tests, buckets, cores, Good-Turing/Chao1 and avoided candidates under `slices`, and `slice_state.json` restores the scheduler on resume. Failure keys now keep the failing MLIR pass with its first diagnostic and the first nvcc error, so `PassManager::run failed` and TileLang CUDA compilation failures split by mechanism.
 
 ## Diversity mechanisms and oracle dimensions
 
