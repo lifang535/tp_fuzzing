@@ -1019,9 +1019,9 @@ class TileSmith:
             return
         if not wrong and scheduler.cores_of(program, bug.failure_bucket) >= self.config.slice_max_cores:
             return
-        # Reduction never takes more than about a third of the slice tests.
+        # Reduction takes at most about a quarter of the slice route's tests.
         tested = sum(state.tests for state in scheduler.states.values())
-        if self.slice_reduction_tests > 0.5 * tested + 4 * self.config.slice_minimize_budget:
+        if self.slice_reduction_tests > 0.3 * tested + 2 * self.config.slice_minimize_budget:
             return
         saved = self.oracle.last_compilation, self.oracle.compilation_complete
         started = time.monotonic()

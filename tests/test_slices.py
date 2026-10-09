@@ -94,6 +94,16 @@ class LegalizationTests(unittest.TestCase):
                     self.assertFalse(DTYPES[dtype].is_fp8, (program.slice, op, dtype))
             self.assertTrue(DTYPES[plan['out_dt']].torch)
 
+    def test_triton_max_min_widen_narrow_types(self):
+        base = SLICES['reduce'].sample(random.Random(0), 'triton')
+        for core, widened in (('u16', 'i32'), ('i8', 'i32'), ('f16', 'f32'), ('bf16', 'f32'), ('i64', 'i64')):
+            params = dict(base, in_dt=core, core_dt=core, kind='max', values='nonneg', pre1_op='none',
+                          pre2_op='none', pre1_dt=core, pre2_dt=core, post1_op='none', post1_dt=widened,
+                          out_dt='f64')
+            plan = SLICES['reduce'].legalize(params, 'triton')
+            self.assertEqual(params['kind'], 'max')
+            self.assertEqual(plan['final_dt'], widened, core)
+
     def test_backend_restrictions(self):
         for program in programs(16, seed=2):
             params = program.params

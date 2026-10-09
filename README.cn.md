@@ -203,7 +203,7 @@ MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Exten
 
 输入是小整数分子的二进分数 k·2^-f，每一步传递静态取值域；结果不能精确表示的参数值在合法化阶段被替换（YARPGen 式范围追踪）。因此 float64/int64 参考是精确的，输出逐位比较，不一致不可能来自舍入噪声。`round` 切片则刻意输入不可精确表示的值，与 harness 内实现的正确舍入参考（`_slice_round`，与 numpy 一致；torch 的 float64 转换会经 float32 两次舍入）比较。每个测试还检查带保护区的输出、重复执行确定性和第二组启动配置。安装版本不支持的特征在前端被拒绝时会打标记并归为 `unsupported_feature`，不计为失败。
 
-调度器（`slices/scheduler.py`）在轮转预热后，按每秒新失败桶与新参数对的 incidence Good-Turing 估计选择切片（STADS，Böhme TOSEM'18）；切片内从若干合法候选中选覆盖最多未覆盖参数对的一个（AETG 式两两覆盖），或对先前有意义的程序变异 1–2 个参数。失败会逐个参数约简到核心（`slices/minimize.py`，每次最多 24 个额外测试，总量不超过切片测试的三分之一）：错误结果按约简后的 dtype 路径分桶（错误值共用检查器消息），之后包含高频桶核心的候选以 1 − max(0.02, 3/命中数) 的概率跳过。约简后的程序与失败一起保存为 `*.min.py`，JSON 记录核心。`summary.json` 的 `slices` 项按切片记录测试数、桶、核心、Good-Turing/Chao1 与跳过数；`slice_state.json` 用于恢复。失败键现在保留失败的 MLIR pass 及其首个诊断、首个 nvcc 错误，`PassManager::run failed` 与 TileLang CUDA 编译失败按机制分开。`summary.json` 和进度文件中的 `route_stats` 按生成路线（fresh、mutate、dsl_extend、slice、slice_reduction）记录测试数与 oracle 耗时，每个桶的首次发现也记录其路线，可据此比较各路线每小时的发现数。
+调度器（`slices/scheduler.py`）在轮转预热后，按每秒新失败桶与新参数对的 incidence Good-Turing 估计选择切片（STADS，Böhme TOSEM'18）；切片内从若干合法候选中选覆盖最多未覆盖参数对的一个（AETG 式两两覆盖），或对先前有意义的程序变异 1–2 个参数。失败会逐个参数约简到核心（`slices/minimize.py`，每次最多 24 个额外测试，总量约不超过切片路线的四分之一；每个崩溃桶最多记录两个核心）：错误结果按约简后的 dtype 路径分桶（错误值共用检查器消息），之后包含高频桶核心的候选以 1 − max(0.02, 3/命中数) 的概率跳过。约简后的程序与失败一起保存为 `*.min.py`，JSON 记录核心。`summary.json` 的 `slices` 项按切片记录测试数、桶、核心、Good-Turing/Chao1 与跳过数；`slice_state.json` 用于恢复。失败键现在保留失败的 MLIR pass 及其首个诊断、首个 nvcc 错误，`PassManager::run failed` 与 TileLang CUDA 编译失败按机制分开。`summary.json` 和进度文件中的 `route_stats` 按生成路线（fresh、mutate、dsl_extend、slice、slice_reduction）记录测试数与 oracle 耗时，每个桶的首次发现也记录其路线，可据此比较各路线每小时的发现数。
 
 ## 多样性机制与 oracle 维度
 

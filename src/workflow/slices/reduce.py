@@ -150,8 +150,10 @@ class ReduceSlice(Slice):
                 out = out.join(init)
         else:
             out = domain if clear else domain.join(init)
-        if backend == 'triton' and kind in ('max', 'min') and core == 'bf16':
-            result = 'f32'  # max/min widen bf16 before reducing
+        if backend == 'triton' and kind in ('max', 'min') and DTYPES[core].bits < 32:
+            # tl.max/tl.min widen narrow inputs before reducing: floats to
+            # float32 and integers, unsigned ones too, to int32.
+            result = 'f32' if DTYPES[core].is_float else 'i32'
         if backend == 'triton' and kind == 'cmax' and core == 'bf16':
             result = 'f32'
         params['kind'] = kind

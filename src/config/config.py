@@ -113,7 +113,7 @@ class Config:
     # reduction runs at most slice_minimize_budget extra tests.
     slice_minimize: bool = True
     slice_minimize_budget: int = 24
-    slice_max_cores: int = 3
+    slice_max_cores: int = 2
     # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong
     # to the separate extend-from-passed stage.
     extended_common_only: bool = True
