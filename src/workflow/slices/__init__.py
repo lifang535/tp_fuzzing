@@ -10,8 +10,13 @@ from .scan import ScanSlice
 from .gemm import GemmSlice
 from .atomic import AtomicSlice
 from .round import RoundSlice
+from .mathfn import MathSlice
+from .layout import LayoutSlice
+from .loop import LoopSlice
+from .memory import MemorySlice
 
-SLICES = {s.name: s for s in (CastSlice(), ReduceSlice(), ScanSlice(), GemmSlice(), AtomicSlice(), RoundSlice())}
+SLICES = {s.name: s for s in (CastSlice(), ReduceSlice(), ScanSlice(), GemmSlice(), AtomicSlice(), RoundSlice(),
+                              MathSlice(), LayoutSlice(), LoopSlice(), MemorySlice())}
 
 
 def available(backend, names=None):
@@ -56,6 +61,15 @@ def slice_origin(program):
         return f"atomic {p['op']} {p['in_dt']} {p['contention']} slots{p['slots']}"
     if program.slice == 'round':
         return f"round {p['src']}>{p['via']}>{p['dst']} {p.get('mode', 'rtne')}"
+    if program.slice == 'math':
+        return f"math {p['fn']} {p['in_dt']} {p['values']}" + (' widen' if p['widen'] else '')
+    if program.slice == 'layout':
+        ops = ','.join(p[f'op{i}'] for i in (1, 2, 3) if p[f'op{i}'] != 'none')
+        return f"layout {p['source']} {p['dt']} {ops}".strip()
+    if program.slice == 'loop':
+        return f"loop {p['loop']} {p['body']} {p['in_dt']}>{p['acc_dt']}"
+    if program.slice == 'memory':
+        return f"memory {p['access']} {p['dt']} {p['view']} mask={p['mask']}"
     path = '>'.join([p['in_dt']] + [p[f'pre{i}_dt'] for i in (1, 2, 3) if f'pre{i}_dt' in p])
     ops = ','.join(p[f'pre{i}_op'] for i in (1, 2, 3) if p.get(f'pre{i}_op', 'none') != 'none')
     if program.slice in ('reduce', 'scan'):
@@ -83,6 +97,40 @@ def path_features(program):
             if op != 'none':
                 features.add(f'path:op {op}@{dtype}')
             conversion(dtype, target)
+    if program.slice == 'math':
+        fn = plan['fn']
+        features.add(f"path:math {params['fn']}@{params['in_dt']}")
+        features.add(f'path:sem {fn.sem}:{fn.mode}@{params["in_dt"]}>{plan["store"]}')
+        return features
+    if program.slice == 'layout':
+        source = f"{plan['source']}@{plan['in_dt']}"
+        features.add(f'path:layout-source {source}')
+        previous = plan['source']
+        for step in plan['steps']:
+            features.add(f"path:layout {step['op']}@{step['dt']}")
+            features.add(f"path:layout {previous}>{step['op']}")
+            if 'scope' in step:
+                features.add(f"path:layout {step['op']}>{step['scope']}")
+            previous = step['op']
+        conversion(plan['final_dt'], plan['out_dt'])
+        return features
+    if program.slice == 'loop':
+        options = [k for k in ('stages', 'unroll', 'flatten', 'disallow', 'ws', 'sched', 'inner') if params.get(k)
+                   not in (None, 0, 'none')]
+        features.add(f"path:loop {params['loop']}>{plan['body']}@{plan['acc_dt']}")
+        for option in options:
+            features.add(f"path:loop {params['loop']}+{option}={params[option]}")
+        if 'addr' in params:
+            features.add(f"path:loop addr={params['addr']}>{plan['body']}")
+        conversion(plan['in_dt'], plan['acc_dt'])
+        return features
+    if program.slice == 'memory':
+        features.add(f"path:memory {params['access']}@{params['dt']}")
+        features.add(f"path:memory {params['access']}>{params['view']}>{params['mask']}")
+        for knob in ('hint', 'cache', 'evict', 'scache', 'sevict', 'coalesced', 'padding', 'transform'):
+            if params.get(knob) not in (None, 'none', 0, 'zero'):
+                features.add(f"path:memory {params['access']}+{knob}={params[knob]}")
+        return features
     if program.slice == 'round':
         via = params['via']
         if via != 'none':

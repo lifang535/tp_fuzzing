@@ -28,10 +28,15 @@ ORDER = ('pair', 'warps2', 'threads2', 'tail', 'dynamic', 'operand', 'values', '
          'post2_op', 'post1_op', 'pre3_op', 'pre2_op', 'pre1_op', 'pre1_dt', 'pre2_dt', 'pre3_dt',
          'post1_dt', 'post2_dt', 'out_dt', 'stage', 'scope', 'batch', 'nanprop', 'dst', 'keep', 'clear',
          'shape', 'axis', 'reverse', 'sem', 'mask', 'contention', 'slots', 'blocks', 'n',
-         'via', 'rows', 'block', 'mix', 'mode',
+         'via', 'rows', 'block', 'mix', 'mode', 'yform', 'widen',
+         'hint', 'cache', 'evict', 'volatile', 'scache', 'sevict', 'coalesced', 'disable_tma', 'padding',
+         'fill', 'transform', 'grid', 'origin', 'row_pad', 'col_extent', 'row_extent', 'view', 'tile', 'access',
+         'store', 'op3', 'arg3', 'scope3', 'op2', 'arg2', 'scope2', 'op1', 'arg1', 'scope1', 'source',
+         'inner', 'ws', 'flatten', 'disallow', 'unroll', 'sched', 'order', 'accform', 'addr', 'dyn', 'coef',
+         'trips', 'inputs', 'stage_in', 'body',
          'acc_mode', 'kloop', 'stages', 'loop', 'kpack', 'areg', 'policy', 'clear_accum', 'gm', 'gn',
          'gk', 'm', 'k', 'bm', 'bn', 'bk', 'trans_a', 'trans_b', 'prec', 'acc', 'kind', 'core_dt',
-         'op', 'in_dt', 'mma_dt')
+         'op', 'acc_dt', 'in_dt', 'dt', 'mma_dt', 'fn')
 
 
 def simplest(slice_, knob, params, plan):
@@ -39,6 +44,11 @@ def simplest(slice_, knob, params, plan):
     space = slice_.space(plan['backend'])
     if knob not in space:
         return None
+    own = slice_.SIMPLEST.get(knob)
+    if isinstance(own, dict):
+        own = own.get(plan['backend'])
+    if own is not None and own in space[knob]:
+        return own
     if knob.endswith('_op'):
         return 'none'
     if knob in ('warps2', 'threads2'):

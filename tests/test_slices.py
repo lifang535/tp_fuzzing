@@ -39,10 +39,12 @@ def programs(count=24, seed=0):
 def harness_namespace(program):
     """Execute a harness module body without running main (no GPU)."""
     code = emit_slice(program, Cfg)
+    code = code.replace('from triton.language.extra.cuda import libdevice', '')
     code = code.replace('import triton.language as tl', '').replace('import triton\n', '')
     code = code.replace('import tilelang.language as T', '').replace('import tilelang\n', '')
     code = code.replace('@triton.jit', '')
-    namespace = {'__name__': 'slice_harness'}
+    # kernel signatures may annotate tl.constexpr, evaluated at definition
+    namespace = {'__name__': 'slice_harness', 'tl': type('tl', (), {'constexpr': object})}
     exec(compile(code, 'harness', 'exec'), namespace)
     return namespace
 
@@ -109,7 +111,7 @@ class LegalizationTests(unittest.TestCase):
             params = program.params
             if program.backend == 'triton' and program.slice != 'round':
                 plan = SLICES[program.slice].legalize(dict(params), 'triton')
-                for op, dtype, *_ in plan['pre'] + plan['post']:
+                for op, dtype, *_ in plan.get('pre', []) + plan.get('post', []):
                     if op in ('floor', 'ceil'):
                         self.assertIn(dtype, ('f32', 'f64'))
             if program.slice == 'reduce' and program.backend == 'tilelang' and params['batch'] > 1:
@@ -134,8 +136,8 @@ class HarnessTests(unittest.TestCase):
 
     def test_references_are_exact_and_representable(self):
         for program in programs(10, seed=5):
-            if program.slice == 'round':
-                continue  # inexact by design; see RoundTests
+            if program.slice in ('round', 'math'):
+                continue  # inexact by design (RoundTests) or per-element (MathTests)
             with self.subTest(slice=program.slice, backend=program.backend, params=program.params):
                 ns = harness_namespace(program)
                 params = dict(program.params)
@@ -145,7 +147,9 @@ class HarnessTests(unittest.TestCase):
                 x = ns['_slice_values'](x_shape, d.lo, d.hi, d.frac, 3, 1)
                 y = ns['_slice_values'](y_shape, d.lo, d.hi, d.frac, 3, 2)
                 expected = ns['reference'](x, y)
-                self.assertFalse(torch.isnan(expected).any())
+                if program.params.get('padding') != 'nan':
+                    self.assertFalse(torch.isnan(expected).any())
+                expected = torch.nan_to_num(expected, nan=0.0)
                 out = DTYPES[plan['out_dt']]
                 if out.is_float:
                     stored = expected.to(getattr(torch, out.torch)).double()
@@ -224,6 +228,150 @@ class RoundTests(unittest.TestCase):
                     self.assertTrue(p['src'].startswith(('f', 'b')) and p['dst'].startswith(('f', 'b')))
                 if p['via'] != 'none':
                     self.assertNotEqual(p['via'], p['dst'])
+
+
+class MathTests(unittest.TestCase):
+    def test_rounding_helpers_match_numpy(self):
+        import numpy as np
+        from fractions import Fraction
+        from src.workflow.slices.runtime import _slice_fnext, _slice_fround, _slice_fsqrt
+        rng = random.Random(2)
+        for _ in range(2000):
+            a = np.float32(rng.uniform(-1, 1) * 2.0 ** rng.randint(-40, 40))
+            b = np.float32(rng.uniform(-1, 1) * 2.0 ** rng.randint(-40, 40))
+            self.assertEqual(_slice_fround(Fraction(float(a)) * Fraction(float(b)), 'f32'), float(a * b))
+            self.assertEqual(_slice_fround(Fraction(float(a)) / Fraction(float(b)), 'f32'), float(a / b))
+            self.assertEqual(_slice_fsqrt(abs(float(a)), 'f32'), float(np.sqrt(np.abs(a))))
+            self.assertEqual(_slice_fnext(float(a), float(b), 'f32'), float(np.nextafter(a, b)))
+            h = np.float16(rng.uniform(-1, 1) * 2.0 ** rng.randint(-20, 15))
+            self.assertEqual(_slice_fround(Fraction(float(h)) * 3, 'f16'), float(np.float16(h * np.float16(3))))
+            v = Fraction(rng.randint(1, 10 ** 9), rng.randint(1, 10 ** 9)) * rng.choice((-1, 1))
+            down, up = _slice_fround(v, 'f32', 'rd'), _slice_fround(v, 'f32', 'ru')
+            self.assertTrue(down <= v <= up)
+            self.assertIn(_slice_fround(v, 'f32', 'rn'), (down, up))
+            self.assertLessEqual(abs(_slice_fround(v, 'f32', 'rz')), abs(v))
+        self.assertEqual(_slice_fround(65520, 'f16'), float('inf'))
+        self.assertEqual(_slice_fround(65520, 'f16', 'rz'), 65504.0)
+
+    def test_philox_matches_triton(self):
+        # Values produced by Triton 3.8 tl.randint / tl.rand on an RTX 4060.
+        from src.workflow.slices.runtime import _slice_meval
+        offsets = [0, 1, 2, 1000, 2 ** 31 - 1, -5, 123456789, -2 ** 31]
+        expected = [3522838145, 11954473, 1814877333, 2817279776, 3552396717, 866953835, 4131302393, 4117041148]
+        self.assertEqual([_slice_meval('philox', '12345:10:0', [v], ['i32'], 'u32') for v in offsets], expected)
+        self.assertEqual([_slice_meval('philox', f'{0x9876543210}:10:0', [v], ['i64'], 'u32')
+                          for v in (0, 1, 2 ** 40 + 7, -3)], [3098728694, 3079670387, 2806096737, 348501100])
+        self.assertEqual(_slice_meval('rand', '4242:10:0', [0], ['i32'], 'f32'), 0.8976094126701355)
+
+    def test_reference_cases_cover_the_catalog(self):
+        """Every (function, dtype) of both catalogs yields operands of its
+        types and results representable in its output type."""
+        import math
+        from src.workflow.slices.mathfn import CATALOGS
+        from src.workflow.slices.runtime import _SLICE_FORMATS, _slice_fround, _slice_int_range
+        for backend, catalog in CATALOGS.items():
+            space = SLICES['math'].space(backend)
+            base = dict(SLICES['math'].sample(random.Random(0), backend), shape=space['shape'][0], tail='none')
+            for name, fn in catalog.items():
+                for dt in fn.dtypes:
+                    for values in sorted({r.split(':')[0] for r in fn.allowed_regimes(dt)}):
+                        program = make_program('math', dict(base, fn=name, in_dt=dt, values=values), backend)
+                        with self.subTest(backend=backend, fn=name, dt=dt, values=values):
+                            ns = harness_namespace(program)
+                            args, want = ns['reference_case'](3)
+                            plan = SLICES['math'].legalize(dict(program.params), backend)
+                            self.assertEqual(len(args), fn.arity)
+                            self.assertEqual(len(want), math.prod(plan['valid']))
+                            for operand, kind in zip(args, plan['types']):
+                                if kind[0] in 'iu':
+                                    lo, hi = _slice_int_range(kind)
+                                    self.assertTrue(all(lo <= v <= hi for v in operand), kind)
+                                else:
+                                    self.assertTrue(all(not math.isfinite(v) or _slice_fround(v, kind) == v
+                                                        for v in operand), kind)
+                            out = plan['out']
+                            for w in want:
+                                if w is None:
+                                    continue
+                                if out[0] in 'iu':
+                                    lo, hi = _slice_int_range(out)
+                                    self.assertTrue(lo <= w <= hi, (w, out))
+                                elif fn.ulps == 0 and math.isfinite(w) and out in _SLICE_FORMATS:
+                                    self.assertEqual(_slice_fround(w, out), w, (w, out))
+
+
+class NewSliceTests(unittest.TestCase):
+    def test_layout_reference_has_the_stored_shape(self):
+        import math
+        rng = random.Random(21)
+        for backend in BACKENDS:
+            for _ in range(60):
+                program = make_program('layout', SLICES['layout'].sample(rng, backend), backend)
+                plan = SLICES['layout'].legalize(dict(program.params), backend)
+                ns = harness_namespace(program)
+                x_shape, y_shape = SLICES['layout'].input_shapes(plan)
+                x = ns['_slice_values'](x_shape, -3, 3, 0, 1, 1)
+                y = ns['_slice_values'](y_shape, -3, 3, 0, 1, 2)
+                expected = ns['reference'](x, y)
+                if program.params.get('store') == 'flat':
+                    self.assertEqual(tuple(expected.shape), (math.prod(plan['final_shape']),))
+                else:
+                    self.assertEqual(tuple(expected.shape), tuple(plan['final_shape']), program.params)
+                for step in plan['steps']:
+                    self.assertNotEqual(step['op'], 'none')
+
+    def test_loop_reference_runs_the_loop(self):
+        base = SLICES['loop'].sample(random.Random(0), 'triton')
+        params = dict(base, loop='range', body='axpy', coef=2, trips=3, in_dt='f32', acc_dt='f32', order='rev',
+                      addr='index', mask='none', inner=0, shape='64')
+        program = make_program('loop', params, 'triton')
+        self.assertEqual(program.params['order'], 'rev')
+        ns = harness_namespace(program)
+        x = torch.arange(3 * 64, dtype=torch.float64).view(3, 64)
+        expected = ns['reference'](x, torch.zeros(1, 64))
+        # reverse order: acc = ((x2) * 2 + x1) * 2 + x0
+        self.assertTrue(torch.equal(expected, x[2] * 4 + x[1] * 2 + x[0]))
+
+    def test_memory_reference_fills_masked_lanes(self):
+        base = SLICES['memory'].sample(random.Random(0), 'triton')
+        params = dict(base, access='ptr', dt='f32', tile='16x16', grid=1, origin=1, row_pad=4, view='row',
+                      mask='bound', row_extent='cut', col_extent='cut', fill=7, transform='none', hint='none')
+        program = make_program('memory', params, 'triton')
+        plan = SLICES['memory'].legalize(dict(program.params), 'triton')
+        ns = harness_namespace(program)
+        x_shape, _ = SLICES['memory'].input_shapes(plan)
+        x = torch.arange(x_shape[0] * x_shape[1], dtype=torch.float64).view(x_shape)
+        expected = ns['reference'](x, None)
+        rows, cols = plan['cut_rows'], plan['cut_cols']
+        self.assertTrue(torch.equal(expected[:rows, :cols], x[1:rows + 1, 1:cols + 1]))
+        self.assertTrue(bool((expected[rows:] == 7).all()) and bool((expected[:, cols:] == 7).all()))
+
+    def test_input_operands_convert_legally(self):
+        from src.workflow.slices.chain import cast_allowed
+        rng = random.Random(23)
+        for _ in range(3000):
+            backend = rng.choice(BACKENDS)
+            name = rng.choice(('cast', 'reduce', 'scan', 'atomic'))
+            program = make_program(name, SLICES[name].sample(rng, backend), backend)
+            plan = SLICES[name].legalize(dict(program.params), backend)
+            for op, dtype, target, source, constant in plan.get('pre', []):
+                if source == 'input':
+                    self.assertTrue(cast_allowed(plan['in_dt'], dtype, backend), program.params)
+
+    def test_new_slices_reduce_to_their_cores(self):
+        from src.workflow.slices.minimize import minimize
+        rng = random.Random(24)
+        for name, knob in (('math', 'fn'), ('layout', 'source'), ('loop', 'body'), ('memory', 'access')):
+            for backend in BACKENDS:
+                program = make_program(name, SLICES[name].sample(rng, backend), backend)
+                value = program.params[knob]
+                reduced, kept, _ = minimize(program, lambda c: c.params[knob] == value, budget=200)
+                self.assertEqual(reduced.params[knob], value)
+                simple = SLICES[name].SIMPLEST.get(knob)
+                if isinstance(simple, dict):
+                    simple = simple[backend]
+                if value != simple:
+                    self.assertIn(knob, kept, (name, backend))
 
 
 class TriageTests(unittest.TestCase):

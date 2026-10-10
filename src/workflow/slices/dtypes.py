@@ -52,6 +52,7 @@ DTYPES = {d.name: d for d in (
     DType('u8', 'uint', 8, 0, 255, 'tl.uint8', 'uint8', 'uint8'),
     DType('u16', 'uint', 16, 0, 65535, 'tl.uint16', 'uint16', ''),
     DType('u32', 'uint', 32, 0, 2 ** 32 - 1, 'tl.uint32', 'uint32', ''),
+    DType('u64', 'uint', 64, 0, 2 ** 64 - 1, 'tl.uint64', 'uint64', ''),
 )}
 
 FLOATS = tuple(n for n, d in DTYPES.items() if d.is_float)

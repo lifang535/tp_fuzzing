@@ -64,6 +64,9 @@ class Slice:
     backends = ('triton', 'tilelang')
     pre_steps = 2
     post_steps = 1
+    # Simplest knob values that differ from the shared table in minimize.py
+    # (a value may be a {backend: value} dict).
+    SIMPLEST = {}
 
     # ---- knob space ---------------------------------------------------------
     def space(self, backend):
@@ -122,7 +125,7 @@ class Slice:
         operand = domain if params['operand'] == 'input' else None
         semantics = 'trunc' if backend == 'triton' else 'floor'
         dtype, domain, pre = legalize_steps(params, 'pre', self.pre_steps, in_dt, domain, backend,
-                                            operand, semantics)
+                                            operand, semantics, operand_dt=in_dt)
         plan = {'backend': backend, 'semantics': semantics, 'input_domain': regimes[params['values']],
                 'in_dt': in_dt, 'pre': pre, 'shape': parse_shape(params['shape']),
                 'operand': params['operand']}

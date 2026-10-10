@@ -75,7 +75,8 @@ class AtomicSlice(Slice):
         semantics = 'trunc' if backend == 'triton' else 'floor'
         params['pre1_dt'] = 'same'
         chain_params = {'pre1_op': params['pre1_op'], 'pre1_dt': dt}
-        _, value, pre = legalize_steps(chain_params, 'pre', 1, dt, domain, backend, operand, semantics)
+        _, value, pre = legalize_steps(chain_params, 'pre', 1, dt, domain, backend, operand, semantics,
+                                       operand_dt=dt)
         params['pre1_op'] = chain_params['pre1_op']
         hits = -(-total // params['slots'])
         init = Domain(INIT, INIT)

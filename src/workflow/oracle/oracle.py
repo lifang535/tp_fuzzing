@@ -120,7 +120,7 @@ class Oracle:
             return program.params_dict, program.spec.dtype.value, "region:" + "->".join(o.kind for o in program.all_operations())
         from src.ir.slice import SliceProgram
         if isinstance(program, SliceProgram):
-            dtypes = sorted({str(v) for k, v in program.params.items() if k.endswith('_dt')})
+            dtypes = sorted({str(v) for k, v in program.params.items() if k.endswith('_dt') or k == 'dt'})
             return program.params_dict, '+'.join(dtypes), 'slice:' + program.slice
         raise TypeError(f'Unsupported program: {type(program).__name__}')
 

@@ -128,7 +128,7 @@ python main.py --backend triton --seed 42 -n 100 --no-save-artifacts
 | `--no-structural-feedback` | 关闭 | 指定后禁用结构反馈引导 |
 | `--compile-only` | 关闭 | 指定后仅编译，并强制 Extended 概率为 1 |
 | `--slice-prob` | 新 CLI：0.4 | 每个测试为特征切片程序的概率（恢复无切片的旧 campaign 时为 0） |
-| `--slices` | 全部 | 逗号分隔的切片子集：`cast,reduce,scan,gemm,atomic` |
+| `--slices` | 全部 | 逗号分隔的切片子集：`cast,reduce,scan,gemm,atomic,round,math,layout,loop,memory` |
 | `--no-slice-adaptive` | 关闭 | 切片与参数均匀采样，不按发现估计和未覆盖参数对选择 |
 
 更多参数通过 `--help` 查看；未开放 CLI 的配置在 `src/config/config.py`，包括尺寸池、模板深度、操作数量、scratch 预算及数值阈值。
@@ -200,8 +200,12 @@ MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Exten
 | `gemm` | 矩阵乘 | MMA dtype（f16、bf16、fp8、i8，f32 的 ieee/tf32/tf32x3）、累加器、转置、批量（三维）`tl.dot`、K 循环与 stages；TileLang 寄存器操作数、k_pack、warp policy、clear_accum、串行/流水循环 |
 | `atomic` | 全局原子 | dtype × add/max/min/and/or/xor/xchg（Triton 的 sem/scope）或 addx2/addx4（TileLang）× 槽位竞争 × 掩码 |
 | `round` | 带舍入的转换 | 浮点/整数源 × 目标，可先经更宽格式，取平局、近平局、次正规和边界值；Triton `fp_downcast_rounding='rtz'`；TileLang global/fragment/shared 三种暂存 |
+| `math` | 数学库 | Triton `tl.*` 数学、libdevice 四种舍入模式的算术与转换、位运算、精确浮点函数和近似函数、Philox 随机数（`tl.randint/rand`）、`inline_asm_elementwise`（舍入模式、打包、双输出）、`map_elementwise`；TileLang `T.ieee_*`、取整、位运算、`T.reinterpret`、打包 x2 运算。输入为满精度值、整数位模式、目标网格中点和特殊值，可在存储前扩宽 |
+| `layout` | 形状操作与布局 | 从 load、arange、`tl.dot` 累加器、cumsum 或广播归约产生的 tile 上做至多三步 reshape、permute、trans、expand、join/split/interleave、cat、flip、sort、gather、keep_dims 归约、ravel（秩 1–4）；TileLang 在共享内存和寄存器片段之间做 reshape、view、transpose、区域拷贝、下标重排、swizzle、归约回广播 |
+| `loop` | 携带状态的循环 | Triton `range`、`tl.range`（num_stages、loop_unroll_factor、flatten、disallow_acc_multi_buffer、warp_specialize）、`static_range`、while；正向/反向/步长 2；下标、指针递增或块指针推进寻址；内层循环、条件、扫描和 dot 累加。TileLang `T.Pipelined`（num_stages、order、stage、sync、group）、serial、unroll、while、`T.loop_break` |
+| `memory` | 访存形式 | 窗口起点、行填充、转置视图、越界与不规则掩码及填充值；Triton 指针（`multiple_of`/`max_contiguous`/`assume` 提示、cache modifier、eviction、volatile）、块指针（边界检查、zero/nan 填充）、tensor descriptor；TileLang `T.copy`（coalesced_width、disable_tma、eviction）、区域拷贝和带掩码的循环加载 |
 
-输入是小整数分子的二进分数 k·2^-f，每一步传递静态取值域；结果不能精确表示的参数值在合法化阶段被替换（YARPGen 式范围追踪）。因此 float64/int64 参考是精确的，输出逐位比较，不一致不可能来自舍入噪声。`round` 切片则刻意输入不可精确表示的值，与 harness 内实现的正确舍入参考（`_slice_round`，与 numpy 一致；torch 的 float64 转换会经 float32 两次舍入）比较。每个测试还检查带保护区的输出、重复执行确定性和第二组启动配置。安装版本不支持的特征在前端被拒绝时会打标记并归为 `unsupported_feature`，不计为失败。
+输入是小整数分子的二进分数 k·2^-f，每一步传递静态取值域；结果不能精确表示的参数值在合法化阶段被替换（YARPGen 式范围追踪）。因此 float64/int64 参考是精确的，输出逐位比较，不一致不可能来自舍入噪声。`math` 切片则用有理数逐元素计算参考，再按所请求的模式只舍入一次（`_slice_fround`、`_slice_fsqrt`；与 numpy 一致），正确舍入的运算逐位比较，近似函数允许若干 ulp；Philox 参考与 Triton 3.8 的输出逐位一致。`layout`、`loop` 和 `memory` 的取值为小整数，合法化时限制增长，参考在 torch 中执行同样的形状操作、循环和下标。`round` 切片则刻意输入不可精确表示的值，与 harness 内实现的正确舍入参考（`_slice_round`，与 numpy 一致；torch 的 float64 转换会经 float32 两次舍入）比较。每个测试还检查带保护区的输出、重复执行确定性和第二组启动配置。安装版本不支持的特征在前端被拒绝时会打标记并归为 `unsupported_feature`，不计为失败。
 
 调度器（`slices/scheduler.py`）在轮转预热后，按每秒新失败桶与新参数对的 incidence Good-Turing 估计选择切片（STADS，Böhme TOSEM'18）；切片内从若干合法候选中选覆盖最多未覆盖参数对的一个（AETG 式两两覆盖），或对先前有意义的程序变异 1–2 个参数。失败会逐个参数约简到核心（`slices/minimize.py`，每次最多 24 个额外测试，总量约不超过切片路线的四分之一；每个崩溃桶最多记录两个核心）：错误结果按约简后的 dtype 路径分桶（错误值共用检查器消息），之后包含高频桶核心的候选以 1 − max(0.02, 3/命中数) 的概率跳过。切片程序还提供与位置无关的路径特征（每个操作及其 dtype、每次转换的“源>目标”对、核心操作），因此已知 bug 隔离可以学到 `path:conv f64>f8e4` 这类不依赖转换出现位置的规则；用 vGPU 上 Triton 前 1.2 小时的记录回放，可学到 5 条规则，仅用参数特征只有 2 条。约简后的程序与失败一起保存为 `*.min.py`，JSON 记录核心。`summary.json` 的 `slices` 项按切片记录测试数、桶、核心、Good-Turing/Chao1 与跳过数；`slice_state.json` 用于恢复。失败键现在保留失败的 MLIR pass 及其首个诊断、首个 nvcc 错误，`PassManager::run failed` 与 TileLang CUDA 编译失败按机制分开。`summary.json` 和进度文件中的 `route_stats` 按生成路线（fresh、mutate、dsl_extend、slice、slice_reduction）记录测试数与 oracle 耗时，每个桶的首次发现也记录其路线，可据此比较各路线每小时的发现数。
 

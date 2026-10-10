@@ -116,11 +116,13 @@ def cast_allowed(src, dst, backend):
     return True
 
 
-def legalize_steps(params, prefix, count, dtype, domain, backend, operand=None, semantics='trunc'):
+def legalize_steps(params, prefix, count, dtype, domain, backend, operand=None, semantics='trunc',
+                   operand_dt=None):
     """Legalize steps prefix1..prefix{count}; returns (dtype, domain, steps).
 
-    operand is the domain of the second input buffer (stored in the input
-    dtype) or None when binary steps use constants only."""
+    operand is the domain of the second input buffer (stored in operand_dt,
+    the input dtype) or None when binary steps use constants only; a step
+    reads it converted to its own dtype, so that conversion must be legal."""
     steps = []
     for i in range(1, count + 1):
         op_key, dt_key = f'{prefix}{i}_op', f'{prefix}{i}_dt'
@@ -130,7 +132,8 @@ def legalize_steps(params, prefix, count, dtype, domain, backend, operand=None, 
             op = 'none'
         if op in BINARY:
             if operand is not None and op not in ('shl', 'shr', 'div', 'mod') and operand.fits(dtype) \
-                    and (DTYPES[dtype].kind != 'uint' or operand.lo >= 0):
+                    and (DTYPES[dtype].kind != 'uint' or operand.lo >= 0) \
+                    and (operand_dt is None or cast_allowed(operand_dt, dtype, backend)):
                 other, source = operand, 'input'
             else:
                 c = constant(op, i - 1, dtype)
