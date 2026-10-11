@@ -693,6 +693,20 @@ class TargetTests(unittest.TestCase):
         self.assertNotEqual(classify_root_cause(amd.split('\n', 1)[1]), 'unsupported_feature')
         self.assertNotEqual(classify_root_cause(cap.split('\n', 1)[1]), 'register_limit')
 
+    def test_markers_survive_a_long_traceback(self):
+        from src.workflow.oracle.oracle import _bounded
+        frames = '\n'.join(f'  File "x.py", line {i}, in f' for i in range(400))
+        rejected = ('TILESMITH_TARGET=sm80\nTILESMITH_REJECTED=not supported in this architecture\n' + frames
+                    + '\ntriton.compiler.errors.CompilationError: at 3:4:')
+        self.assertEqual(classify_root_cause(rejected[-2000:]), 'triton_compile_error')
+        self.assertEqual(classify_root_cause(_bounded(rejected)), 'unsupported_feature')
+        amd = ("TILESMITH_TARGET=gfx1100:compile-only\nk.py:9:1: error: Unsupported conversion from 'f64' to "
+               "'f8E5M2'\n" + frames + '\nRuntimeError: PassManager::run failed')
+        self.assertEqual(classify_root_cause(_bounded(amd)), 'unsupported_feature')
+        crash = 'TILESMITH_TARGET=sm100:compile-only\n' + frames + '\nRuntimeError: PassManager::run failed'
+        self.assertEqual(failure_key(_bounded(crash)), failure_key(crash[-2000:]))
+        self.assertEqual(_bounded('short'), 'short')
+
     def test_non_native_targets_are_path_features(self):
         from src.workflow.slices import path_features
         rng = random.Random(44)

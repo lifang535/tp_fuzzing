@@ -34,6 +34,21 @@ def _slice_timeout_multiplier(program):
     return len(SLICES[program.slice].variants(program.params, program.backend))
 
 
+_MARKERS = ('TILESMITH_TARGET=', 'TILESMITH_REJECTED=')
+
+
+def _bounded(message, limit=2000):
+    """The message's last `limit` characters, led by what classification
+    reads that is printed before a traceback that can outgrow the tail: the
+    harness markers (the compilation target, a clean rejection) and, for a
+    foreign target, the backend's unsupported-conversion diagnostic."""
+    tail = message[-limit:]
+    foreign = 'TILESMITH_TARGET=' in message
+    kept = [line for line in message.splitlines() if line not in tail and (
+        line.startswith(_MARKERS) or (foreign and 'error: Unsupported conversion from' in line))][:4]
+    return '\n'.join(kept + [tail]) if kept else tail
+
+
 def _take_lowering(stdout):
     """(lowering features, stdout without them) of a slice harness run; the
     harness prints its compiled kernels' features on one stdout line."""
@@ -247,7 +262,7 @@ class Oracle:
                 params["input_seed"] = self.config.input_seed
                 report = BugReport(
                     bug_type=bug_type,
-                    error_message=error_msg[-2000:],
+                    error_message=_bounded(error_msg),
                     params=params,
                     dtype=dtype_str,
                     compute_kind=compute_kind_str,

@@ -5,7 +5,7 @@ int8, tf32), per operand layout and per software pipeline. Inputs are small
 integers or dyadic values, so every accumulator stays exact and the float64
 product is the reference. An epilogue chain then converts the accumulator.
 """
-from .base import Slice, zero
+from .base import HIP_TARGETS, Slice, zero
 from .chain import OPS, cast_allowed, cast_domain, legalize_steps
 from .dtypes import DTYPES, STORAGE, Domain, value_regimes
 
@@ -74,7 +74,7 @@ class GemmSlice(Slice):
                 params['kloop'] //= 2
             if params['kloop'] == 1:
                 params['stages'] = 1
-            if mma != 'f32':
+            if mma != 'f32' or params['cfg_target'] in HIP_TARGETS:  # AMD has no TF32 dot
                 params['prec'] = 'ieee'
             if mma == 'i8' and params['acc_mode'] == 'arg':
                 params['acc_mode'] = 'ret'
@@ -94,6 +94,9 @@ class GemmSlice(Slice):
                 params['batch'] //= 2
         else:
             params['bk'] = max(params['bk'], kmin)
+            if params['cfg_target'] in HIP_TARGETS:
+                # an MFMA consumes 16 (8-bit: 32) elements of K per k_pack
+                params['bk'] = max(params['bk'], (32 if DTYPES[mma].bits == 8 else 16) * params['kpack'])
             for knob in ('threads', 'threads2'):
                 if not warp_partition(params['bm'], params['bn'], params[knob] // 32, params['policy']):
                     params[knob] = next((t for t in (128, 64, 256) if warp_partition(
