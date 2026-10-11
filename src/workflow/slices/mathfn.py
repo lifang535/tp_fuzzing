@@ -187,7 +187,7 @@ def triton_catalog():
         c[f'ld_{name}'] = Fn(f'libdevice.{name}({{x}})', F32_64, sem, regimes=rounding_regimes, signed=True)
     c['llrint'] = Fn('libdevice.llrint({x})', F32_64, 'convert', out='i64', regimes=('ties:i64', 'small'))
     c['llround'] = Fn('libdevice.llround({x})', F32_64, 'round', out='i64', regimes=('ties:i64', 'small'))
-    c['ld_abs'] = Fn('libdevice.abs({x})', F32_64 + ('i32', 'i64'), 'abs', signed=True)
+    c['ld_abs'] = Fn('libdevice.abs({x})', F32_64 + ('i32', 'i64'), 'cabs', signed=True)
     c['copysign'] = Fn('libdevice.copysign({x}, {y})', F32_64, 'copysign', signed=True)
     c['fmod'] = Fn('libdevice.fmod({x}, {y})', F32_64, 'fmod', domains=('any', 'nonzero'), signed=True,
                    regimes=('small', 'wide'))

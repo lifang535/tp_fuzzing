@@ -388,6 +388,12 @@ def _slice_meval(sem, mode, args, types, out):
 
     def rnd(value):
         return _slice_fround(value, out, mode)
+    if sem == 'cabs':
+        # C abs (libdevice __nv_abs calls nvvm.abs.i, which LLVM upgrades to
+        # llvm.abs(x, true)): undefined for the integer minimum
+        if integer and x == _slice_int_range(t)[0]:
+            return None
+        sem = 'abs'
     if sem == 'fma' and not integer and not finite:
         # IEEE fma of special values: the product is exact, so a finite
         # x * y never overflows into the sum with an infinite z

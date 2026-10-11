@@ -359,6 +359,16 @@ class HarnessModelTests(unittest.TestCase):
         code = emit_slice(program, Cfg)
         self.assertIn('r = r.to(tl.uint16)\n    r = r.to(tl.int16, bitcast=True)', code)
 
+    def test_libdevice_integer_abs_is_undefined_at_the_minimum(self):
+        from src.workflow.slices.mathfn import CATALOGS
+        from src.workflow.slices.runtime import _slice_meval
+        self.assertEqual(CATALOGS['triton']['ld_abs'].sem, 'cabs')
+        self.assertIsNone(_slice_meval('cabs', 'rn', [-2 ** 31], ['i32'], 'i32'))
+        self.assertIsNone(_slice_meval('cabs', 'rn', [-2 ** 63], ['i64'], 'i64'))
+        self.assertEqual(_slice_meval('cabs', 'rn', [-7], ['i32'], 'i32'), 7)
+        self.assertEqual(_slice_meval('cabs', 'rn', [-1.5], ['f32'], 'f32'), 1.5)
+        self.assertEqual(_slice_meval('abs', 'rn', [-2 ** 31], ['i32'], 'i32'), -2 ** 31)  # tl.abs wraps
+
     def test_cdiv_follows_the_triton_formula(self):
         from src.workflow.slices.runtime import _slice_meval
         self.assertEqual(_slice_meval('cdiv', 'rn', [93, 43], ['i8', 'i8'], 'i8'), -2)
