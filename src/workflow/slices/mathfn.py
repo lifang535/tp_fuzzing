@@ -15,10 +15,12 @@ Each catalog entry lists only the operand dtypes the front end accepts
 (probed on Triton 3.8 / TileLang 0.1.14): a dtype the front end rejects is
 noise, one it accepts and then miscompiles is the target.
 """
+import functools
 import math
+import re
 import zlib
 
-from .base import GUARD, Slice, TILELANG_SHAPES, TRITON_SHAPES, parse_shape, triton_offsets, valid_extents
+from .base import GUARD, HIP_TARGETS, Slice, TILELANG_SHAPES, TRITON_SHAPES, parse_shape, triton_offsets, valid_extents
 from .runtime import SOURCES
 
 FLOAT = ('f16', 'bf16', 'f32', 'f64')
@@ -48,6 +50,25 @@ INT_REGIMES = ('small', 'bits', 'edges')
 
 def is_float(dt):
     return dt[0] in 'fb'
+
+
+@functools.lru_cache(maxsize=None)
+def hip_libdevice():
+    """Functions of Triton's HIP libdevice (empty without Triton installed)."""
+    try:
+        from triton.language.extra.hip import libdevice
+    except Exception:
+        return frozenset()
+    return frozenset(name for name in dir(libdevice) if not name.startswith('_'))
+
+
+def hip_supports(fn):
+    """Whether an entry lowers for AMD: no PTX inline assembly, and every
+    libdevice function it calls exists in the HIP libdevice."""
+    if 'inline_asm' in fn.template:
+        return False
+    names = re.findall(r'libdevice\.(\w+)', fn.template)
+    return all(name in hip_libdevice() for name in names)
 
 
 class Fn:
@@ -418,6 +439,10 @@ class MathSlice(Slice):
             if knob not in space:
                 del params[knob]
         fn = CATALOGS[backend][params['fn']]
+        if backend == 'triton' and params['cfg_target'] in HIP_TARGETS and not hip_supports(fn):
+            # PTX inline assembly and CUDA-only libdevice functions have no
+            # AMD lowering; such an entry goes to another CUDA architecture.
+            params['cfg_target'] = 'sm90'
         if params['in_dt'] not in fn.dtypes:
             params['in_dt'] = fn.dtypes[0]
         dt = params['in_dt']
@@ -573,7 +598,8 @@ class MathSlice(Slice):
         backend = program.backend
         fn = plan['fn']
         kernel = self.triton_kernel(params, plan) if backend == 'triton' else self.tilelang_kernel(params, plan)
-        imports = ('import triton\nimport triton.language as tl\nfrom triton.language.extra.cuda import libdevice'
+        vendor = 'hip' if params.get('cfg_target') in HIP_TARGETS else 'cuda'
+        imports = (f'import triton\nimport triton.language as tl\nfrom triton.language.extra.{vendor} import libdevice'
                    if backend == 'triton' else 'import tilelang\nimport tilelang.language as T')
         valid = tuple(plan['valid'])
         n = math.prod(valid)
@@ -611,6 +637,7 @@ class MathSlice(Slice):
             '',
             'def main():',
             f'    seed = {seed!r}',
+            f"    compile_only = _slice_target({params.get('cfg_target', 'native')!r}, {backend!r}, {params.get('cfg_amd', 'none')!r})",
             "    print('TILESMITH_STAGE=reference', file=sys.stderr, flush=True)",
             '    args, want = reference_case(seed)',
             f'    A = [_slice_tensor(a, s).view({valid!r}) for a, s in zip(args, {storage!r})]',
@@ -626,6 +653,8 @@ class MathSlice(Slice):
             '            except Exception as exc:',
             '                _slice_reject(exc)',
             '                raise',
+            '            if compile_only:',
+            '                break',
             f'            guard = _slice_values_of(storage[:{GUARD}], {store_storage!r}) + '
             f'_slice_values_of(storage[-{GUARD}:], {store_storage!r})',
             '            if any(g != 7 for g in guard):',

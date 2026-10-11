@@ -78,6 +78,17 @@ def slice_origin(program):
 
 
 def path_features(program):
+    """Position-free features of the executed program (see
+    _path_features), plus the compilation target when it is not the GPU in
+    use: a defect of one backend's lowering recurs across its programs."""
+    features = _path_features(program)
+    target = program.params.get('cfg_target', 'native')
+    if target != 'native':
+        features.add(f'path:target {target}')
+    return features
+
+
+def _path_features(program):
     """Position-free features of the executed program: every operation with
     the dtype it computes in, every conversion as a source>target pair and
     the core operation, wherever in the chain they occur. A defect in one
@@ -150,4 +161,6 @@ def path_features(program):
     chain(plan.get('post', []))
     final = plan.get('final_dt', plan['post'][-1][2] if plan.get('post') else current)
     conversion(final, plan['out_dt'])
+    if not features:  # a chain without operations or conversions copies its input
+        features.add(f"path:copy {plan['in_dt']}")
     return features

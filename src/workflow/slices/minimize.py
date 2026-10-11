@@ -24,7 +24,7 @@ SIMPLEST = {
 # Cheap, rarely essential knobs first; the operation-defining ones last.
 # Conversions are reset front to back: a reset step's conversion moves to
 # the next step, then to the output store, where one conversion remains.
-ORDER = ('cfg_pass', 'cfg_maxnreg', 'cfg_fusion', 'cfg_stages', 'cfg_ftz', 'pair', 'warps2', 'threads2', 'tail', 'dynamic', 'operand', 'values', 'warps', 'threads',
+ORDER = ('cfg_target', 'cfg_amd', 'cfg_pass', 'cfg_maxnreg', 'cfg_fusion', 'cfg_stages', 'cfg_ftz', 'pair', 'warps2', 'threads2', 'tail', 'dynamic', 'operand', 'values', 'warps', 'threads',
          'post2_op', 'post1_op', 'pre3_op', 'pre2_op', 'pre1_op', 'pre1_dt', 'pre2_dt', 'pre3_dt',
          'post1_dt', 'post2_dt', 'out_dt', 'stage', 'scope', 'batch', 'nanprop', 'dst', 'keep', 'clear',
          'shape', 'axis', 'reverse', 'sem', 'mask', 'contention', 'slots', 'blocks', 'n',
@@ -67,7 +67,7 @@ def simplest(slice_, knob, params, plan):
     return space[knob][0] if value is None else value
 
 
-def minimize(program, still_fails, budget=24):
+def minimize(program, still_fails, budget=28):
     """(reduced program, core, tests used); still_fails runs one test."""
     slice_ = SLICES[program.slice]
     current = program

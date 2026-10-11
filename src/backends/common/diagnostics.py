@@ -48,6 +48,14 @@ def classify_root_cause(error_message):
     # installed DSL does not support; it is invalid input, not a bug.
     if 'tilesmith_rejected=' in err:
         return 'unsupported_feature'
+    # A program compiled for another architecture (TILESMITH_TARGET=) may
+    # ask for what that architecture lacks: AMD's fp8 and rounding-mode
+    # conversions, which the backend reports while legalizing tt.fp_to_fp,
+    # or a register cap below what a Blackwell instruction needs.
+    if 'tilesmith_target=gfx' in err and "unsupported conversion from '" in err:
+        return 'unsupported_feature'
+    if 'tilesmith_target=' in err and 'insufficient registers' in err:
+        return 'register_limit'
     if 'wrong result' in err and 'repeat determinism' in err:
         return 'nondeterminism'
     if 'wrong result' in err and 'schedule invariance' in err:

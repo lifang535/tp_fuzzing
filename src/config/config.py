@@ -112,7 +112,7 @@ class Config:
     # cores, and the scheduler steers away from well-sampled cores. Each
     # reduction runs at most slice_minimize_budget extra tests.
     slice_minimize: bool = True
-    slice_minimize_budget: int = 24
+    slice_minimize_budget: int = 28
     slice_max_cores: int = 2
     # Keep fresh Extended IR backend-neutral. DSL-specific mutations belong
     # to the separate extend-from-passed stage.

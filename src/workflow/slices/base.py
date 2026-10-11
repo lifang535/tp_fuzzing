@@ -3,7 +3,7 @@ import math
 
 from .chain import OPS, legalize_steps, triton_step, tilelang_step
 from .dtypes import DTYPES, STORAGE, value_regimes
-from .runtime import SOURCES
+from .runtime import SOURCES, _SLICE_AMD, _SLICE_TARGETS
 
 GUARD = 64  # guard elements on each side of every output allocation
 
@@ -29,8 +29,22 @@ TILELANG_PASSES = {
     'reducer_baseline': {'tl.reducer_force_baseline': True}, 'io_aware': {'tl.layout_cost_model': 'io-aware'},
     'alias': {'tirx.noalias': False}, 'regs0': {'tl.ptxas_register_usage_level': 0},
     'regs10': {'tl.ptxas_register_usage_level': 10}}
-CONFIG_KNOBS = tuple(TRITON_CONFIGS) + ('cfg_pass',)
+CONFIG_KNOBS = tuple(TRITON_CONFIGS) + ('cfg_pass', 'cfg_amd')
 DEFAULT_CONFIG_PROB = 0.5  # share of sampled programs compiled under the default configuration
+
+# Targets a program is compiled for besides the GPU in use (see
+# _SLICE_TARGETS in runtime.py). Lowering of the campaign GPU saturates
+# within hours; other architectures reach code the native target never
+# runs: wgmma/TMA (sm_90), tcgen05 (sm_100), mma without cp.async (sm_75)
+# and the AMD backends (Triton 3.x supports only compute capability 8.0 and
+# up, so Turing is a TileLang target alone). Same-major older targets (sm_80 on sm_89) execute
+# under the full oracle; the rest are compiled only, so a failure is a
+# crash or a rejected build.
+TARGETS = {'triton': ('native', 'sm80', 'sm90', 'sm100', 'sm120', 'gfx90a', 'gfx942', 'gfx950', 'gfx1100'),
+           'tilelang': ('native', 'sm80', 'sm75', 'sm90', 'sm100', 'sm120', 'gfx942', 'gfx950')}
+TARGET_PROB = 0.35  # share of sampled programs compiled for another target
+HIP_TARGETS = tuple(name for name, (vendor, _, _) in _SLICE_TARGETS.items() if vendor == 'hip')
+AMD_CONFIGS = tuple(_SLICE_AMD)  # Triton's AMD lowering choices; inert on CUDA targets
 
 
 def launch_options(params, backend):
@@ -117,8 +131,11 @@ class Slice:
 
     def config_space(self, backend):
         if backend == 'tilelang':
-            return {'cfg_pass': tuple(TILELANG_PASSES)}
-        return {knob: TRITON_CONFIGS[knob] for knob in ('cfg_maxnreg', 'cfg_fusion') + self.CONFIGS}
+            return {'cfg_pass': tuple(TILELANG_PASSES), 'cfg_target': TARGETS[backend]}
+        space = {knob: TRITON_CONFIGS[knob] for knob in ('cfg_maxnreg', 'cfg_fusion') + self.CONFIGS}
+        space['cfg_target'] = TARGETS[backend]
+        space['cfg_amd'] = AMD_CONFIGS
+        return space
 
     # ---- knob space ---------------------------------------------------------
     def space(self, backend):
@@ -158,6 +175,11 @@ class Slice:
         params = {knob: rng.choice(values) for knob, values in space.items()}
         if rng.random() < DEFAULT_CONFIG_PROB:
             params.update({knob: space[knob][0] for knob in CONFIG_KNOBS if knob in space})
+        if 'cfg_target' in space:
+            params['cfg_target'] = (rng.choice(space['cfg_target'][1:]) if rng.random() < TARGET_PROB
+                                    else 'native')
+        if 'cfg_amd' in space and params['cfg_target'] not in HIP_TARGETS:
+            params['cfg_amd'] = 'none'
         return params
 
     # ---- legalization -------------------------------------------------------
@@ -251,6 +273,7 @@ class Slice:
             f'PLAN = {self.plan_data(params, plan)!r}', '', kernel, '', reference, '',
             'def main():',
             f'    seed = {seed!r}',
+            f"    compile_only = _slice_target({params.get('cfg_target', 'native')!r}, {backend!r}, {params.get('cfg_amd', 'none')!r})",
             f'    x = _slice_values({x_shape!r}, {d.lo!r}, {d.hi!r}, {d.frac!r}, seed, 1)',
             f'    y = _slice_values({y_shape!r}, {d.lo!r}, {d.hi!r}, {d.frac!r}, seed, 2)',
             "    print('TILESMITH_STAGE=reference', file=sys.stderr, flush=True)",
@@ -268,6 +291,8 @@ class Slice:
             '            except Exception as exc:',
             '                _slice_reject(exc)',
             '                raise',
+            '            if compile_only:',
+            '                break',
             f'            guard = torch.cat([storage[:{GUARD}].float(), storage[-{GUARD}:].float()])',
             '            if not bool((guard == 7).all()):',
             f"                raise RuntimeError(f'WRONG RESULT: output canary modified by slice={self.name} variant={{label}}')",

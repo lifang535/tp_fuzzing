@@ -730,6 +730,10 @@ def _slice_lowering(namespace):
                             line = line.partition(' ')[2].strip()
                         if line[:1].isalpha() and not line.endswith(':'):
                             features.add('ptx:' + line.split()[0].rstrip(';'))
+                    for line in str(asm.get('amdgcn', '')).splitlines():
+                        line = line.strip()
+                        if line[:1].isalpha() and not line.endswith(':'):
+                            features.add('gcn:' + line.split()[0])
                     ttgir = str(asm.get('ttgir', ''))
                     aliases = dict(re.findall(r'^#(\w+) = #([\w.]+)', ttgir, re.M))
                     features.update('layout:' + kind('#' + a, aliases) for a in aliases)
@@ -766,6 +770,27 @@ _SLICE_REJECTIONS = ('not supported', 'does not support', 'unsupported dtype', '
 _SLICE_INTERNAL = ('passmanager', 'llvm error', "error: '", 'assert', 'check failed',
                    'internalerror', 'segmentation', 'core dumped', 'tvm_kernels.cu', 'ptxas',
                    'illegal', 'mlir')
+_SLICE_TARGET_REJECTIONS = ('not supported in this architecture', 'needs at least one full wavefront')
+# Compilation targets besides the GPU in use: (vendor, architecture, warp
+# size). Hopper and Blackwell reach wgmma, TMA and tcgen05 lowering, Turing
+# the pre-cp.async paths, and the AMD targets an entire second backend
+# (CDNA wave64 MFMA, RDNA wave32 WMMA).
+_SLICE_TARGETS = {'sm75': ('cuda', 75, 32), 'sm80': ('cuda', 80, 32), 'sm90': ('cuda', 90, 32),
+                  'sm100': ('cuda', 100, 32), 'sm120': ('cuda', 120, 32), 'gfx90a': ('hip', 'gfx90a', 64),
+                  'gfx942': ('hip', 'gfx942', 64), 'gfx950': ('hip', 'gfx950', 64),
+                  'gfx1100': ('hip', 'gfx1100', 32)}
+# Triton's AMD lowering choices, applied only with an AMD target: buffer
+# loads/stores/atomics and their range analysis, block ping-pong, in-thread
+# transpose, async copies, the two alternative schedulers, scalarized packed
+# float ops, and the occupancy and MFMA shape options. (knobs, options)
+_SLICE_AMD = {'none': ({}, {}), 'nobuffer': ({'use_buffer_ops': False}, {}),
+              'noatomics': ({'use_buffer_atomics': False}, {}),
+              'smallrange': ({'buffer_ops_analyze_small_tensor_range': True}, {}),
+              'pingpong': ({'use_block_pingpong': True}, {}), 'transpose': ({'use_in_thread_transpose': True}, {}),
+              'async': ({'use_async_copy': True}, {}), 'coexec': ({'use_coexec_scheduler': True}, {}),
+              'expert': ({'use_expert_scheduling': True}, {}), 'scalarize': ({'scalarize_packed_fops': True}, {}),
+              'waves2': ({}, {'waves_per_eu': 2}), 'nonk16': ({}, {'matrix_instr_nonkdim': 16}),
+              'nonk32': ({}, {'matrix_instr_nonkdim': 32}), 'kpack2': ({}, {'kpack': 2})}
 
 
 def _slice_reject(exc):
@@ -776,15 +801,99 @@ def _slice_reject(exc):
         texts.append(f'{type(seen).__name__}: {seen}')
         seen = seen.__cause__ or seen.__context__
     text = '\n'.join(texts).lower()
-    if any(p in text for p in _SLICE_REJECTIONS) and not any(p in text for p in _SLICE_INTERNAL):
+    # Triton's front end rejects a dtype the target lacks with an assert
+    # whose message names the architecture: a clean rejection all the same.
+    reason = next((p for p in _SLICE_TARGET_REJECTIONS if p in text), None)
+    if reason is None and any(p in text for p in _SLICE_REJECTIONS) and not any(p in text for p in _SLICE_INTERNAL):
         reason = next(p for p in _SLICE_REJECTIONS if p in text)
+    if reason is not None:
         print(f'TILESMITH_REJECTED={reason}', file=sys.stderr, flush=True)
+
+
+def _slice_target(name, backend, amd='none'):
+    """Compile every kernel of the harness for target `name` instead of the
+    GPU in use. A CUDA target of the GPU's major architecture and no newer
+    minor one still executes (an sm_80 binary runs on sm_89); any other
+    target is compiled only, through every compiler stage that needs no
+    device: Triton to cubin or hsaco, TileLang to CUDA source and an nvcc
+    cubin, or to HIP source. `amd` names Triton's AMD lowering choices
+    (_SLICE_AMD) for an AMD target. Returns True when kernels are compiled
+    only."""
+    import sys
+    if name == 'native':
+        return False
+    import torch
+    kind, arch, warp = _SLICE_TARGETS[name]
+    major, minor = torch.cuda.get_device_capability()
+    runs = kind == 'cuda' and arch // 10 == major and arch % 10 <= minor
+    print(f'TILESMITH_TARGET={name}' + ('' if runs else ':compile-only'), file=sys.stderr, flush=True)
+    if kind == 'hip' and arch != 'gfx950':
+        # Only gfx950 has OCP fp8; elsewhere the AMD backend lacks most fp8
+        # conversions and says so while legalizing tt.fp_to_fp.
+        globals()['_SLICE_TARGET_REJECTIONS'] = _SLICE_TARGET_REJECTIONS + ('unsupported conversion from',)
+    if backend == 'triton':
+        import triton
+        from triton.backends.compiler import GPUTarget
+        from triton.compiler import make_backend
+        from triton.runtime.jit import JITFunction
+        target = GPUTarget(kind, arch, warp)
+        triton.runtime.driver.active.get_current_target = lambda: target
+        # Options another vendor's backend lacks (maxnreg on HIP) are dropped.
+        known = set(make_backend(target).parse_options({}).__dict__)
+        knobs, options = _SLICE_AMD[amd] if kind == 'hip' else ({}, {})
+        for knob, value in knobs.items():
+            setattr(triton.knobs.amd, knob, value)
+        run = JITFunction.run
+
+        def redirected(self, *args, grid, warmup, **kwargs):
+            kwargs = {k: v for k, v in dict(kwargs, **options).items() if k in known or k in self.arg_names}
+            return run(self, *args, grid=grid, warmup=warmup or not runs, **kwargs)
+        JITFunction.run = redirected
+        return not runs
+    import tilelang
+    from tilelang import tvm
+    if kind == 'cuda':
+        target = {'kind': 'cuda', 'arch': f'sm_{arch}' + ('a' if arch in (90, 100) else '')}
+        # nvcc builds sm_90a from CUDA 12.0 and Blackwell from 12.8; with an
+        # older toolkit the kernel is lowered only.
+        from tilelang.contrib.nvcc import get_cuda_version
+        build = tuple(get_cuda_version()[:2]) >= {90: (12, 0), 100: (12, 8), 120: (12, 8)}.get(arch, (11, 0))
+    else:
+        target = {'kind': 'hip', 'mcpu': arch}
+        build = False
+    jit = tilelang.jit
+
+    class Lowered:
+        """A kernel lowered (and for CUDA, built by nvcc) but never run."""
+        def __init__(self, func, configs):
+            with tvm.transform.PassContext(opt_level=3, config=configs), tvm.target.Target(target):
+                self.artifact = tilelang.lower(func, target=target)
+            if build:
+                from tilelang.cuda.backend import tilelang_callback_cuda_compile
+                tilelang_callback_cuda_compile(self.artifact.kernel_source, self.artifact.target, configs)
+
+        def __call__(self, *args):
+            return None
+
+        def get_kernel_source(self):
+            return self.artifact.kernel_source
+
+    def redirected(*args, pass_configs=None, **kwargs):
+        if runs:
+            return jit(*args, pass_configs=pass_configs, target=target, **kwargs)
+
+        def decorate(fn):
+            return lambda *a, **k: Lowered(fn(*a, **k), dict(pass_configs or {}))
+        return decorate
+    tilelang.jit = redirected
+    return not runs
 
 
 HELPERS = (_slice_values, _slice_storage, _slice_cast, _slice_step, _slice_output, _slice_bits,
            _slice_compare, _slice_reject, _slice_round, _slice_round_values, _slice_fround, _slice_fsqrt,
            _slice_fnext, _slice_int_range, _slice_wrap, _slice_mvalues, _slice_meval, _slice_tensor,
-           _slice_values_of, _slice_ftz, _slice_mcheck, _slice_lowering)
+           _slice_values_of, _slice_ftz, _slice_mcheck, _slice_lowering, _slice_target)
 SOURCES = '\n\n'.join([f'_SLICE_REJECTIONS = {_SLICE_REJECTIONS!r}', f'_SLICE_INTERNAL = {_SLICE_INTERNAL!r}',
-                        f'_SLICE_FORMATS = {_SLICE_FORMATS!r}']
+                        f'_SLICE_TARGET_REJECTIONS = {_SLICE_TARGET_REJECTIONS!r}',
+                        f'_SLICE_TARGETS = {_SLICE_TARGETS!r}', f'_SLICE_AMD = {_SLICE_AMD!r}', f'_SLICE_FORMATS = {_SLICE_FORMATS!r}']
                        + [inspect.getsource(fn) for fn in HELPERS])

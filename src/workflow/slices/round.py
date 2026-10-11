@@ -97,6 +97,7 @@ class RoundSlice(Slice):
         lines = [
             'import sys', 'import torch', imports, '', SOURCES, '', kernel, '',
             'def main():',
+            f"    compile_only = _slice_target({params.get('cfg_target', 'native')!r}, {backend!r}, {params.get('cfg_amd', 'none')!r})",
             f'    x = _slice_round_values({src!r}, {dst!r}, {n}, {seed!r} * 7919 + {zlib.crc32((src + dst).encode()) % 7919}, '
             f'{params["mix"]!r})',
             "    print('TILESMITH_STAGE=reference', file=sys.stderr, flush=True)",
@@ -113,6 +114,8 @@ class RoundSlice(Slice):
             '            except Exception as exc:',
             '                _slice_reject(exc)',
             '                raise',
+            '            if compile_only:',
+            '                break',
             f'            guard = torch.cat([storage[:{GUARD}].float(), storage[-{GUARD}:].float()])',
             '            if not bool((guard == 7).all()):',
             "                raise RuntimeError(f'WRONG RESULT: output canary modified by slice=round variant={label}')",

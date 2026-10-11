@@ -2,6 +2,7 @@
 scheduling, persistence and campaign integration (CPU only)."""
 import json
 import random
+import re
 import tempfile
 import unittest
 from collections import Counter
@@ -39,9 +40,9 @@ def programs(count=24, seed=0):
 def harness_namespace(program):
     """Execute a harness module body without running main (no GPU)."""
     code = emit_slice(program, Cfg)
-    code = code.replace('from triton.language.extra.cuda import libdevice', '')
-    code = code.replace('import triton.language as tl', '').replace('import triton\n', '')
-    code = code.replace('import tilelang.language as T', '').replace('import tilelang\n', '')
+    # only the module's own imports: helpers import the DSLs inside functions
+    code = re.sub(r'^(?:import (?:triton|tilelang)(?:\.language as \w+)?|from triton\.language\.extra\.\w+ import libdevice)$',
+                  '', code, flags=re.M)
     code = code.replace('@triton.jit', '')
     # kernel signatures may annotate tl.constexpr, evaluated at definition
     namespace = {'__name__': 'slice_harness', 'tl': type('tl', (), {'constexpr': object})}
@@ -616,6 +617,89 @@ class SchedulerTests(unittest.TestCase):
             SliceScheduler('tilelang', ['reduce']).restore(snapshot)
         stats = scheduler.stats()
         self.assertEqual(set(stats), {'reduce', 'gemm'})
+
+
+class TargetTests(unittest.TestCase):
+    """Compilation targets are a knob every slice samples and every harness
+    honours before its first compilation."""
+
+    def test_targets_are_sampled_beside_the_native_gpu(self):
+        from src.workflow.slices.base import TARGET_PROB, TARGETS
+        rng = random.Random(41)
+        seen = Counter()
+        for backend in BACKENDS:
+            for name, slice_ in SLICES.items():
+                self.assertEqual(slice_.space(backend)['cfg_target'][0], 'native')
+                for _ in range(40):
+                    program = make_program(name, slice_.sample(rng, backend), backend)
+                    seen[program.params['cfg_target'] != 'native'] += 1
+                    self.assertIn(program.params['cfg_target'], TARGETS[backend])
+        share = seen[True] / sum(seen.values())
+        self.assertLess(abs(share - TARGET_PROB), 0.08, share)
+
+    def test_harness_redirects_before_compiling_and_skips_checks_when_compile_only(self):
+        rng = random.Random(42)
+        for backend in BACKENDS:
+            for name, slice_ in SLICES.items():
+                params = dict(slice_.sample(rng, backend), cfg_target='sm90')
+                code = emit_slice(make_program(name, params, backend), Cfg)
+                main = code[code.index('def main():'):]
+                redirect = main.index(f"compile_only = _slice_target('sm90', '{backend}', ")
+                self.assertLess(redirect, main.index('launch('))
+                self.assertIn('if compile_only:\n                break', main)
+                self.assertLess(main.index('if compile_only:'), main.index('guard'))
+
+    def test_amd_math_keeps_only_entries_with_an_amd_lowering(self):
+        from src.workflow.slices.mathfn import CATALOGS, HIP_TARGETS, hip_supports
+        slice_ = SLICES['math']
+        moved = kept = 0
+        for fn_name, fn in CATALOGS['triton'].items():
+            params = dict(slice_.sample(random.Random(fn_name), 'triton'), fn=fn_name, cfg_target='gfx942')
+            program = make_program('math', params, 'triton')
+            if hip_supports(fn):
+                kept += 1
+                self.assertEqual(program.params['cfg_target'], 'gfx942')
+                code = emit_slice(program, Cfg)
+                self.assertIn('from triton.language.extra.hip import libdevice', code)
+            else:
+                moved += 1
+                self.assertNotIn(program.params['cfg_target'], HIP_TARGETS)
+        self.assertGreater(moved, 0)
+        self.assertGreater(kept, 0)
+
+    def test_reduction_resets_the_target_first(self):
+        from src.workflow.slices.minimize import ORDER, minimize
+        self.assertEqual(ORDER[0], 'cfg_target')
+        rng = random.Random(43)
+        program = make_program('cast', dict(SLICES['cast'].sample(rng, 'triton'), cfg_target='gfx942'), 'triton')
+        tried = []
+
+        def still_fails(candidate):
+            tried.append(candidate.params['cfg_target'])
+            return True
+        reduced, core, _ = minimize(program, still_fails)
+        self.assertEqual(tried[0], 'native')
+        self.assertEqual(reduced.params['cfg_target'], 'native')
+        self.assertNotIn('cfg_target', core)
+
+    def test_what_a_foreign_target_lacks_is_noise(self):
+        amd = ("TILESMITH_TARGET=gfx942:compile-only\nerror: Unsupported conversion from 'f8E4M3FN' to 'f64'\n"
+               'RuntimeError: PassManager::run failed')
+        self.assertEqual(classify_root_cause(amd), 'unsupported_feature')
+        cap = ('TILESMITH_TARGET=sm100:compile-only\nptxas-blackwell fatal : (C7602) Insufficient registers (32)\n'
+               'triton.runtime.errors.PTXASError: PTXAS error: Internal Triton PTX codegen error')
+        self.assertEqual(classify_root_cause(cap), 'register_limit')
+        # the same diagnostics without a foreign target stay failures
+        self.assertNotEqual(classify_root_cause(amd.split('\n', 1)[1]), 'unsupported_feature')
+        self.assertNotEqual(classify_root_cause(cap.split('\n', 1)[1]), 'register_limit')
+
+    def test_non_native_targets_are_path_features(self):
+        from src.workflow.slices import path_features
+        rng = random.Random(44)
+        program = make_program('scan', dict(SLICES['scan'].sample(rng, 'triton'), cfg_target='gfx1100'), 'triton')
+        self.assertIn('path:target gfx1100', path_features(program))
+        native = make_program('scan', dict(program.params, cfg_target='native'), 'triton')
+        self.assertFalse(any(f.startswith('path:target') for f in path_features(native)))
 
 
 class ConfigurationTests(unittest.TestCase):

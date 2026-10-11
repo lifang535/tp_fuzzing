@@ -31,7 +31,7 @@ import random
 from . import SLICES, available
 
 NOISE_ROOTS = ('oracle_unstable', 'unsupported_feature', 'shared_memory_overflow', 'warp_partition',
-               'gpu_oom', 'timeout')
+               'gpu_oom', 'timeout', 'register_limit')
 
 
 def pairs(params):
