@@ -34,6 +34,18 @@ def _slice_timeout_multiplier(program):
     return len(SLICES[program.slice].variants(program.params, program.backend))
 
 
+def _take_lowering(stdout):
+    """(lowering features, stdout without them) of a slice harness run; the
+    harness prints its compiled kernels' features on one stdout line."""
+    features, kept = None, []
+    for line in (stdout or '').splitlines(keepends=True):
+        if line.startswith('TILESMITH_LOWERING='):
+            features = frozenset(f for f in line.strip().split('=', 1)[1].split(',') if f)
+        else:
+            kept.append(line)
+    return features, ''.join(kept)
+
+
 class BugType(Enum):
     COMPILE_CRASH = "compile_crash"
     RUNTIME_CRASH = "runtime_crash"
@@ -105,6 +117,7 @@ class Oracle:
         self.last_compilation = []
         self.compilation_complete = False
         self.last_artifact_dir = None
+        self.last_lowering = None  # lowering features of the last slice test
 
     def _emit_code(self, program) -> str:
         return self.emitter.emit(program)
@@ -138,6 +151,7 @@ class Oracle:
         self.last_compilation = []
         self.compilation_complete = False
         self.last_artifact_dir = None
+        self.last_lowering = None
         from src.ir.extended import ExtendedProgram
         from src.ir.slice import SliceProgram
         extended = isinstance(program, ExtendedProgram)
@@ -200,6 +214,8 @@ class Oracle:
                         output += '\n' + evidence_error + '\n'
                 (artifact_dir / 'run.log').write_text(output)
             else:
+                if sliced:
+                    self.last_lowering, result.stdout = _take_lowering(result.stdout)
                 # Successful execution is also evidence of compilation. Failed
                 # Region/probe reproducers do not expose a reliable stage marker.
                 # Post-execute failures (e.g. the oracle-unstable gate, which

@@ -147,9 +147,12 @@ class HarnessTests(unittest.TestCase):
                 x = ns['_slice_values'](x_shape, d.lo, d.hi, d.frac, 3, 1)
                 y = ns['_slice_values'](y_shape, d.lo, d.hi, d.frac, 3, 2)
                 expected = ns['reference'](x, y)
-                if program.params.get('padding') != 'nan':
+                # a layout view may reinterpret integer bits as NaN or infinity
+                special = program.params.get('padding') == 'nan' or any(
+                    step['op'] == 'view' and DTYPES[step['dt']].is_float for step in plan.get('steps', []))
+                if not special:
                     self.assertFalse(torch.isnan(expected).any())
-                expected = torch.nan_to_num(expected, nan=0.0)
+                expected = torch.nan_to_num(expected, nan=0.0, posinf=float('inf'), neginf=float('-inf'))
                 out = DTYPES[plan['out_dt']]
                 if out.is_float:
                     stored = expected.to(getattr(torch, out.torch)).double()
@@ -298,6 +301,121 @@ class MathTests(unittest.TestCase):
                                     self.assertTrue(lo <= w <= hi, (w, out))
                                 elif fn.ulps == 0 and math.isfinite(w) and out in _SLICE_FORMATS:
                                     self.assertEqual(_slice_fround(w, out), w, (w, out))
+
+
+class HarnessModelTests(unittest.TestCase):
+    """Semantics the b9e08b4c campaign showed the harness must model."""
+
+    def test_libdevice_unsigned_conversions_are_int32(self):
+        from src.workflow.slices.mathfn import CATALOGS
+        fn = CATALOGS['triton']['double2uint_rn']
+        self.assertEqual((fn.out, fn.wraps), ('i32', 'u32'))
+        program = make_program('math', dict(SLICES['math'].sample(random.Random(0), 'triton'), fn='double2uint_rn',
+                                            in_dt='f64', values='wide', widen=1), 'triton')
+        code = emit_slice(program, Cfg)
+        self.assertIn("_slice_wrap(w, 'i32')", code)
+        ns = harness_namespace(program)
+        self.assertEqual(ns['_slice_wrap'](ns['_slice_meval']('convert', 'rn', [3464260925.0], ['f64'], 'u32'),
+                                           'i32'), 3464260925 - 2 ** 32)
+
+    def test_approximations_may_overflow_to_infinity(self):
+        from src.workflow.slices.runtime import _slice_mcheck
+        inf = float('inf')
+        _slice_mcheck([inf, -inf], [4.52e38, -1.47e40], 'x', 'bf16', 16, False)
+        _slice_mcheck([inf], [65504.0 * (1 + 2 ** -12)], 'x', 'f16', 1, False)
+        for got, want in (([-inf], [4.52e38]), ([inf], [1.0e30]), ([inf], [65504.0 / 2])):
+            with self.assertRaises(RuntimeError):
+                _slice_mcheck(got, want, 'x', 'f16' if want[0] < 1e5 else 'bf16', 16, False)
+
+    def test_fma_of_special_values_is_exact(self):
+        import math
+        from src.workflow.slices.runtime import _slice_meval
+        big = 1.7976931348623157e308
+
+        def fma(x, y, z, dt='f64', mode='rn'):
+            return _slice_meval('fma', mode, [x, y, z], [dt] * 3, dt)
+        self.assertEqual(fma(big, -1478974.0, math.inf), math.inf)
+        self.assertEqual(fma(big, 2.0, -math.inf, mode='rz'), -math.inf)
+        self.assertEqual(fma(math.inf, 2.0, 1.0), math.inf)
+        self.assertTrue(math.isnan(fma(-math.inf, 2.0, math.inf)))
+        self.assertTrue(math.isnan(fma(math.inf, 0.0, 1.0)))
+        self.assertTrue(math.isnan(fma(1.0, math.nan, 1.0)))
+        self.assertEqual(fma(math.inf, -0.5, -math.inf), -math.inf)
+
+    def test_triton_libdevice_f32_is_flush_to_zero(self):
+        from src.workflow.slices.runtime import _slice_ftz
+        self.assertIsNone(_slice_ftz(2.0 ** -149, [0.0, 1.0], ['f32', 'f32'], 'f32'))
+        self.assertIsNone(_slice_ftz(1.0, [2.0 ** -130, 1.0], ['f32', 'f32'], 'f32'))
+        self.assertEqual(_slice_ftz(2.0 ** -149, [0.0, 1.0], ['f64', 'f64'], 'f64'), 2.0 ** -149)
+        self.assertEqual(_slice_ftz(0.5, [0.0, 1.0], ['f32', 'f32'], 'f32'), 0.5)
+        for backend, expected in (('triton', True), ('tilelang', False)):
+            program = make_program('math', dict(SLICES['math'].sample(random.Random(1), backend), fn='nextafter',
+                                                in_dt='f32', values='small'), backend)
+            self.assertEqual('_slice_ftz(w,' in emit_slice(program, Cfg), expected, backend)
+
+    def test_triton_results_take_the_declared_type(self):
+        program = make_program('math', dict(SLICES['math'].sample(random.Random(2), 'triton'), fn='maximum',
+                                            in_dt='u16', yform='const', widen=0, values='small'), 'triton')
+        code = emit_slice(program, Cfg)
+        self.assertIn('r = r.to(tl.uint16)\n    r = r.to(tl.int16, bitcast=True)', code)
+
+    def test_cdiv_follows_the_triton_formula(self):
+        from src.workflow.slices.runtime import _slice_meval
+        self.assertEqual(_slice_meval('cdiv', 'rn', [93, 43], ['i8', 'i8'], 'i8'), -2)
+        self.assertEqual(_slice_meval('cdiv', 'rn', [7, 2], ['i32', 'i32'], 'i32'), 4)
+        self.assertEqual(_slice_meval('cdiv', 'rn', [100, 60], ['u8', 'u8'], 'u8'), 2)
+        self.assertEqual(_slice_meval('cdiv', 'rn', [0, 5], ['i16', 'i16'], 'i16'), 0)
+
+    def test_tilelang_float_constants_are_typed(self):
+        program = make_program('math', dict(SLICES['math'].sample(random.Random(3), 'tilelang'), fn='div',
+                                            in_dt='f16', yform='const', values='small'), 'tilelang')
+        self.assertEqual(program.params['yform'], 'const')
+        self.assertIn('T.cast(0.75, "float16")', emit_slice(program, Cfg))
+        program = make_program('math', dict(program.params, fn='mul', in_dt='i8'), 'tilelang')
+        self.assertIn('* 3)', emit_slice(program, Cfg))
+
+    def test_loop_envelope_counts_both_inputs(self):
+        from src.workflow.slices.loop import envelope, fits
+        rng = random.Random(4)
+        for _ in range(400):
+            params = dict(SLICES['loop'].sample(rng, 'tilelang'), inputs=2, body='axpy')
+            program = make_program('loop', params, 'tilelang')
+            p = program.params
+            plan = SLICES['loop'].legalize(dict(p), 'tilelang')
+            if p['inputs'] != 2:
+                continue
+            nonneg = DTYPES[plan['in_dt']].kind == 'uint'
+            bound = envelope(plan['body'], p['coef'], p['trips'], (0 if nonneg else -4, 4), p['k'], 1, plan['init'])
+            self.assertTrue(fits(*bound, plan['acc_dt']), p)
+
+    def test_memory_coalesced_width_fits_each_thread(self):
+        rng = random.Random(5)
+        seen = Counter()
+        for _ in range(3000):
+            program = make_program('memory', SLICES['memory'].sample(rng, 'tilelang'), 'tilelang')
+            p = program.params
+            if not p['coalesced']:
+                continue
+            rows, cols = (int(v) for v in p['tile'].split('x'))
+            seen[p['coalesced']] += 1
+            for threads in {p['threads'], p['threads2']}:
+                self.assertEqual((rows * cols) % (threads * p['coalesced']), 0, p)
+            self.assertEqual(cols % p['coalesced'], 0)
+            self.assertLessEqual(p['coalesced'] * DTYPES[p['dt']].bits // 8, 16)
+        self.assertGreaterEqual(len(seen), 3, seen)
+
+    def test_tilelang_uint64_neutral_is_not_a_long_literal(self):
+        import re
+        base = SLICES['reduce'].sample(random.Random(6), 'tilelang')
+        for kind in ('min', 'bitand'):
+            params = dict(base, kind=kind, core_dt='u64', in_dt='u8', values='nonneg', pre1_op='none',
+                          pre2_op='none', post1_op='none', out_dt='u64', clear=1)
+            program = make_program('reduce', params, 'tilelang')
+            if program.params['kind'] != kind or program.params['core_dt'] != 'u64':
+                continue
+            code = emit_slice(program, Cfg)
+            self.assertIn('T.max_value("uint64")', code, kind)
+            self.assertFalse([v for v in re.findall(r'\d{19,}', code) if int(v) >= 2 ** 63], kind)
 
 
 class NewSliceTests(unittest.TestCase):
@@ -488,6 +606,146 @@ class SchedulerTests(unittest.TestCase):
             SliceScheduler('tilelang', ['reduce']).restore(snapshot)
         stats = scheduler.stats()
         self.assertEqual(set(stats), {'reduce', 'gemm'})
+
+
+class ConfigurationTests(unittest.TestCase):
+    """Compiler configurations are knobs that reach the launch options."""
+
+    def test_configurations_reach_the_launch(self):
+        from src.workflow.slices.base import CONFIG_KNOBS, TILELANG_PASSES
+        rng = random.Random(30)
+        defaults = Counter()
+        for backend in BACKENDS:
+            for name, slice_ in SLICES.items():
+                space = slice_.space(backend)
+                self.assertTrue(any(k in space for k in CONFIG_KNOBS), (name, backend))
+                for _ in range(20):
+                    program = make_program(name, slice_.sample(rng, backend), backend)
+                    p = program.params
+                    defaults[all(p[k] == space[k][0] for k in CONFIG_KNOBS if k in space)] += 1
+                    variants = slice_.variants(p, backend)
+                    for label, options in variants:
+                        self.assertTrue(label[0] in 'wt' and label[1:].isdigit(), label)
+                        if backend == 'tilelang':
+                            self.assertEqual(options.get('pass_configs', {}), TILELANG_PASSES[p['cfg_pass']])
+                        else:
+                            self.assertEqual(options.get('maxnreg', 0), p['cfg_maxnreg'])
+                            self.assertEqual(options.get('enable_fp_fusion', True), bool(p['cfg_fusion']))
+                            self.assertEqual(options.get('num_stages', 0), p.get('cfg_stages', 0))
+                            self.assertEqual(options.get('enable_reflect_ftz', True), bool(p.get('cfg_ftz', 1)))
+        self.assertGreater(defaults[True], defaults[False] / 3)
+        self.assertGreater(defaults[False], defaults[True] / 3)
+
+    def test_tilelang_builds_are_keyed_by_configuration(self):
+        program = make_program('cast', dict(SLICES['cast'].sample(random.Random(31), 'tilelang'),
+                                            cfg_pass='index64'), 'tilelang')
+        code = emit_slice(program, Cfg)
+        self.assertIn('@tilelang.jit(pass_configs=configs)', code)
+        self.assertIn("'pass_configs': {'tl.config_index_bitwidth': 64}", code)
+        ns = harness_namespace(program)
+        built = []
+        ns['build'] = lambda threads, configs: built.append((threads, configs)) or (lambda *a: None)
+        options = {'threads': 64, 'pass_configs': {'tl.config_index_bitwidth': 64}}
+        ns['launch'](None, None, None, options)
+        ns['launch'](None, None, None, options)
+        ns['launch'](None, None, None, {'threads': 64})
+        self.assertEqual(built, [(64, {'tl.config_index_bitwidth': 64}), (64, None)])
+
+    def test_math_flush_to_zero_follows_the_configuration(self):
+        base = dict(SLICES['math'].sample(random.Random(32), 'triton'), fn='nextafter', in_dt='f32', values='small')
+        on = make_program('math', dict(base, cfg_ftz=1), 'triton')
+        off = make_program('math', dict(base, cfg_ftz=0), 'triton')
+        self.assertIn('_slice_ftz(w,', emit_slice(on, Cfg))
+        self.assertNotIn('_slice_ftz(w,', emit_slice(off, Cfg))
+        self.assertIn("'enable_reflect_ftz': False", emit_slice(off, Cfg))
+
+    def test_configurations_reduce_first(self):
+        from src.workflow.slices.minimize import minimize
+        program = make_program('loop', dict(SLICES['loop'].sample(random.Random(33), 'triton'), cfg_maxnreg=32,
+                                            cfg_stages=2, cfg_fusion=0), 'triton')
+        reduced, kept, _ = minimize(program, lambda c: c.params['cfg_stages'] == 2, budget=200)
+        self.assertEqual(kept.get('cfg_stages'), 2)
+        self.assertEqual((reduced.params['cfg_maxnreg'], reduced.params['cfg_fusion']), (0, 1))
+
+
+class LoweringFeedbackTests(unittest.TestCase):
+    def test_harness_reports_lowering_features(self):
+        from src.workflow.slices.runtime import _slice_lowering
+        import contextlib
+        import io
+        ptx = '\n'.join(['.reg .b32 %r<4>;', '$L__BB0_1:', '\tld.global.v4.b32 {%r1, %r2}, [%rd1];',
+                         '\t@%p1 st.global.b32 [%rd2], %r1;', '\tmma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32 '
+                         '{%f1}, {%r1}, {%r2}, {%f2};', '\tret;'])
+        ttgir = '\n'.join(['#blocked = #ttg.blocked<{sizePerThread = [1]}>', '#mma = #ttg.nvidia_mma<{version = 2}>',
+                           'module {', '  %0 = tt.load %arg0 : tensor<64x!tt.ptr<f16>, #blocked>',
+                           '  %1 = ttg.convert_layout %0 : tensor<64xf16, #blocked> -> tensor<64xf16, #mma>',
+                           '  %2 = "tt.reduce"(%1) <{axis = 0 : i32}> ({', '  tt.return', '}'])
+        compiled = type('K', (), {'asm': {'ptx': ptx, 'ttgir': ttgir}})()
+        jit = type('J', (), {'device_caches': {0: ({'key': compiled}, None, None, None, None)}})()
+        cuda = ('extern "C" __global__ void __launch_bounds__(128) main_kernel(half_t* A) {\n'
+                '  #pragma unroll\n  *(uint4*)(A + 8) = *(uint4*)(A);\n'
+                '  tl::cp_async_gs<16>(A, A);\n  tl::AllReduce<tl::SumOp, 128, 1, 0>::run(x, red);\n'
+                '  asm volatile("cvt.rn.f16x2.f32 %0, %1, %2;" : "=r"(r) : "f"(a), "f"(b));\n'
+                '  __syncthreads();\n  if (x < 3) { y = max(x, y); }\n}')
+        tl_kernel = type('T', (), {'get_kernel_source': lambda self: cuda})()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            _slice_lowering({'kernel': jit, '_KERNELS': {(128, '[]'): tl_kernel}, 'other': 3})
+        line = out.getvalue().strip()
+        self.assertTrue(line.startswith('TILESMITH_LOWERING='))
+        features = set(line.split('=', 1)[1].split(','))
+        for f in ('ptx:ld.global.v4.b32', 'ptx:st.global.b32', 'ptx:ret',
+                  'ptx:mma.sync.aligned.m16n8k16.row.col.f32.f16.f16.f32', 'layout:blocked', 'layout:nvidia_mma',
+                  'convert:blocked>nvidia_mma', 'ttgir:tt.load', 'ttgir:tt.reduce', 'ttgir:tt.return',
+                  'call:tl::cp_async_gs<16>', 'call:tl::AllReduce<tl::SumOp/N/1/0>::run', 'call:__syncthreads',
+                  'call:max', 'cast:uint4', 'asm:cvt.rn.f16x2.f32', 'pragma:unroll'):
+            self.assertIn(f, features)
+        self.assertFalse([f for f in features if f.startswith('ptx:.') or f.startswith('ptx:$')
+                          or 'main_kernel' in f or f in ('call:if', 'call:volatile', 'call:__launch_bounds__')
+                          or ' ' in f], features)
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            _slice_lowering({'kernel': object()})
+        self.assertEqual(out.getvalue(), '')
+
+    def test_oracle_takes_the_lowering_line(self):
+        from src.workflow.oracle.oracle import _take_lowering
+        features, rest = _take_lowering('x\nTILESMITH_LOWERING=ptx:ret,call:max\nALL PASSED\n')
+        self.assertEqual(features, frozenset({'ptx:ret', 'call:max'}))
+        self.assertEqual(rest, 'x\nALL PASSED\n')
+        self.assertEqual(_take_lowering('ALL PASSED\n'), (None, 'ALL PASSED\n'))
+
+    def test_new_lowering_makes_rarity_weighted_seeds(self):
+        scheduler = SliceScheduler('triton', ['cast', 'reduce'], warmup=0, seeds_max=3)
+        rng = random.Random(34)
+        programs = [make_program('cast', SLICES['cast'].sample(rng, 'triton'), 'triton') for _ in range(6)]
+        state = scheduler.states['cast']
+        self.assertTrue(scheduler.observe(programs[0], None, None, 1.0, lowering={'a', 'b'}))
+        scheduler.observe(programs[1], None, None, 1.0, lowering={'a', 'b'})
+        scheduler.observe(programs[2], 'wrong_result', 'w', 1.0, lowering={'a', 'c'})
+        self.assertEqual(state.seeds, [[programs[0].params, ['a', 'b']]])
+        self.assertEqual((state.lowered, state.lowering_single()), (3, 1))
+        for i, program in enumerate(programs[3:]):
+            scheduler.observe(program, None, None, 1.0, lowering={'a', f'n{i}'})
+        self.assertEqual(len(state.seeds), 3)
+        self.assertNotIn([programs[0].params, ['a', 'b']], state.seeds)  # its features are no longer rare
+        before = scheduler.estimate('cast')
+        scheduler.observe(programs[3], None, None, 1.0, lowering={'a', 'n0', 'n1', 'n2'})
+        self.assertLess(scheduler.estimate('cast'), before)
+        stats = scheduler.lowering_stats()
+        self.assertEqual((stats['features'], stats['seeds'], stats['tests']), (6, 3, 7))
+        restored = SliceScheduler('triton', ['cast', 'reduce'])
+        restored.restore(json.loads(json.dumps(scheduler.snapshot())))
+        self.assertEqual(restored.snapshot(), scheduler.snapshot())
+        draws = Counter()
+        mutate = SliceScheduler('triton', ['cast'], mutate_prob=1.0, warmup=0)
+        mutate.restore(json.loads(json.dumps(scheduler.snapshot())))
+        mutate.states['cast'].interesting = []
+        with patch.object(random.Random, 'choices', autospec=True,
+                          side_effect=lambda self, population, weights=None, k=1:
+                          draws.update([len(population)]) or [population[0]]):
+            mutate.next(random.Random(35))
+        self.assertEqual(draws[3], 1)  # one rarity-weighted draw among the three seeds
 
 
 class PathFeatureTests(unittest.TestCase):

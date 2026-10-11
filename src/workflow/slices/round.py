@@ -40,6 +40,7 @@ class RoundSlice(Slice):
         else:
             space.update(block=TILELANG_BLOCKS, stage=('global', 'fragment', 'shared'),
                          threads=(32, 64, 128, 256), threads2=(32, 64, 128, 256))
+        space.update(self.config_space(backend))
         return space
 
     def legalize(self, params, backend):
@@ -122,7 +123,10 @@ class RoundSlice(Slice):
             "    print('ALL PASSED')",
             '',
             "if __name__ == '__main__':",
-            '    main()',
+            '    try:',
+            '        main()',
+            '    finally:',
+            '        _slice_lowering(globals())',
         ]
         return '\n'.join(lines) + '\n'
 
@@ -163,8 +167,8 @@ def launch(X, out, options):
                     f'for i in T.Parallel({block}):', f'    of[i] = {value}',
                     f'for i in T.Parallel({block}):', f'    if {guard}:', f'        O[bx * {block} + i] = of[i]']
         text = '\n'.join('                ' + line for line in body)
-        return f'''def build(threads):
-    @tilelang.jit
+        return f'''def build(threads, configs):
+    @tilelang.jit(pass_configs=configs)
     def kern():
         @T.prim_func
         def main(X: T.Tensor(({n},), "{s_t}"), O: T.Tensor(({n},), "{d_t}")):
@@ -178,7 +182,7 @@ _KERNELS = {{}}
 
 
 def launch(X, out, options):
-    threads = options['threads']
-    if threads not in _KERNELS:
-        _KERNELS[threads] = build(threads)
-    _KERNELS[threads](X, out)'''
+    key = (options['threads'], repr(sorted(options.get('pass_configs', {{}}).items())))
+    if key not in _KERNELS:
+        _KERNELS[key] = build(options['threads'], options.get('pass_configs'))
+    _KERNELS[key](X, out)'''

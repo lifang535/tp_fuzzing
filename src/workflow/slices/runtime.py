@@ -388,6 +388,15 @@ def _slice_meval(sem, mode, args, types, out):
 
     def rnd(value):
         return _slice_fround(value, out, mode)
+    if sem == 'fma' and not integer and not finite:
+        # IEEE fma of special values: the product is exact, so a finite
+        # x * y never overflows into the sum with an infinite z
+        if any(math.isnan(v) for v in (x, y, z)) or (math.isinf(x) and y == 0) or (math.isinf(y) and x == 0):
+            return math.nan
+        if math.isinf(x) or math.isinf(y):
+            p = math.copysign(math.inf, math.copysign(1, x) * math.copysign(1, y))
+            return math.nan if math.isinf(z) and z != p else p
+        return z
     if sem in ('add', 'sub', 'mul', 'div', 'fma', 'rcp') and not integer:
         if not finite or (sem == 'div' and y == 0) or (sem == 'rcp' and x == 0):
             a = float(x)
@@ -494,7 +503,13 @@ def _slice_meval(sem, mode, args, types, out):
             return None
         return _slice_wrap(x // y if sem == 'floordiv' else x % y, out)
     if sem == 'cdiv':
-        return -((-x) // y) if y > 0 and x >= 0 else None
+        # tl.cdiv is (x + (y - 1)) // y in the operand type: the sum wraps and
+        # the division truncates
+        if y <= 0:
+            return None
+        s = _slice_wrap(x + (y - 1), t)
+        q = abs(s) // y
+        return _slice_wrap(q if s >= 0 else -q, out)
     if sem in ('and', 'or', 'xor'):
         return _slice_wrap(x & y if sem == 'and' else x | y if sem == 'or' else x ^ y, out)
     if sem == 'not':
@@ -637,6 +652,16 @@ def _slice_values_of(tensor, dt):
     return t.double().tolist()
 
 
+def _slice_ftz(want, args, types, out):
+    """None when flush-to-zero may decide a single-precision element (an f32
+    operand or result in the subnormal range), else want unchanged."""
+    tiny = 2.0 ** -126
+    for value, dt in list(zip(args, types)) + [(want, out)]:
+        if dt == 'f32' and isinstance(value, float) and value != 0 and abs(value) <= tiny:
+            return None
+    return want
+
+
 def _slice_mcheck(got, want, label, fmt, ulps, signed_zero):
     """Compare result values with the reference: exactly (NaN matches NaN,
     the sign of zero when signed_zero), or within ulps units in the last
@@ -651,13 +676,18 @@ def _slice_mcheck(got, want, label, fmt, ulps, signed_zero):
         elif isinstance(g, float) and math.isnan(g):
             ok = False
         elif ulps and fmt in _SLICE_FORMATS and math.isfinite(w):
-            mant, emin = _SLICE_FORMATS[fmt][:2]
+            mant, emin, largest = _SLICE_FORMATS[fmt][:3]
             # the float64 reference of an approximation carries its own
             # error (sin(pi * x) near an integer), so f64 checks ~40 bits
             mant = min(mant, 40)
             e = math.frexp(abs(w))[1] - 1 if w else emin
             tolerance = ulps * 2.0 ** (max(e, emin) - mant + 1) + ulps * 2.0 ** (-mant - 6)
-            ok = abs(g - w) <= tolerance
+            if isinstance(g, float) and math.isinf(g):
+                # the float64 reference is not saturated: a result within the
+                # tolerance of the format's range may round to infinity
+                ok = math.copysign(1, g) == math.copysign(1, w) and abs(w) + tolerance > largest
+            else:
+                ok = abs(g - w) <= tolerance
         else:
             ok = g == w and (not signed_zero or g != 0 or math.copysign(1, g) == math.copysign(1, w))
         if not ok:
@@ -666,6 +696,62 @@ def _slice_mcheck(got, want, label, fmt, ulps, signed_zero):
         i = bad[0]
         raise RuntimeError(f'WRONG RESULT: {label} differs at {len(bad)}/{len(want)} elements; '
                            f'first index {i}: got {got[i]!r}, expected {want[i]!r}')
+
+
+def _slice_lowering(namespace):
+    """Print the lowering features of every kernel compiled so far, for the
+    scheduler's coverage feedback: PTX opcodes, TTGIR operations, layout
+    encodings and layout conversions (Triton), or the intrinsics called,
+    vector casts, inline PTX and pragmas of the generated CUDA (TileLang)."""
+    import re
+    features = set()
+
+    def kind(text, aliases):
+        found = re.search(r'#([\w.]+)', text)
+        name = aliases.get(found.group(1), found.group(1)) if found else 'none'
+        return name.split('.')[-1]
+    try:
+        for value in list(namespace.values()):
+            caches = getattr(value, 'device_caches', None)
+            if not isinstance(caches, dict):
+                continue
+            for cache in list(caches.values()):
+                for compiled in list(cache[0].values()):
+                    asm = getattr(compiled, 'asm', None) or {}
+                    for line in str(asm.get('ptx', '')).splitlines():
+                        line = line.strip()
+                        if line.startswith('@'):
+                            line = line.partition(' ')[2].strip()
+                        if line[:1].isalpha() and not line.endswith(':'):
+                            features.add('ptx:' + line.split()[0].rstrip(';'))
+                    ttgir = str(asm.get('ttgir', ''))
+                    aliases = dict(re.findall(r'^#(\w+) = #([\w.]+)', ttgir, re.M))
+                    features.update('layout:' + kind('#' + a, aliases) for a in aliases)
+                    for line in ttgir.splitlines():
+                        op = re.match(r'\s*(?:%[\w#:, ]+ = )?"?([a-z_]+\.[\w.]+)', line)
+                        if op:
+                            features.add('ttgir:' + op.group(1))
+                        if 'ttg.convert_layout' in line and ' -> ' in line:
+                            source, target = line.split(' -> ', 1)
+                            features.add(f"convert:{kind(source.split(' : ', 1)[-1], aliases)}>"
+                                         f"{kind(target, aliases)}")
+        for compiled in list(namespace.get('_KERNELS', {}).values()):
+            source = compiled.get_kernel_source()
+            for name, args, member in re.findall(r'((?:\b[A-Za-z_]\w*::)*\b[A-Za-z_]\w*)(<[^;(){}]*?>)?(::\w+)?\s*\(',
+                                                 source):
+                if name in ('if', 'for', 'while', 'switch', 'return', 'sizeof', 'asm', 'volatile',
+                            '__launch_bounds__') or name.endswith('_kernel'):
+                    continue
+                # thread counts in template arguments are not lowering choices
+                args = re.sub(r'\b(?:[3-9]\d|\d{3,})\b', 'N', re.sub(r'\s+', '', args)).replace(',', '/')
+                features.add('call:' + name + args + member)
+            features.update('cast:' + t for t in re.findall(r'\(\(?\s*([\w:]+)\s*\*\s*\)', source))
+            features.update('asm:' + t for t in re.findall(r'asm\s+(?:volatile\s*)?\(\s*"\s*\{?\s*([a-z][\w.]*)', source))
+            features.update('pragma:' + t for t in re.findall(r'#pragma\s+(\w+)', source))
+    except Exception:
+        return
+    if features:
+        print('TILESMITH_LOWERING=' + ','.join(sorted(features)), flush=True)
 
 
 _SLICE_REJECTIONS = ('not supported', 'does not support', 'unsupported dtype', 'cannot cast',
@@ -692,7 +778,7 @@ def _slice_reject(exc):
 HELPERS = (_slice_values, _slice_storage, _slice_cast, _slice_step, _slice_output, _slice_bits,
            _slice_compare, _slice_reject, _slice_round, _slice_round_values, _slice_fround, _slice_fsqrt,
            _slice_fnext, _slice_int_range, _slice_wrap, _slice_mvalues, _slice_meval, _slice_tensor,
-           _slice_values_of, _slice_mcheck)
+           _slice_values_of, _slice_ftz, _slice_mcheck, _slice_lowering)
 SOURCES = '\n\n'.join([f'_SLICE_REJECTIONS = {_SLICE_REJECTIONS!r}', f'_SLICE_INTERNAL = {_SLICE_INTERNAL!r}',
                         f'_SLICE_FORMATS = {_SLICE_FORMATS!r}']
                        + [inspect.getsource(fn) for fn in HELPERS])

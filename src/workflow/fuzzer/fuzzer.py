@@ -588,6 +588,8 @@ class TileSmith:
                 test_started = time.monotonic()
                 bug = self.oracle.test(program)
                 test_seconds = time.monotonic() - test_started
+                # reduction below runs more tests; keep this test's lowering
+                lowering = getattr(self.oracle, 'last_lowering', None)
                 _inflight_i, _inflight_program = None, None
                 self.stats.total_tested += 1
                 new_tested += 1
@@ -599,7 +601,8 @@ class TileSmith:
                     self._minimize_slice(program, bug)
                 bucket = self._record_bucket(bug) if bug else None
                 if sliced and self.slice_scheduler is not None:
-                    self.slice_scheduler.observe(program, bug.root_cause if bug else None, bucket, test_seconds)
+                    self.slice_scheduler.observe(program, bug.root_cause if bug else None, bucket, test_seconds,
+                                                 lowering=lowering)
                 from src.workflow.feedback import confirmed_failure
                 signature = (bug.confirmed_signature or confirmed_failure(bug, self.backend)) if bug else None
                 from src.workflow.feedback import program_features
@@ -820,6 +823,8 @@ class TileSmith:
                 "structural_species": species(self.feedback.passed),
                 "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
                 "slices": self.slice_scheduler.stats() if self.slice_scheduler is not None else None,
+                "slice_lowering": (self.slice_scheduler.lowering_stats()
+                                   if self.slice_scheduler is not None else None),
                 "slice_reduction_tests": self.slice_reduction_tests,
                 "route_stats": self.route_stats,
                 "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
@@ -905,6 +910,8 @@ class TileSmith:
                                'buckets': len(s.buckets), 'pair_cells': len(s.covered)}
                         for name, s in self.slice_scheduler.states.items()}
                        if self.slice_scheduler is not None else None),
+            'slice_lowering_features': (self.slice_scheduler.lowering_stats()['features']
+                                        if self.slice_scheduler is not None else None),
             'campaign_seconds': round(self._campaign_seconds(), 1),
             'timeline_origin': self.timeline_origin,
             'discovery': self._discovery(),

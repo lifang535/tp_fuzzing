@@ -14,6 +14,15 @@ samples, or a mutation of 1-2 knobs of an interesting earlier program (one
 that showed a new bucket or many new cells). A candidate containing the
 reduced core of a bucket already hit `k` times is skipped with probability
 1 - max(min_explore, 3 / k), as in the known-bug quarantine.
+
+Lowering feedback (Zest, Padhye et al. ISSTA'19; FairFuzz, Lemieux and Sen
+ASE'18): every harness reports features of the code its kernels lowered to
+(PTX opcodes, TTGIR operations and layout conversions, CUDA intrinsics). A
+passing program that reaches a lowering feature first becomes a seed; half
+of the mutations start from a seed drawn with weight 1 / (tests showing its
+rarest such feature), steering mutation toward rarely reached lowering. The
+Good-Turing estimate of unseen lowering features (features seen in one test
+per test) joins the slice's discovery rate.
 """
 from collections import Counter
 import itertools
@@ -43,18 +52,29 @@ class SliceState:
         self.seconds = 0.0        # moving average test time
         self.cells_per_test = 0   # knob-pair cells of one program
         self.cores = []           # [core dict, bucket, root cause] from reduced failures
+        self.lowering = Counter()  # lowering feature -> tests that showed it
+        self.lowered = 0          # tests that reported lowering features
+        self.seeds = []           # [params, lowering features it reached first] of passing programs
 
-    def discovery(self, cell_weight):
+    def discovery(self, cell_weight, lowering_weight=0.0):
         bugs = sum(1 for c in self.buckets.values() if c == 1)
         cells = len(self.single) / max(1, self.tests * self.cells_per_test)
-        return (bugs + 1) / (self.tests + 2) + cell_weight * cells
+        lowering = self.lowering_single() / max(1, self.lowered)
+        return (bugs + 1) / (self.tests + 2) + cell_weight * cells + lowering_weight * lowering
+
+    def lowering_single(self):
+        return sum(1 for c in self.lowering.values() if c == 1)
+
+    def rarity(self, seed):
+        return 1.0 / min(self.lowering[f] or 1 for f in seed[1])
 
     def snapshot(self):
         return {'tests': self.tests, 'passed': self.passed, 'rejected': self.rejected,
                 'covered': sorted(self.covered), 'single': sorted(self.single),
                 'buckets': dict(self.buckets), 'noise': dict(self.noise),
                 'interesting': self.interesting, 'seconds': self.seconds,
-                'cells_per_test': self.cells_per_test, 'cores': self.cores}
+                'cells_per_test': self.cells_per_test, 'cores': self.cores,
+                'lowering': dict(self.lowering), 'lowered': self.lowered, 'seeds': self.seeds}
 
     @classmethod
     def restore(cls, data):
@@ -65,18 +85,23 @@ class SliceState:
         state.interesting, state.seconds = list(data['interesting']), float(data['seconds'])
         state.cells_per_test = int(data.get('cells_per_test', 0))
         state.cores = [[dict(kept), bucket, cause] for kept, bucket, cause in data.get('cores', [])]
+        state.lowering = Counter(data.get('lowering', {}))
+        state.lowered = int(data.get('lowered', 0))
+        state.seeds = [[dict(params), list(novel)] for params, novel in data.get('seeds', [])]
         return state
 
 
 class SliceScheduler:
     def __init__(self, backend, names=None, candidates=16, mutate_prob=0.3, epsilon=0.15,
-                 cell_weight=0.25, interesting_max=64, adaptive=True, warmup=3, min_explore=0.02):
+                 cell_weight=0.25, interesting_max=64, adaptive=True, warmup=3, min_explore=0.02,
+                 lowering_weight=0.25, seeds_max=256):
         self.backend = backend
         self.names = available(backend, names)
         if not self.names:
             raise ValueError(f'No slices available for {backend}')
         self.candidates, self.mutate_prob, self.epsilon = candidates, mutate_prob, epsilon
         self.cell_weight, self.interesting_max, self.adaptive = cell_weight, interesting_max, adaptive
+        self.lowering_weight, self.seeds_max = lowering_weight, seeds_max
         self.warmup, self.min_explore = warmup, min_explore
         self.avoided = Counter()
         self.states = {name: SliceState() for name in self.names}
@@ -85,7 +110,7 @@ class SliceScheduler:
     # ---- selection ------------------------------------------------------------
     def estimate(self, name):
         state = self.states[name]
-        return state.discovery(self.cell_weight) / max(state.seconds, 0.5)
+        return state.discovery(self.cell_weight, self.lowering_weight) / max(state.seconds, 0.5)
 
     def choose_slice(self, rng=random):
         if not self.adaptive or rng.random() < self.epsilon:
@@ -103,8 +128,12 @@ class SliceScheduler:
         slice_ = SLICES[name]
         state = self.states[name]
         best, best_score = None, -1
-        if state.interesting and rng.random() < self.mutate_prob:
-            base = dict(rng.choice(state.interesting[-16:]))
+        if (state.interesting or state.seeds) and rng.random() < self.mutate_prob:
+            if state.seeds and (not state.interesting or rng.random() < 0.5):
+                seed = rng.choices(state.seeds, weights=[state.rarity(s) for s in state.seeds], k=1)[0]
+                base = dict(seed[0])
+            else:
+                base = dict(rng.choice(state.interesting[-16:]))
             space = slice_.space(self.backend)
             for knob in rng.sample(sorted(space), k=min(len(space), rng.choice((1, 1, 2)))):
                 base[knob] = rng.choice(space[knob])
@@ -158,10 +187,20 @@ class SliceScheduler:
         return sum(1 for _, known, _ in (state.cores if state else []) if known == bucket)
 
     # ---- feedback -------------------------------------------------------------
-    def observe(self, program, root_cause=None, bucket=None, seconds=0.0):
+    def observe(self, program, root_cause=None, bucket=None, seconds=0.0, lowering=None):
         state = self.states.get(program.slice)
         if state is None:
             return False
+        fresh_lowering = []
+        if lowering:
+            state.lowered += 1
+            fresh_lowering = sorted(f for f in lowering if f not in state.lowering)
+            state.lowering.update(lowering)
+            if fresh_lowering and bucket is None:
+                # a valid program reaching new lowering is a seed (Zest)
+                state.seeds.append([dict(program.params), fresh_lowering])
+                if len(state.seeds) > self.seeds_max:
+                    state.seeds.remove(min(state.seeds, key=state.rarity))
         state.tests += 1
         state.seconds = seconds if state.tests == 1 else 0.9 * state.seconds + 0.1 * seconds
         cells = pairs(program.params)
@@ -182,7 +221,7 @@ class SliceScheduler:
         if novel_bucket or len(fresh) >= 8:
             state.interesting.append(dict(program.params))
             del state.interesting[:-self.interesting_max]
-        return novel_bucket or bool(fresh)
+        return novel_bucket or bool(fresh) or bool(fresh_lowering)
 
     # ---- reporting and persistence --------------------------------------------
     def stats(self):
@@ -191,12 +230,24 @@ class SliceScheduler:
                        'noise': dict(s.noise), 'buckets': dict(s.buckets.most_common()),
                        'bug_species': species(s.buckets, samples=s.tests),
                        'pair_cells_covered': len(s.covered), 'pair_cells_single': len(s.single),
+                       'lowering_features': len(s.lowering), 'lowering_single': s.lowering_single(),
+                       'lowering_tests': s.lowered, 'lowering_seeds': len(s.seeds),
                        'mean_seconds': round(s.seconds, 2), 'estimate': round(self.estimate(name), 4),
                        'chosen': self.choices[name],
                        'cores': [{'bucket': bucket, 'root_cause': cause, 'core': kept}
                                  for kept, bucket, cause in s.cores],
                        'avoided': {b: n for (slice_name, b), n in self.avoided.items() if slice_name == name}}
                 for name, s in self.states.items()}
+
+    def lowering_stats(self):
+        """Lowering features over all slices, in total and per kind."""
+        union = Counter()
+        for state in self.states.values():
+            union.update(state.lowering)
+        kinds = Counter(feature.split(':', 1)[0] for feature in union)
+        return {'features': len(union), 'single': sum(1 for c in union.values() if c == 1),
+                'tests': sum(s.lowered for s in self.states.values()), 'by_kind': dict(kinds.most_common()),
+                'seeds': sum(len(s.seeds) for s in self.states.values())}
 
     def snapshot(self):
         return {'version': 1, 'backend': self.backend, 'names': self.names,

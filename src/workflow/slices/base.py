@@ -7,6 +7,49 @@ from .runtime import SOURCES
 
 GUARD = 64  # guard elements on each side of every output allocation
 
+# Compiler configurations a program is compiled under; the first value of
+# each knob is the default. They change lowering decisions, not semantics:
+# Triton's register cap (ptxas spills), FMA contraction, libdevice
+# flush-to-zero and default software-pipelining depth; TileLang's pass
+# configurations (index width, vectorization, CSE, cp.async and LDG/STG
+# lowering, shared-memory planning, let inlining, in-place storage reuse,
+# loop unswitching, the reducer's baseline plan, the layout cost model,
+# aliasing assumptions and ptxas register usage). A differential oracle per
+# configuration exposes miscompilations that the default never reaches.
+TRITON_CONFIGS = {'cfg_maxnreg': (0, 32, 64, 128), 'cfg_fusion': (1, 0), 'cfg_stages': (0, 1, 2, 4),
+                  'cfg_ftz': (1, 0)}
+TILELANG_PASSES = {
+    'none': {}, 'index64': {'tl.config_index_bitwidth': 64}, 'novec': {'tirx.disable_vectorize': True},
+    'nocse': {'tirx.disable_cse_tir': True}, 'noasync': {'tl.enable_async_copy': False},
+    'ldgstg': {'tl.enable_lower_ldgstg': True, 'tl.enable_lower_ldgstg_predicated': True},
+    'smem_merge': {'tl.enable_aggressive_shared_memory_merge': True},
+    'smem_noreuse': {'tl.disable_shared_memory_reuse': True}, 'let_inline': {'tl.force_let_inline': True},
+    'inplace': {'tl.storage_rewrite_detect_inplace': True}, 'no_unswitch': {'tl.disable_loop_unswitching': True},
+    'unswitch_else': {'tl.loop_unswitching_allow_non_trivial_else': True},
+    'reducer_baseline': {'tl.reducer_force_baseline': True}, 'io_aware': {'tl.layout_cost_model': 'io-aware'},
+    'alias': {'tirx.noalias': False}, 'regs0': {'tl.ptxas_register_usage_level': 0},
+    'regs10': {'tl.ptxas_register_usage_level': 10}}
+CONFIG_KNOBS = tuple(TRITON_CONFIGS) + ('cfg_pass',)
+DEFAULT_CONFIG_PROB = 0.5  # share of sampled programs compiled under the default configuration
+
+
+def launch_options(params, backend):
+    """Compiler options of a program's configuration knobs."""
+    if backend == 'tilelang':
+        configs = TILELANG_PASSES[params.get('cfg_pass', 'none')]
+        return {'pass_configs': dict(configs)} if configs else {}
+    options = {}
+    if params.get('cfg_maxnreg'):
+        options['maxnreg'] = params['cfg_maxnreg']
+    if params.get('cfg_fusion', 1) == 0:
+        options['enable_fp_fusion'] = False
+    if params.get('cfg_stages'):
+        options['num_stages'] = params['cfg_stages']
+    if params.get('cfg_ftz', 1) == 0:
+        options['enable_reflect_ftz'] = False
+    return options
+
+
 TRITON_SHAPES = ('32', '64', '128', '256', '1024', '4x64', '16x16', '16x32', '32x16', '64x8', '2x128',
                  '2x4x32', '4x8x8', '2x16x4', '8x2x16')
 TILELANG_SHAPES = ('32', '64', '128', '256', '512', '96', '16x16', '16x32', '32x64', '8x64', '64x8',
@@ -67,6 +110,15 @@ class Slice:
     # Simplest knob values that differ from the shared table in minimize.py
     # (a value may be a {backend: value} dict).
     SIMPLEST = {}
+    # Triton configuration knobs beyond the register cap and FMA contraction
+    # that matter to this slice (pipelining depth for loops, flush-to-zero
+    # for libdevice math).
+    CONFIGS = ()
+
+    def config_space(self, backend):
+        if backend == 'tilelang':
+            return {'cfg_pass': tuple(TILELANG_PASSES)}
+        return {knob: TRITON_CONFIGS[knob] for knob in ('cfg_maxnreg', 'cfg_fusion') + self.CONFIGS}
 
     # ---- knob space ---------------------------------------------------------
     def space(self, backend):
@@ -95,13 +147,18 @@ class Slice:
             space['threads2'] = (32, 64, 128, 256)
             space['stage'] = ('global', 'fragment', 'shared')
         space.update(self.core_space(backend))
+        space.update(self.config_space(backend))
         return space
 
     def core_space(self, backend):
         return {}
 
     def sample(self, rng, backend):
-        return {knob: rng.choice(values) for knob, values in self.space(backend).items()}
+        space = self.space(backend)
+        params = {knob: rng.choice(values) for knob, values in space.items()}
+        if rng.random() < DEFAULT_CONFIG_PROB:
+            params.update({knob: space[knob][0] for knob in CONFIG_KNOBS if knob in space})
+        return params
 
     # ---- legalization -------------------------------------------------------
     def legalize(self, params, backend):
@@ -165,12 +222,15 @@ class Slice:
 
     # ---- harness ------------------------------------------------------------
     def variants(self, params, backend):
+        # The configuration stays out of the label, which failure keys keep:
+        # one mechanism under several configurations is one bucket.
+        config = launch_options(params, backend)
         if backend == 'triton':
-            first = (f"w{params['warps']}", {'num_warps': params['warps']})
-            second = (f"w{params['warps2']}", {'num_warps': params['warps2']})
+            first = (f"w{params['warps']}", {'num_warps': params['warps'], **config})
+            second = (f"w{params['warps2']}", {'num_warps': params['warps2'], **config})
         else:
-            first = (f"t{params['threads']}", {'threads': params['threads']})
-            second = (f"t{params['threads2']}", {'threads': params['threads2']})
+            first = (f"t{params['threads']}", {'threads': params['threads'], **config})
+            second = (f"t{params['threads2']}", {'threads': params['threads2'], **config})
         return [first] if not params['pair'] or first[0] == second[0] else [first, second]
 
     def emit(self, program, config):
@@ -218,7 +278,10 @@ class Slice:
             "    print('ALL PASSED')",
             '',
             "if __name__ == '__main__':",
-            '    main()',
+            '    try:',
+            '        main()',
+            '    finally:',
+            '        _slice_lowering(globals())',
         ]
         return '\n'.join(lines) + '\n'
 

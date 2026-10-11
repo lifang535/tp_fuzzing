@@ -100,6 +100,7 @@ class LayoutSlice(Slice):
             space[f'arg{i}'] = tuple(range(8))
             if backend == 'tilelang':
                 space[f'scope{i}'] = ('shared', 'fragment')
+        space.update(self.config_space(backend))
         return space
 
     # ---- legalization -------------------------------------------------------

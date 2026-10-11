@@ -58,9 +58,14 @@ class Fn:
 
     def __init__(self, template, dtypes, sem, mode='rn', out='$', types=('$', '$', '$'),
                  domains=('any', 'any', 'any'), regimes=None, ulps=0, signed=False, const=None, packed=False,
-                 helper=''):
+                 helper='', wraps=None):
         self.template, self.dtypes, self.sem, self.mode = template, tuple(dtypes), sem, mode
         self.helper = helper
+        # wraps: the type the reference computes in when the DSL declares the
+        # result as out (the bits of a u32 result typed int32); ftz: Triton
+        # links libdevice with flush-to-zero, so f32 subnormals are unchecked
+        self.wraps = wraps
+        self.ftz = template.startswith('libdevice.') or '(libdevice.' in template
         self.out, self.types, self.domains, self.ulps = out, types, domains, ulps
         self.regimes, self.signed, self.const, self.packed = regimes, signed, const, packed
         self.arity = sum(f'{{{v}}}' in template for v in 'xyz')
@@ -93,9 +98,12 @@ def rounding(prefix, sem, dtypes, arity, extra=None):
     return entries
 
 
-def conversions(name, src, dst, modes=('rn', 'rz', 'rd', 'ru'), regimes=None, domain='any'):
-    return {f'{name}_{m}': Fn(f'libdevice.{name}_{m}({{x}})', (src,), 'convert', m, out=dst,
-                              regimes=regimes or (f'ties:{dst}', 'wide', 'small'), domains=(domain,))
+def conversions(name, src, dst, modes=('rn', 'rz', 'rd', 'ru'), regimes=None, domain='any', declared=None):
+    """libdevice conversions name_rn/_rz/_rd/_ru; declared is the result type
+    of the libdevice table when it differs from the conversion's target."""
+    return {f'{name}_{m}': Fn(f'libdevice.{name}_{m}({{x}})', (src,), 'convert', m, out=declared or dst,
+                              regimes=regimes or (f'ties:{dst}', 'wide', 'small'), domains=(domain,),
+                              wraps=dst if declared else None)
             for m in modes}
 
 
@@ -161,10 +169,11 @@ def triton_catalog():
     # libdevice conversions
     c.update(conversions('double2float', 'f64', 'f32'))
     c.update(conversions('double2int', 'f64', 'i32'))
-    c.update(conversions('double2uint', 'f64', 'u32', domain='nonneg'))
+    # Triton's libdevice table declares the unsigned conversions as int32
+    c.update(conversions('double2uint', 'f64', 'u32', domain='nonneg', declared='i32'))
     c.update(conversions('double2ll', 'f64', 'i64'))
     c.update(conversions('float2int', 'f32', 'i32'))
-    c.update(conversions('float2uint', 'f32', 'u32', domain='nonneg'))
+    c.update(conversions('float2uint', 'f32', 'u32', domain='nonneg', declared='i32'))
     c.update(conversions('float2ll', 'f32', 'i64'))
     for name, src, dst in (('int2float', 'i32', 'f32'), ('uint2float', 'u32', 'f32'), ('ll2float', 'i64', 'f32'),
                            ('ull2float', 'u64', 'f32'), ('ll2double', 'i64', 'f64'), ('ull2double', 'u64', 'f64')):
@@ -374,6 +383,7 @@ def clamp_bounds(dt):
 
 class MathSlice(Slice):
     name = 'math'
+    CONFIGS = ('cfg_ftz',)
     SIMPLEST = {'yform': 'tensor', 'widen': 0, 'values': 'small', 'stage': 'global'}
 
     def space(self, backend):
@@ -389,6 +399,7 @@ class MathSlice(Slice):
         else:
             space.update(threads=(32, 64, 128, 256), threads2=(32, 64, 128, 256),
                          stage=('global', 'fragment', 'shared'))
+        space.update(self.config_space(backend))
         return space
 
     def sample(self, rng, backend):
@@ -473,6 +484,10 @@ class MathSlice(Slice):
                                             if plan['backend'] == 'tilelang' else (repr(lo), repr(hi)))
         elif params['yform'] == 'const':
             values['y'] = repr(fn.const)
+            if plan['backend'] == 'tilelang' and isinstance(fn.const, float):
+                # a bare Python float promotes a half-precision operation to
+                # float32; the typed constant keeps the operand type
+                values['y'] = f'T.cast({fn.const!r}, "{TILELANG_TYPE[plan["types"][1]]}")'
         twin = TWIN.get(plan['in_dt'], '')
         types = TRITON_TYPE if plan['backend'] == 'triton' else TILELANG_TYPE
         return fn.template.format(twin=types.get(twin, ''), tt=types[plan['in_dt']], **values)
@@ -492,6 +507,9 @@ class MathSlice(Slice):
             body.append(f'    a{k} = {load}')
             operands.append(f'a{k}')
         body.append(f'    r = {self.expression(params, plan, operands)}')
+        # integer operations with a Python constant may promote (tl.maximum
+        # of uint16 and 3 is 32-bit); the catalog declares the result type
+        body.append(f'    r = r.to({TRITON_TYPE[plan["out"]]})')
         if plan['store'] != plan['out']:
             body.append(f'    r = r.to({TRITON_TYPE[plan["store"]]})')
         if plan['store'] in ('u16', 'u32', 'u64'):
@@ -544,7 +562,7 @@ class MathSlice(Slice):
         signature += f', O: T.Tensor({valid!r}, "{out_t}")'
         text = tilelang_launch(signature, lines)
         return text.replace('def launch(X, Y, out, options):', 'def launch(A, out, options):').replace(
-            '_KERNELS[threads](X, Y, out)', '_KERNELS[threads](*A, out)')
+            '_KERNELS[key](X, Y, out)', '_KERNELS[key](*A, out)')
 
     def emit(self, program, config):
         params = dict(program.params)
@@ -572,7 +590,12 @@ class MathSlice(Slice):
                          f"{plan['out']!r})"]
         else:
             reference = [f'    want = [_slice_meval({fn.sem!r}, {fn.mode!r}, [a[i] for a in args], '
-                         f'{plan["types"]!r}, {plan["out"]!r}) for i in range({n})]']
+                         f'{plan["types"]!r}, {fn.wraps or plan["out"]!r}) for i in range({n})]']
+            if fn.wraps:
+                reference.append(f'    want = [None if w is None else _slice_wrap(w, {plan["out"]!r}) for w in want]')
+            if fn.ftz and backend == 'triton' and params['cfg_ftz']:
+                reference.append(f'    want = [_slice_ftz(w, [a[i] for a in args], {plan["types"]!r}, '
+                                 f'{plan["out"]!r}) for i, w in enumerate(want)]')
         if store != plan['out']:
             reference.append(f'    want = [None if w is None else (float(w) if {is_float(store)!r} else int(w)) '
                              f'for w in want]')
@@ -616,7 +639,10 @@ class MathSlice(Slice):
             "    print('ALL PASSED')",
             '',
             "if __name__ == '__main__':",
-            '    main()',
+            '    try:',
+            '        main()',
+            '    finally:',
+            '        _slice_lowering(globals())',
         ]
         return '\n'.join(lines) + '\n'
 

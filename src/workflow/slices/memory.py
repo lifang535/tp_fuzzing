@@ -48,6 +48,7 @@ class MemorySlice(Slice):
                          coalesced=(0, 1, 2, 4, 8), disable_tma=(0, 1),
                          evict=('none', 'evict_first', 'evict_last'), stage=('fragment', 'shared'),
                          threads=(32, 64, 128, 256), threads2=(32, 64, 128, 256))
+        space.update(self.config_space(backend))
         return space
 
     # ---- legalization -------------------------------------------------------
@@ -159,15 +160,20 @@ class MemorySlice(Slice):
             if params['fill'] not in (0, 1):
                 params['fill'] = 1
         size = DTYPES[params['dt']].bits // 8
-        # a coalesced width must divide the vector the copy can prove aligned
-        cols = tile[1] - tile[1] // 4 - 1 if params['col_extent'] == 'cut' else tile[1]
-        if params['coalesced'] and (tile[1] % params['coalesced'] or params['coalesced'] * size > 16
-                                    or params['origin'] or ((cols + params['row_pad']) * size) % 16
-                                    or params['access'] == 'loop'):
-            params['coalesced'] = 0
         for knob in ('threads', 'threads2'):
             while params[knob] > 32 and (tile[0] * tile[1]) % params[knob]:
                 params[knob] //= 2
+        # a coalesced width must divide the vector the copy can prove aligned,
+        # and a copy into a fragment gives each thread at most tile / threads
+        # elements (ComputePlanCandidate halves the vector until it fits)
+        cols = tile[1] - tile[1] // 4 - 1 if params['col_extent'] == 'cut' else tile[1]
+        threads = max(params['threads'], params['threads2'] if params['pair'] else 0)
+        if params['coalesced'] and (params['origin'] or ((cols + params['row_pad']) * size) % 16
+                                    or params['access'] == 'loop'):
+            params['coalesced'] = 0
+        while params['coalesced'] and (tile[1] % params['coalesced'] or params['coalesced'] * size > 16
+                                       or (tile[0] * tile[1]) % (threads * params['coalesced'])):
+            params['coalesced'] //= 2
 
     # ---- harness ------------------------------------------------------------
     def input_shapes(self, plan):

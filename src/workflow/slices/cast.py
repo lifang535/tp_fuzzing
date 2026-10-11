@@ -79,8 +79,8 @@ def tilelang_elementwise(slice_, params, plan, chain):
 
 def tilelang_launch(signature, lines, grid='1'):
     body = '\n'.join('                ' + line for line in lines)
-    return f'''def build(threads):
-    @tilelang.jit
+    return f'''def build(threads, configs):
+    @tilelang.jit(pass_configs=configs)
     def kern():
         @T.prim_func
         def main({signature}):
@@ -94,7 +94,7 @@ _KERNELS = {{}}
 
 
 def launch(X, Y, out, options):
-    threads = options['threads']
-    if threads not in _KERNELS:
-        _KERNELS[threads] = build(threads)
-    _KERNELS[threads](X, Y, out)'''
+    key = (options['threads'], repr(sorted(options.get('pass_configs', {{}}).items())))
+    if key not in _KERNELS:
+        _KERNELS[key] = build(options['threads'], options.get('pass_configs'))
+    _KERNELS[key](X, Y, out)'''

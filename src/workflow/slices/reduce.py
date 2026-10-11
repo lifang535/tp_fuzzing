@@ -233,6 +233,9 @@ class ReduceSlice(Slice):
         fill = neutral(NEUTRAL_KIND[kind], plan['core_dt'])
         fill_expr = (f'T.cast({literal(fill)}, "{core}")' if not (isinstance(fill, float) and math.isinf(fill))
                      else f'{"-" if fill < 0 else ""}T.infinity("{core}")')
+        if isinstance(fill, int) and fill >= 2 ** 63:
+            # the FFI passes a literal as a C long: spell uint64's maximum
+            fill_expr = f'T.max_value("{core}")'
         alloc = 'T.alloc_fragment' if params['scope'] == 'fragment' else 'T.alloc_shared'
         out_tile, out_valid = plan['out_tile'], plan['out_shape']
         lines = [f'xf = {alloc}({shape!r}, "{core}")', f'of = T.alloc_fragment({out_tile!r}, "{core}")',

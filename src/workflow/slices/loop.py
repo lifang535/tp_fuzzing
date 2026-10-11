@@ -72,6 +72,7 @@ def envelope(body, coef, trips, value, k, size, init):
 
 class LoopSlice(Slice):
     name = 'loop'
+    CONFIGS = ('cfg_stages',)
     SIMPLEST = {'coef': 1, 'in_dt': 'f32', 'acc_dt': 'f32', 'k': 16,
                 'loop': {'triton': 'range', 'tilelang': 'serial'}, 'dyn': 0, 'order': 'fwd',
                 'accform': 'arg', 'stages': 0, 'unroll': 0, 'flatten': 0, 'disallow': 0, 'ws': 0,
@@ -94,6 +95,7 @@ class LoopSlice(Slice):
                          body=TILELANG_BODIES, inputs=(1, 2), stage_in=('shared', 'fragment'),
                          shape=TILELANG_LOOP_SHAPES, threads=(32, 64, 128, 256), threads2=(32, 64, 128, 256))
             space['trips'] = (1, 2, 3, 4, 6)
+        space.update(self.config_space(backend))
         return space
 
     # ---- legalization -------------------------------------------------------
@@ -141,7 +143,9 @@ class LoopSlice(Slice):
         trips = params['trips']
         inner = params.get('inner', 0)
         nonneg = DTYPES[in_dt].kind == 'uint'
-        value = (0 if nonneg else -2 * (1 + inner), 2 * (1 + inner))
+        # each step adds 1 + inner input values (TileLang: x + y with two inputs)
+        terms = (1 + inner) * params.get('inputs', 1)
+        value = (0 if nonneg else -2 * terms, 2 * terms)
         size = math.prod(shape) if body == 'cumsum' else shape[-1] if body == 'rsum' else 1
         init = -3 if body == 'max' and not nonneg else 0
         bound = envelope(body, params['coef'], trips, value, params['k'], size, init)

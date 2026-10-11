@@ -34,6 +34,7 @@ class AtomicSlice(Slice):
                          warps=(1, 2, 4, 8), warps2=(1, 2, 4, 8))
         else:
             space.update(threads=(32, 64, 128, 256), threads2=(32, 64, 128, 256))
+        space.update(self.config_space(backend))
         return space
 
     def legalize(self, params, backend):
@@ -157,8 +158,8 @@ class AtomicSlice(Slice):
             else:
                 loop.append(f'    {call}')
         body = '\n'.join('                ' + line for line in loop)
-        return f'''def build(threads):
-    @tilelang.jit
+        return f'''def build(threads, configs):
+    @tilelang.jit(pass_configs=configs)
     def kern():
         @T.prim_func
         def main(X: T.Tensor(({total},), "{t}"), Y: T.Tensor(({total},), "{t}"), O: T.Tensor(({slots},), "{t}")):
@@ -172,11 +173,11 @@ _KERNELS = {{}}
 
 
 def launch(X, Y, out, options):
-    threads = options['threads']
-    if threads not in _KERNELS:
-        _KERNELS[threads] = build(threads)
+    key = (options['threads'], repr(sorted(options.get('pass_configs', {{}}).items())))
+    if key not in _KERNELS:
+        _KERNELS[key] = build(options['threads'], options.get('pass_configs'))
     out.fill_({INIT})
-    _KERNELS[threads](X, Y, out)'''
+    _KERNELS[key](X, Y, out)'''
 
     def reference(self, params, plan):
         return '\n'.join(['def reference(x, y):', '    import torch', '    v = x'] + self.reference_chain('v', 'pre') + [

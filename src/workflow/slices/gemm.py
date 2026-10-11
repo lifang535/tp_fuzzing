@@ -47,6 +47,7 @@ class GemmSlice(Slice):
                          gk=(1, 2, 3), areg=(0, 1), kpack=(1, 2), policy=('Square', 'FullRow', 'FullCol'),
                          stages=(1, 2, 3), loop=('pipelined', 'serial'), clear_accum=(0, 1),
                          threads=(64, 128, 256), threads2=(64, 128, 256))
+        space.update(self.config_space(backend))
         return space
 
     def legalize(self, params, backend):
@@ -256,8 +257,8 @@ class GemmSlice(Slice):
                      f'O: T.Tensor(({mv}, {nv}), "{out_t}")')
         body = '\n'.join('                ' + line for line in lines)
         grid = f'T.ceildiv({nv}, {bn}), T.ceildiv({mv}, {bm})'
-        return f'''def build(threads):
-    @tilelang.jit
+        return f'''def build(threads, configs):
+    @tilelang.jit(pass_configs=configs)
     def kern():
         @T.prim_func
         def main({signature}):
@@ -271,7 +272,7 @@ _KERNELS = {{}}
 
 
 def launch(X, Y, out, options):
-    threads = options['threads']
-    if threads not in _KERNELS:
-        _KERNELS[threads] = build(threads)
-    _KERNELS[threads](X, Y, out)'''
+    key = (options['threads'], repr(sorted(options.get('pass_configs', {{}}).items())))
+    if key not in _KERNELS:
+        _KERNELS[key] = build(options['threads'], options.get('pass_configs'))
+    _KERNELS[key](X, Y, out)'''
