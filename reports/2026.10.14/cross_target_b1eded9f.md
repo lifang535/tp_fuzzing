@@ -33,10 +33,10 @@
 
 | # | DSL | 现象 | 发现 | 复现 |
 |---|---|---|---|---|
-| 28 | Triton（或 ptxas 12.9） | f16 `tl.dot`（32×64 @ 64×128）用 `num_warps=1, maxnreg=128` 运行报 `illegal memory access`；不加 maxnreg、maxnreg=255 或 num_warps=2 都正确。maxnreg 只应强制溢出（138 次溢出），不应改变语义 | 10-12 17:28，4090，16.3 h，gemm 切片 | `tr_maxnreg_spill_illegal_access.py` |
+| 28 | Triton 经 ptxas（12.4、12.9 都有） | f16 `tl.dot`（32×64 @ 64×128）用 `num_warps=1, maxnreg=128` 运行报 `illegal memory access`；不加 maxnreg、maxnreg=255 或 num_warps=2 都正确。maxnreg 只应强制溢出（138 次溢出），不应改变语义。10-14 定位：PTX 只差 `.maxnreg 128` 一行，同一份 PTX 用 ptxas 12.4、12.9 汇编都越界，ptxas `-O1` 正确；ptxas 在寄存器紧张时提前改写了保存 `tid & 15` 的寄存器，把 B 块写入共享内存的地址算错（详见 `real_bugs_catalog.md`） | 10-12 17:28，4090，16.3 h，gemm 切片 | `tr_maxnreg_spill_illegal_access.py` |
 | 29 | Triton 经 ptxas 12.9 | bf16 `tl.atomic_add`（`sem=acquire/acq_rel`，sm_89 上降级为 32 位 CAS 循环）用 `num_warps=1, maxnreg=32` 时丢失更新（得 10，应 12），确定性复现。加与不加 maxnreg 的 PTX 只差 `.maxnreg 32` 一行，都没有溢出，错误在 ptxas。maxnreg≥40、num_warps≥2、`sem=relaxed` 都正确 | 10-14 02:33，4090，48.7 h，atomic 切片 | `tr_maxnreg_atomic_cas_lost_update.py` |
 
-两者都由编译配置旋钮 `cfg_maxnreg`（方法 B）到达，在原生目标上触发，本地 RTX 4060 确定性复现。另外，#8（TileLang 嵌套 floordiv 的 Let 冲突）以前只在本地探测中出现，本轮第一次在实验中被命中（vGPU，约 25.7 h）。
+两者都由编译配置旋钮 `cfg_maxnreg`（方法 B）到达，在原生目标上触发，本地 RTX 4060 确定性复现，根因都在 ptxas 的寄存器受限优化。另外，#8（TileLang 嵌套 floordiv 的 Let 冲突）以前只在本地探测中出现，本轮第一次在实验中被命中（vGPU，约 25.7 h）。
 
 ### 本轮命中的已知机制（32 种）
 
