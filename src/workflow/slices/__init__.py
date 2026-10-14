@@ -43,7 +43,15 @@ def make_program(name, params, backend):
     """Legalize params (in place on a copy) and wrap them as a program."""
     from src.ir.slice import SliceProgram
     params = dict(params)
-    SLICES[name].legalize(params, backend)
+    # Legalization should be idempotent; iterate to a fixed point so a slice
+    # that is not stays emittable instead of failing in emit.
+    for _ in range(4):
+        before = dict(params)
+        SLICES[name].legalize(params, backend)
+        if params == before:
+            break
+    else:
+        raise ValueError(f'Slice {name} parameters do not reach a legalized fixed point')
     return SliceProgram(name, params, backend)
 
 

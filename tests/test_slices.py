@@ -78,6 +78,27 @@ class LegalizationTests(unittest.TestCase):
                 report = {'params': program.params_dict}
                 self.assertEqual(program_from_dict(report).to_dict(), program.to_dict())
 
+    def test_legalization_is_idempotent(self):
+        # b1eded9f vGPU Triton crashed in emit: a cumsum layout program's
+        # second legalization read arg1 after the first had zeroed it.
+        crashed = {'source': 'cumsum', 'dt': 'f32', 'shape': '64x8', 'k': 16, 'store': 'native', 'out_dt': 'i8',
+                   'pair': 0, 'warps': 1, 'warps2': 1, 'op1': 'none', 'arg1': 1, 'op2': 'split', 'arg2': 3,
+                   'op3': 'flip', 'arg3': 2, 'cfg_maxnreg': 0, 'cfg_fusion': 0, 'cfg_target': 'native',
+                   'cfg_amd': 'none'}
+        program = make_program('layout', crashed, 'triton')
+        emit_slice(program, Cfg)
+        rng = random.Random(7)
+        for backend in BACKENDS:
+            for name, slice_ in SLICES.items():
+                if backend not in slice_.backends:
+                    continue
+                for _ in range(3000):
+                    params = slice_.sample(rng, backend)
+                    slice_.legalize(params, backend)
+                    again = dict(params)
+                    slice_.legalize(again, backend)
+                    self.assertEqual(again, params, f'{name}/{backend}')
+
     def test_unlegalized_parameters_are_rejected(self):
         program = next(programs(1))
         broken = SliceProgram(program.slice, dict(program.params, out_dt='nonsense'), program.backend)

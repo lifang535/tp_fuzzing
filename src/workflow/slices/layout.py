@@ -152,7 +152,10 @@ class LayoutSlice(Slice):
             if step is None:
                 params[f'op{i}'] = op = 'none'
             if op == 'none':
-                params[f'arg{i}'] = 0
+                # arg1 also picks the cumsum/bcast source axis: keep it, or a
+                # second legalization reads another axis and another bound.
+                if i != 1 or source not in ('cumsum', 'bcast'):
+                    params[f'arg{i}'] = 0
                 continue
             steps.append(step)
             shape, cur, bound = step['shape'], step['dt'], step['bound']
