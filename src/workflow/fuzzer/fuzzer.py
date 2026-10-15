@@ -524,370 +524,350 @@ class TileSmith:
 
     def run(self, num_iterations: int = 1000, verbose: bool = True):
         if verbose:
-            from src.backends.common.versions import describe
-            from src.backends.common.knobs import missing_option_fields, missing_pool_keys
-            print(f"TileSmith: {num_iterations} iterations, backend={self.backend}")
-            print(f"Output: {self.output_dir}")
-            print(f"Environment: {describe()}")
-            # A pool key the installed DSL dropped is a silent no-op: the
-            # variant compiles like its baseline and the coverage it was meant
-            # to add disappears without any failure to notice.
-            for label, missing in (('tilelang pass pool', missing_pool_keys()),
-                                   ('triton compile options', missing_option_fields())):
-                if missing:
-                    print(f"WARNING: {label} names {sorted(missing)}, absent from the "
-                          f"installed release (sampled variants there are no-ops)")
-            print()
-
-        pool_rotation_interval = self.config.pool_rotation_interval
-        # i counts all generation attempts (including dedup skips); new_tested counts
-        # only cases actually tested this session — loop runs until new_tested == num_iterations
-        i = getattr(self, '_resume_generation_attempts', 0)
+            self._announce(num_iterations)
+        # _attempt counts every generation attempt, deduplicated ones too;
+        # new_tested counts the programs this session executes.
+        self._attempt = getattr(self, '_resume_generation_attempts', 0)
         new_tested = 0
-        # If a previous run was interrupted mid-test, resume that program first.
-        _pending_program = getattr(self, '_resume_pending_program', None)
-        _pending_i = getattr(self, '_resume_pending_i', None)
-        _inflight_i, _inflight_program = None, None  # set around oracle.test(); used by finally
-
+        # A program interrupted mid-test in the previous session runs first.
+        pending = getattr(self, '_resume_pending_program', None)
+        self._inflight = None  # (attempt, program) while oracle.test() runs
         try:
             while new_tested < num_iterations:
                 self._current_extension = None
                 self._current_origin = None
                 self._current_features = None
-                if _pending_program is not None:
-                    # Resume the interrupted program directly (already past dedup).
-                    program = _pending_program
-                    self._current_extension = getattr(self, '_resume_pending_extension', None)
-                    self._current_origin = getattr(self, '_resume_pending_origin', None)
-                    i = _pending_i
-                    self.tested_configs.add(self._make_sig(program))
-                    self.stats.total_generated += 1
-                    _pending_program = None
-                    _pending_i = None
+                if pending is not None:
+                    program, pending = pending, None
+                    self._resume_pending(program)
                 else:
-                    # Rotate dim_pool periodically based on generation attempts
-                    if i > 0 and i % pool_rotation_interval == 0:
-                        self.generator.type_gen._init_pool()
-                        if verbose:
-                            print(f"[{i}] dim_pool rotated → {self.generator.type_gen.dim_pool[:5]}...")
-
-                    program = self._generate_test_case()
-                    self.stats.total_generated += 1
-                    i += 1
-
-                    # Dedup
-                    config_sig = self._make_sig(program)
-                    if config_sig in self.tested_configs:
-                        if verbose:
-                            print(f"[{i}] [DUPLICATE] {self._kind_label(program)}")
+                    program = self._next_candidate(verbose)
+                    if program is None:
                         continue
-                    self.tested_configs.add(config_sig)
-
-                # Test — track inflight program so interrupt can resume it
-                _inflight_i, _inflight_program = i, program
-                test_started = time.monotonic()
-                bug = self.oracle.test(program)
-                test_seconds = time.monotonic() - test_started
-                # reduction below runs more tests; keep this test's lowering
-                lowering = getattr(self.oracle, 'last_lowering', None)
-                _inflight_i, _inflight_program = None, None
-                self.stats.total_tested += 1
+                bug, seconds, lowering = self._execute(program)
                 new_tested += 1
-                self._count_route(self._route(), test_seconds)
-
-                from src.ir.slice import SliceProgram
-                sliced = isinstance(program, SliceProgram)
-                if bug and sliced and self.slice_scheduler is not None:
-                    self._minimize_slice(program, bug)
-                bucket = self._record_bucket(bug) if bug else None
-                if sliced and self.slice_scheduler is not None:
-                    self.slice_scheduler.observe(program, bug.root_cause if bug else None, bucket, test_seconds,
-                                                 lowering=lowering)
-                from src.workflow.feedback import confirmed_failure
-                signature = (bug.confirmed_signature or confirmed_failure(bug, self.backend)) if bug else None
-                from src.workflow.feedback import program_features
-                features = self._current_features or program_features(program)
-                # Target-only operations and slices have their own coverage
-                # accounting; they must not steer the common-IR generator.
-                if self._current_extension or sliced:
-                    novelty = compiler_novelty = False
-                else:
-                    novelty = self.feedback.observe(program, passed=bug is None and not self.config.compile_only,
-                                                    features=features)
-                    compiler_novelty = self.feedback.observe_compilation(
-                        program, self.oracle.last_compilation, self.oracle.compilation_complete,
-                        passed=bug is None and not self.config.compile_only)
-                    if (bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback
-                            and bug.bug_type is not BugType.WRONG_RESULT):
-                        self.feedback.explain(features)
-                if self.quarantine is not None:
-                    # Both generation paths supply evidence. Unknown wrong
-                    # results and unstable oracles cannot teach exclusion rules.
-                    self.quarantine.observe(
-                        features, bucket, learn=bug is None or (
-                            bug.bug_type is not BugType.WRONG_RESULT
-                            and bug.root_cause != 'oracle_unstable'))
-                if self.oracle.compilation_complete:
-                    self.stats.programs_compiled += 1
-                if bug is None and not self.config.compile_only:
-                    self.stats.programs_passed += 1
-                if self._current_extension:
-                    compiler_novelty = self.dsl_stage.observe_outcome(
-                        program, self._current_extension, self.oracle.last_compilation,
-                        passed=bug is None and not self.config.compile_only, seconds=test_seconds,
-                        known_repeat=bool(signature and self.failure_buckets[bucket] > 1))
-                if bug:
-                    source_digest = ((self._current_origin or {}).get('seed_digest')
-                                     or (self._current_extension or {}).get('source_sha256'))
-                    self.feedback.observe_known_failure(source_digest, signature)
-                    if bug.root_cause == 'oracle_unstable':
-                        # The numeric check was skipped: no implementation could
-                        # pass it, so this is wasted fuzzing effort (MLIRSmith
-                        # counts invalid programs the same way), not a bug.
-                        # Every reproducer is kept for auditing (0 = no cap,
-                        # same convention as max_same_root_cause) and the
-                        # failed-program feedback demotion still applies.
-                        self.stats.oracle_unstable += 1
-                        saved = (self.config.max_oracle_unstable_saved <= 0
-                                 or self.stats.oracle_unstable <= self.config.max_oracle_unstable_saved)
-                        if saved:
-                            self._save_bug(bug, i, program)
-                        if verbose:
-                            marker = 'saved' if saved else 'dup'
-                            print(f"[{i}] [ORACLE UNSTABLE] ({marker}) {self._kind_label(program)}"
-                                  f"{self._bucket_label(bucket)}")
-                        if new_tested % 100 == 0:
-                            self._write_progress()
-                        continue
-                    self.stats.bugs_found.append(bug)
-                    seen = self.known_root_causes.get(bug.root_cause, 0)
-                    # max_same_root_cause == 0 disables throttling: every failure
-                    # writes a reproducer. A coarse label merges distinct defects
-                    # (unclassified diagnostics all land in 'other'), so capping
-                    # *saving* per label discards real bugs that cannot be
-                    # recovered afterwards — the count stays in summary.json but
-                    # the program is gone.
-                    saved = self.config.max_same_root_cause <= 0 or seen < self.config.max_same_root_cause
-                    if saved:
-                        self.stats.unique_bugs.append(bug)
-                        self._save_bug(bug, i, program)
-                    self.known_root_causes[bug.root_cause] = seen + 1
-                    self.root_cause_locations.setdefault(bug.root_cause, Counter())[bug.location] += 1
-                    if verbose:
-                        marker = 'NEW' if seen == 0 else ('saved' if saved else 'dup')
-                        print(f"[{i}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}"
-                              f"{self._bucket_label(bucket)}")
-                else:
-                    passed_path = self._save_passed(program, i)
-                    if self._current_extension:
-                        self.dsl_stage.retain_target(program, passed_path, self._current_extension,
-                                                     self.oracle.last_compilation, compiler_novelty)
-                    elif not sliced:
-                        retained_as_dsl_source = False
-                        if self.config.dsl_extend_prob and not self.config.compile_only:
-                            retained_as_dsl_source = self.dsl_stage.add(program, passed_path)
-                        retained_as_mutation_seed = ((self.config.structural_feedback and (novelty or compiler_novelty))
-                                                     or random.random() < self.config.seed_add_prob)
-                        if retained_as_mutation_seed:
-                            self.feedback.register_seed(program, self.oracle.last_compilation)
-                            self.seed_pool.append(program)
-                            if len(self.seed_pool) > self.config.seed_pool_max:
-                                if self.config.corpus_feedback:
-                                    from src.workflow.feedback import corpus_eviction
-                                    index = corpus_eviction([self.feedback.corpus_features(p) for p in self.seed_pool])
-                                else:
-                                    index = random.randint(0, len(self.seed_pool) - 1)
-                                self.seed_pool.pop(index)
-                        if retained_as_dsl_source and not retained_as_mutation_seed:
-                            self.feedback.register_seed(program, self.oracle.last_compilation)
-                    if verbose:
-                        status = 'COMPILED' if self.config.compile_only else 'PASSED'
-                        print(f"[{i}] [{status}] {self._kind_label(program)}")
-
+                self._count_route(self._route(), seconds)
+                if self._observe(program, bug, seconds, lowering, verbose) == 'oracle_unstable':
+                    # Wasted effort, not a test result: no periodic report.
+                    if new_tested % 100 == 0:
+                        self._write_progress()
+                    continue
                 if verbose and new_tested % 100 == 0:
                     total_bugs = self._historical_bugs_total + len(self.stats.bugs_found)
-                    total_unique = len(self.known_root_causes)
-                    print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} categories={total_unique}")
+                    print(f"[{new_tested}] tested={self.stats.total_tested} bugs={total_bugs} "
+                          f"categories={len(self.known_root_causes)}")
                 if new_tested % 100 == 0:
                     self._prune_seed_feedback()
                     self._write_progress()
-
         finally:
-            bugs_total = sum(self.known_root_causes.values())
-            bugs_unique = len(self.known_root_causes)
-
-            from src.backends.common.versions import TARGET_TILELANG, TARGET_TRITON, environment
-            from src.workflow.triage import species
-            summary = {
-                "backend": self.backend,
-                # What this campaign actually ran against: the harness adapts
-                # to both the target and the legacy DSL pair, so the recorded
-                # versions are what make two runs comparable.
-                "environment": environment(),
-                "target_versions": {"tilelang": TARGET_TILELANG, "triton": TARGET_TRITON},
-                "input_seed": self.config.input_seed,
-                "compile_only": self.config.compile_only,
-                "save_artifacts": self.config.save_artifacts,
-                "programs_compiled": self.stats.programs_compiled,
-                "programs_passed": self.stats.programs_passed,
-                "coverage_probe_prob": self.config.coverage_probe_prob,
-                "dtype_mutate_prob": self.config.dtype_mutate_prob,
-                # 0 means every failure saved a reproducer this run.
-                "max_same_root_cause": self.config.max_same_root_cause,
-                # Likewise: 0 means every oracle_unstable sample was saved.
-                "max_oracle_unstable_saved": self.config.max_oracle_unstable_saved,
-                "generation_config": {
-                    "extended_prob": self.config.extended_prob,
-                    "dsl_extend_prob": self.config.dsl_extend_prob,
-                    "dsl_evolve_prob": self.config.dsl_evolve_prob,
-                    "dsl_max_depth": self.config.dsl_max_depth,
-                    "dsl_max_ops": self.config.dsl_max_ops,
-                    "dsl_adaptive_schedule": self.config.dsl_adaptive_schedule,
-                    "dsl_source_variants": self.config.dsl_source_variants,
-                    "dsl_matrix_prob": self.config.dsl_matrix_prob,
-                    "dsl_attributes": self.config.dsl_attributes,
-                    "corpus_feedback": self.config.corpus_feedback,
-                    "extended_common_only": self.config.extended_common_only,
-                    "extended_configuration_pair": self.config.extended_configuration_pair,
-                    "extended_config_depth": self.config.extended_config_depth,
-                    "extended_fast_math_pair": self.config.extended_fast_math_pair,
-                    "extended_precision_pair": self.config.extended_precision_pair,
-                    "extended_identity_pair": self.config.extended_identity_pair,
-                    "extended_observation_pair": self.config.extended_observation_pair,
-                    "random_config_count": self.config.random_config_count,
-                    "instance_grid": self.config.instance_grid,
-                    "extended_atomic_prob": self.config.extended_atomic_prob,
-                    "extended_fma_prob": self.config.extended_fma_prob,
-                    "extended_shape_op_prob": self.config.extended_shape_op_prob,
-                    "extended_int8_prob": self.config.extended_int8_prob,
-                    "region_int8_prob": self.config.region_int8_prob,
-                    "region_pass_config": self.config.region_pass_config,
-                    "region_swizzle_pair": self.config.region_swizzle_pair,
-                    "region_gemm_prob": self.config.region_gemm_prob,
-                    "region_typed_prob": self.config.region_typed_prob,
-                    "region_scratch_max_bytes": self.config.region_scratch_max_bytes,
-                    "local_mutate_prob": self.config.local_mutate_prob,
-                    "latest_value_prob": self.config.latest_value_prob,
-                    "function_min_count": self.config.function_min_count,
-                    "function_max_count": self.config.function_max_count,
-                    "function_call_prob": self.config.function_call_prob,
-                    "region_input_seed_count": self.config.region_input_seed_count,
-                    "region_repeat_count": self.config.region_repeat_count,
-                    "region_schedule_pair": self.config.region_schedule_pair,
-                    "region_layout_prob": self.config.region_layout_prob,
-                    "uncovered_boost": self.config.uncovered_boost,
-                    "quarantine": self.config.quarantine,
-                    "quarantine_window": self.config.quarantine_window,
-                    "quarantine_precision": self.config.quarantine_precision,
-                    "quarantine_retries": self.config.quarantine_retries,
-                    "quarantine_min_explore": self.config.quarantine_min_explore,
-                    "explained_feedback": self.config.explained_feedback,
-                    "swarm_prob": self.config.swarm_prob,
-                    "slice_prob": self.config.slice_prob,
-                    "slice_names": list(self.config.slice_names),
-                    "slice_adaptive": self.config.slice_adaptive,
-                    "slice_candidates": self.config.slice_candidates,
-                    "slice_minimize": self.config.slice_minimize,
-                    "slice_minimize_budget": self.config.slice_minimize_budget,
-                    "slice_max_cores": self.config.slice_max_cores,
-                },
-                "structural_features_attempted": len(self.feedback.attempted),
-                "structural_features_passed": len(self.feedback.passed),
-                "structural_features_compiled": len(self.feedback.compiled),
-                "compiler_ir_features": len(self.feedback.compiler),
-                "compiler_ir_features_passed": len(self.feedback.compiler_passed),
-                "total_tested": self.stats.total_tested,
-                "oracle_unstable": self.stats.oracle_unstable,
-                "bugs_total": bugs_total,
-                "bugs_unique": bugs_unique,
-                "root_causes": self.known_root_causes,
-                "root_cause_locations": {cause: dict(counts) for cause, counts in self.root_cause_locations.items()},
-                "confirmed_failure_signatures": dict(self.feedback.known_signatures),
-                "failure_buckets": dict(self.failure_buckets.most_common()),
-                "failure_bucket_keys": {bucket: self.failure_bucket_keys.get(bucket, '')
-                                        for bucket, _ in self.failure_buckets.most_common()},
-                # In discovery order; sightings from before the timeline first.
-                "failure_bucket_first_seen": dict(sorted(
-                    self.failure_bucket_first_seen.items(),
-                    key=lambda item: (item[1].get('tested') is not None, item[1].get('tested') or 0))),
-                "campaign_seconds": round(self._campaign_seconds(), 1),
-                "timeline_origin": self.timeline_origin,
-                "discovery": self._discovery(),
-                # Distinct failure mechanisms, oracle noise excluded: the
-                # Good-Turing estimate is the chance that the next test shows
-                # an unseen bucket, Chao1 a lower bound on the bucket total.
-                "failure_species": species(Counter({bucket: count for bucket, count in self.failure_buckets.items()
-                                                    if not bucket.startswith(('oracle_unstable:',
-                                                                              'unsupported_feature:'))}),
-                                           samples=self.stats.total_tested),
-                "structural_species": species(self.feedback.passed),
-                "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
-                "slices": self.slice_scheduler.stats() if self.slice_scheduler is not None else None,
-                "slice_lowering": (self.slice_scheduler.lowering_stats()
-                                   if self.slice_scheduler is not None else None),
-                "slice_reduction_tests": self.slice_reduction_tests,
-                "route_stats": self.route_stats,
-                "dsl_extension": {"by_op": dict(self.dsl_stage.counts),
-                                  "evolution_actions": dict(self.dsl_stage.evolution_counts),
-                                  "target_pool": len(self.dsl_stage.targets),
-                                  "target_structural_features": len(self.dsl_stage.target_structural),
-                                  "compiler_features": len(self.dsl_stage.compiler),
-                                  "compiler_features_passed": len(self.dsl_stage.compiler_passed),
-                                  "adaptive_schedule": self.dsl_stage.adaptive,
-                                  "schedule": self.dsl_stage.schedule.snapshot(include_parents=False),
-                                  "compiler_guided_sources": len(self.dsl_stage.source_compiler),
-                                  "source_pool": len(self.dsl_stage.sources),
-                                  "baseline_rejected": self.dsl_stage.baseline_rejected,
-                                  "invalid_extension": self.dsl_stage.invalid_extension,
-                                  "duplicate_derivatives": self.dsl_stage.duplicate_derivatives},
-            }
-            with open(self.output_dir / "summary.json", "w") as f:
-                json.dump(summary, f, indent=2)
-
-            rng_state = random.getstate()
-            with open(self.output_dir / "rng_state.json", "w") as f:
-                json.dump({
-                    "version": rng_state[0],
-                    "internalstate": list(rng_state[1]),
-                    "gauss_next": rng_state[2],
-                    "generation_attempts": i,
-                    "grid_cursors": self.generator.grids.save() if self.generator.grids is not None else {},
-                }, f)
-            pending_path = self.output_dir / "pending_program.pkl"
-            # _inflight_program is non-None only when interrupt happened inside oracle.test()
-            if _inflight_program is not None:
-                with open(pending_path, "wb") as f:
-                    pickle.dump((_inflight_i, _inflight_program, self._current_extension,
-                                 self._current_origin), f)
-            elif pending_path.exists():
-                pending_path.unlink()
-
-            self._prune_seed_feedback()
-            self.feedback.save(self.output_dir / "structural_feedback.json")
-            if self.quarantine is not None:
-                path = self.output_dir / 'quarantine.json'
-                temporary = path.with_suffix('.tmp')
-                temporary.write_text(json.dumps(self.quarantine.snapshot()))
-                temporary.replace(path)
-            self._save_dim_pool()
-            self._save_seed_pool()
-            if self.config.dsl_extend_prob:
-                (self.output_dir / 'dsl_stage.json').write_text(json.dumps(self.dsl_stage.snapshot()))
-            if self.slice_scheduler is not None:
-                path = self.output_dir / 'slice_state.json'
-                temporary = path.with_suffix('.tmp')
-                temporary.write_text(json.dumps(self.slice_scheduler.snapshot()))
-                temporary.replace(path)
-            self._write_progress()
-
+            self._save_campaign()
         if verbose:
             print()
             print(self.stats.summary(
-                max(0, bugs_total - len(self.stats.bugs_found)),
-                total_categories=bugs_unique, discovery=self._discovery(),
+                max(0, sum(self.known_root_causes.values()) - len(self.stats.bugs_found)),
+                total_categories=len(self.known_root_causes), discovery=self._discovery(),
             ))
-
         return self.stats
+
+    def _announce(self, num_iterations):
+        from src.backends.common.versions import describe
+        from src.backends.common.knobs import missing_option_fields, missing_pool_keys
+        print(f"TileSmith: {num_iterations} iterations, backend={self.backend}")
+        print(f"Output: {self.output_dir}")
+        print(f"Environment: {describe()}")
+        # A pool key the installed DSL dropped is a silent no-op: the variant
+        # compiles like its baseline and the coverage it was meant to add
+        # disappears without any failure to notice.
+        for label, missing in (('tilelang pass pool', missing_pool_keys()),
+                               ('triton compile options', missing_option_fields())):
+            if missing:
+                print(f"WARNING: {label} names {sorted(missing)}, absent from the "
+                      f"installed release (sampled variants there are no-ops)")
+        print()
+
+    def _resume_pending(self, program):
+        """Re-run the program the previous session was testing (already past dedup)."""
+        self._current_extension = getattr(self, '_resume_pending_extension', None)
+        self._current_origin = getattr(self, '_resume_pending_origin', None)
+        self._attempt = getattr(self, '_resume_pending_i', None)
+        self.tested_configs.add(self._make_sig(program))
+        self.stats.total_generated += 1
+
+    def _next_candidate(self, verbose):
+        """A new program, or None when it duplicates a tested one."""
+        # The dimension pool rotates on generation attempts.
+        if self._attempt > 0 and self._attempt % self.config.pool_rotation_interval == 0:
+            self.generator.type_gen._init_pool()
+            if verbose:
+                print(f"[{self._attempt}] dim_pool rotated → {self.generator.type_gen.dim_pool[:5]}...")
+        program = self._generate_test_case()
+        self.stats.total_generated += 1
+        self._attempt += 1
+        signature = self._make_sig(program)
+        if signature in self.tested_configs:
+            if verbose:
+                print(f"[{self._attempt}] [DUPLICATE] {self._kind_label(program)}")
+            return None
+        self.tested_configs.add(signature)
+        return program
+
+    def _execute(self, program):
+        """Run the oracle; an interrupt inside it leaves the program pending."""
+        self._inflight = (self._attempt, program)
+        started = time.monotonic()
+        bug = self.oracle.test(program)
+        seconds = time.monotonic() - started
+        # Reduction runs more tests: keep this test's lowering.
+        lowering = getattr(self.oracle, 'last_lowering', None)
+        self._inflight = None
+        self.stats.total_tested += 1
+        return bug, seconds, lowering
+
+    def _observe(self, program, bug, seconds, lowering, verbose):
+        """Feed one result to every learner and record it; returns the bug's root cause."""
+        from src.ir.slice import SliceProgram
+        from src.workflow.feedback import confirmed_failure, program_features
+        sliced = isinstance(program, SliceProgram)
+        executed = not self.config.compile_only
+        if bug and sliced and self.slice_scheduler is not None:
+            self._minimize_slice(program, bug)
+        bucket = self._record_bucket(bug) if bug else None
+        if sliced and self.slice_scheduler is not None:
+            self.slice_scheduler.observe(program, bug.root_cause if bug else None, bucket, seconds,
+                                         lowering=lowering)
+        signature = (bug.confirmed_signature or confirmed_failure(bug, self.backend)) if bug else None
+        features = self._current_features or program_features(program)
+        # Target-only operations and slices have their own coverage
+        # accounting; they must not steer the common-IR generator.
+        if self._current_extension or sliced:
+            novelty = compiler_novelty = False
+        else:
+            novelty = self.feedback.observe(program, passed=bug is None and executed, features=features)
+            compiler_novelty = self.feedback.observe_compilation(
+                program, self.oracle.last_compilation, self.oracle.compilation_complete,
+                passed=bug is None and executed)
+            if (bucket and self.failure_buckets[bucket] > 1 and self.config.explained_feedback
+                    and bug.bug_type is not BugType.WRONG_RESULT):
+                self.feedback.explain(features)
+        if self.quarantine is not None:
+            # Both generation paths supply evidence. Unknown wrong results and
+            # unstable oracles cannot teach exclusion rules.
+            self.quarantine.observe(features, bucket, learn=bug is None or (
+                bug.bug_type is not BugType.WRONG_RESULT and bug.root_cause != 'oracle_unstable'))
+        if self.oracle.compilation_complete:
+            self.stats.programs_compiled += 1
+        if bug is None and executed:
+            self.stats.programs_passed += 1
+        if self._current_extension:
+            compiler_novelty = self.dsl_stage.observe_outcome(
+                program, self._current_extension, self.oracle.last_compilation,
+                passed=bug is None and executed, seconds=seconds,
+                known_repeat=bool(signature and self.failure_buckets[bucket] > 1))
+        if bug:
+            self._record_failure(program, bug, bucket, signature, verbose)
+            return bug.root_cause
+        self._retain_passed(program, sliced, novelty, compiler_novelty, verbose)
+        return None
+
+    def _record_failure(self, program, bug, bucket, signature, verbose):
+        source_digest = ((self._current_origin or {}).get('seed_digest')
+                         or (self._current_extension or {}).get('source_sha256'))
+        self.feedback.observe_known_failure(source_digest, signature)
+        if bug.root_cause == 'oracle_unstable':
+            # The numeric check was skipped: no implementation could pass it,
+            # so this is wasted fuzzing effort (MLIRSmith counts invalid
+            # programs the same way), not a bug. Every reproducer is kept for
+            # auditing (0 = no cap, as for max_same_root_cause) and the
+            # failed-program feedback demotion still applies.
+            self.stats.oracle_unstable += 1
+            saved = (self.config.max_oracle_unstable_saved <= 0
+                     or self.stats.oracle_unstable <= self.config.max_oracle_unstable_saved)
+            if saved:
+                self._save_bug(bug, self._attempt, program)
+            if verbose:
+                print(f"[{self._attempt}] [ORACLE UNSTABLE] ({'saved' if saved else 'dup'}) "
+                      f"{self._kind_label(program)}{self._bucket_label(bucket)}")
+            return
+        self.stats.bugs_found.append(bug)
+        seen = self.known_root_causes.get(bug.root_cause, 0)
+        # max_same_root_cause == 0 disables throttling: every failure writes
+        # a reproducer. A coarse label merges distinct defects (unclassified
+        # diagnostics all land in 'other'), so capping *saving* per label
+        # discards real bugs that cannot be recovered afterwards -- the count
+        # stays in summary.json but the program is gone.
+        saved = self.config.max_same_root_cause <= 0 or seen < self.config.max_same_root_cause
+        if saved:
+            self.stats.unique_bugs.append(bug)
+            self._save_bug(bug, self._attempt, program)
+        self.known_root_causes[bug.root_cause] = seen + 1
+        self.root_cause_locations.setdefault(bug.root_cause, Counter())[bug.location] += 1
+        if verbose:
+            marker = 'NEW' if seen == 0 else ('saved' if saved else 'dup')
+            print(f"[{self._attempt}] [FAILED] ({marker} / {bug.root_cause}) {self._kind_label(program)}"
+                  f"{self._bucket_label(bucket)}")
+
+    def _retain_passed(self, program, sliced, novelty, compiler_novelty, verbose):
+        """Save a passing program and decide which seed pools keep it."""
+        passed_path = self._save_passed(program, self._attempt)
+        if self._current_extension:
+            self.dsl_stage.retain_target(program, passed_path, self._current_extension,
+                                         self.oracle.last_compilation, compiler_novelty)
+        elif not sliced:
+            dsl_source = False
+            if self.config.dsl_extend_prob and not self.config.compile_only:
+                dsl_source = self.dsl_stage.add(program, passed_path)
+            mutation_seed = ((self.config.structural_feedback and (novelty or compiler_novelty))
+                             or random.random() < self.config.seed_add_prob)
+            if mutation_seed:
+                self.feedback.register_seed(program, self.oracle.last_compilation)
+                self.seed_pool.append(program)
+                if len(self.seed_pool) > self.config.seed_pool_max:
+                    self.seed_pool.pop(self._evicted_seed())
+            if dsl_source and not mutation_seed:
+                self.feedback.register_seed(program, self.oracle.last_compilation)
+        if verbose:
+            status = 'COMPILED' if self.config.compile_only else 'PASSED'
+            print(f"[{self._attempt}] [{status}] {self._kind_label(program)}")
+
+    def _evicted_seed(self) -> int:
+        if self.config.corpus_feedback:
+            from src.workflow.feedback import corpus_eviction
+            return corpus_eviction([self.feedback.corpus_features(p) for p in self.seed_pool])
+        return random.randint(0, len(self.seed_pool) - 1)
+
+    # Config fields recorded as summary.json["generation_config"]; a resumed
+    # campaign restores the generation distribution from them.
+    GENERATION_FIELDS = (
+        'extended_prob', 'dsl_extend_prob', 'dsl_evolve_prob', 'dsl_max_depth', 'dsl_max_ops',
+        'dsl_adaptive_schedule', 'dsl_source_variants', 'dsl_matrix_prob', 'dsl_attributes', 'corpus_feedback',
+        'extended_common_only', 'extended_configuration_pair', 'extended_config_depth', 'extended_fast_math_pair',
+        'extended_precision_pair', 'extended_identity_pair', 'extended_observation_pair', 'random_config_count',
+        'instance_grid', 'extended_atomic_prob', 'extended_fma_prob', 'extended_shape_op_prob',
+        'extended_int8_prob', 'region_int8_prob', 'region_pass_config', 'region_swizzle_pair', 'region_gemm_prob',
+        'region_typed_prob', 'region_scratch_max_bytes', 'local_mutate_prob', 'latest_value_prob',
+        'function_min_count', 'function_max_count', 'function_call_prob', 'region_input_seed_count',
+        'region_repeat_count', 'region_schedule_pair', 'region_layout_prob', 'uncovered_boost', 'quarantine',
+        'quarantine_window', 'quarantine_precision', 'quarantine_retries', 'quarantine_min_explore',
+        'explained_feedback', 'swarm_prob', 'slice_prob', 'slice_names', 'slice_adaptive', 'slice_candidates',
+        'slice_minimize', 'slice_minimize_budget', 'slice_max_cores',
+    )
+
+    def _generation_config(self) -> dict:
+        config = {name: getattr(self.config, name) for name in self.GENERATION_FIELDS}
+        config['slice_names'] = list(config['slice_names'])
+        return config
+
+    def _summary(self) -> dict:
+        from src.backends.common.versions import TARGET_TILELANG, TARGET_TRITON, environment
+        from src.workflow.triage import species
+        noise = ('oracle_unstable:', 'unsupported_feature:')
+        stage = self.dsl_stage
+        return {
+            "backend": self.backend,
+            # What this campaign actually ran against: the harness adapts to
+            # both the target and the legacy DSL pair, so the recorded versions
+            # are what make two runs comparable.
+            "environment": environment(),
+            "target_versions": {"tilelang": TARGET_TILELANG, "triton": TARGET_TRITON},
+            "input_seed": self.config.input_seed,
+            "compile_only": self.config.compile_only,
+            "save_artifacts": self.config.save_artifacts,
+            "programs_compiled": self.stats.programs_compiled,
+            "programs_passed": self.stats.programs_passed,
+            "coverage_probe_prob": self.config.coverage_probe_prob,
+            "dtype_mutate_prob": self.config.dtype_mutate_prob,
+            # 0 means every failure saved a reproducer this run.
+            "max_same_root_cause": self.config.max_same_root_cause,
+            # Likewise: 0 means every oracle_unstable sample was saved.
+            "max_oracle_unstable_saved": self.config.max_oracle_unstable_saved,
+            "generation_config": self._generation_config(),
+            "structural_features_attempted": len(self.feedback.attempted),
+            "structural_features_passed": len(self.feedback.passed),
+            "structural_features_compiled": len(self.feedback.compiled),
+            "compiler_ir_features": len(self.feedback.compiler),
+            "compiler_ir_features_passed": len(self.feedback.compiler_passed),
+            "total_tested": self.stats.total_tested,
+            "oracle_unstable": self.stats.oracle_unstable,
+            "bugs_total": sum(self.known_root_causes.values()),
+            "bugs_unique": len(self.known_root_causes),
+            "root_causes": self.known_root_causes,
+            "root_cause_locations": {cause: dict(counts) for cause, counts in self.root_cause_locations.items()},
+            "confirmed_failure_signatures": dict(self.feedback.known_signatures),
+            "failure_buckets": dict(self.failure_buckets.most_common()),
+            "failure_bucket_keys": {bucket: self.failure_bucket_keys.get(bucket, '')
+                                    for bucket, _ in self.failure_buckets.most_common()},
+            # In discovery order; sightings from before the timeline first.
+            "failure_bucket_first_seen": dict(sorted(
+                self.failure_bucket_first_seen.items(),
+                key=lambda item: (item[1].get('tested') is not None, item[1].get('tested') or 0))),
+            "campaign_seconds": round(self._campaign_seconds(), 1),
+            "timeline_origin": self.timeline_origin,
+            "discovery": self._discovery(),
+            # Distinct failure mechanisms, oracle noise excluded: the
+            # Good-Turing estimate is the chance that the next test shows an
+            # unseen bucket, Chao1 a lower bound on the bucket total.
+            "failure_species": species(Counter({bucket: count for bucket, count in self.failure_buckets.items()
+                                                if not bucket.startswith(noise)}),
+                                       samples=self.stats.total_tested),
+            "structural_species": species(self.feedback.passed),
+            "quarantine": self.quarantine.stats() if self.quarantine is not None else None,
+            "slices": self.slice_scheduler.stats() if self.slice_scheduler is not None else None,
+            "slice_lowering": (self.slice_scheduler.lowering_stats()
+                               if self.slice_scheduler is not None else None),
+            "slice_reduction_tests": self.slice_reduction_tests,
+            "route_stats": self.route_stats,
+            "dsl_extension": {"by_op": dict(stage.counts),
+                              "evolution_actions": dict(stage.evolution_counts),
+                              "target_pool": len(stage.targets),
+                              "target_structural_features": len(stage.target_structural),
+                              "compiler_features": len(stage.compiler),
+                              "compiler_features_passed": len(stage.compiler_passed),
+                              "adaptive_schedule": stage.adaptive,
+                              "schedule": stage.schedule.snapshot(include_parents=False),
+                              "compiler_guided_sources": len(stage.source_compiler),
+                              "source_pool": len(stage.sources),
+                              "baseline_rejected": stage.baseline_rejected,
+                              "invalid_extension": stage.invalid_extension,
+                              "duplicate_derivatives": stage.duplicate_derivatives},
+        }
+
+    def _save_campaign(self):
+        """Persist everything a resumed campaign restores."""
+        with open(self.output_dir / "summary.json", "w") as f:
+            json.dump(self._summary(), f, indent=2)
+        version, internal, gauss = random.getstate()
+        with open(self.output_dir / "rng_state.json", "w") as f:
+            json.dump({
+                "version": version,
+                "internalstate": list(internal),
+                "gauss_next": gauss,
+                "generation_attempts": self._attempt,
+                "grid_cursors": self.generator.grids.save() if self.generator.grids is not None else {},
+            }, f)
+        pending_path = self.output_dir / "pending_program.pkl"
+        if self._inflight is not None:
+            with open(pending_path, "wb") as f:
+                pickle.dump((*self._inflight, self._current_extension, self._current_origin), f)
+        elif pending_path.exists():
+            pending_path.unlink()
+        self._prune_seed_feedback()
+        self.feedback.save(self.output_dir / "structural_feedback.json")
+        if self.quarantine is not None:
+            self._replace_json('quarantine.json', self.quarantine.snapshot())
+        self._save_dim_pool()
+        self._save_seed_pool()
+        if self.config.dsl_extend_prob:
+            (self.output_dir / 'dsl_stage.json').write_text(json.dumps(self.dsl_stage.snapshot()))
+        if self.slice_scheduler is not None:
+            self._replace_json('slice_state.json', self.slice_scheduler.snapshot())
+        self._write_progress()
+
+    def _replace_json(self, name, data):
+        """Write a state file atomically: an interrupt never leaves half of it."""
+        path = self.output_dir / name
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(data))
+        temporary.replace(path)
 
     def _write_progress(self):
         """Small live counters; IR features are proxies, not compiler edges."""
