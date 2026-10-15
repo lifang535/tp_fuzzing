@@ -9,8 +9,10 @@ TileSmith 为 TileLang 和 Triton 生成 GPU tile 程序，结合结构化生成
 ## 代码布局
 
 ```text
-main.py                           命令行参数、后端加载、dump / campaign 入口
+main.py                           入口：加载后端插件、dump / 启动 campaign
+tools/                            extend（对通过样例做 DSL 扩展）、api_coverage（DSL API 清单），用 python -m tools.<name> 运行
 src/
+  cli.py                          命令行参数、续跑默认值、参数检查与对应的 Config
   config/config.py                生成、变异、数值检查和资源限制
   ir/
     ir.py                         TileKernel：形状、dtype、调度和 probe 参数

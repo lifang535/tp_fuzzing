@@ -10,7 +10,9 @@ The executable representations are **RegionProgram** and **ExtendedProgram**. Di
 
 | Location | Responsibility |
 |---|---|
-| `main.py` | CLI, backend loading, dump and campaign entry |
+| `main.py` | Entry point: backend plugins, dump and campaign start |
+| `src/cli.py` | Command-line options, resume defaults, validation and the Config they build |
+| `tools/` | `extend` (DSL extensions of passing programs) and `api_coverage` (DSL API inventory), run with `python -m tools.<name>` |
 | `src/config/config.py` | Generation, mutation, limits and tolerances |
 | `src/ir/ir.py` | TileKernel launch/probe parameters, dtype and scheduling enums |
 | `src/ir/region.py` | Operations, lexical regions, functions and RegionProgram |
