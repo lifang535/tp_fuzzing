@@ -80,203 +80,232 @@ class ExtendedLowering:
         level, indices = self.loop(indent, ty.shape)
         self.add(level, f'{self.ref(scope, dst, indices)} = {self.ref(scope, src, indices)}')
 
+    # Elementwise operations: one expression over the operand references
+    # ({0}, {1}, ...) at the loop indices.
+    ELEMENTWISE = {
+        'cast': '{0}',
+        'broadcast': '{0}',
+        # TileLang has no scalar fma (T.fma2 is packed x2 only); the plain
+        # contraction may or may not fuse under the compiler's pass pipeline,
+        # and the fma checker accepts both outcomes.
+        'fma': '({0} * {1} + {2})',
+        'dsl_sigmoid': 'T.sigmoid({0})',
+        'dsl_clamp': 'T.clamp({0}, -0.5, 0.5)',
+        'mod': 'T.floormod({0}, T.max(T.abs({1}), 1))',
+        'select': 'T.if_then_else({0}, {1}, {2})',
+        **{op: f'({{0}} {symbol} {{1}})' for op, symbol in (
+            ('add', '+'), ('sub', '-'), ('mul', '*'), ('bitand', '&'), ('bitxor', '^'), ('lt', '<'),
+            ('eq', '=='), ('and', 'and'), ('or', 'or'))},
+    }
+    # Operations that read their source through a staged shared copy.
+    STAGED = {
+        # A proper subset of a fragment is not a bijective layout transform.
+        # Materialize it so consumers may choose their own thread mapping (in
+        # particular when feeding an MMA operand).
+        'slice': 'view',
+        # Same contract as slice: the reversed read happens on the staged
+        # shared copy, never on the source fragment.
+        'flip': 'flip',
+    }
+    TARGET_REDUCTIONS = ('reduce_abssum', 'reduce_absmax', 'reduce_bitand', 'reduce_bitor', 'reduce_bitxor')
+
     def lower(self, block, scope, indent):
         for node in block.operations:
-            op, args, a = node.op, node.operands, node.attrs
-            names = [v.name for v in node.results]
-            out = names[0] if names else None
-            ty = node.results[0].type if names else None
-            if op in ('for', 'while', 'if'):
-                if op == 'if':
-                    self.add(indent, f'if {self.ref(scope, args[0])}:')
-                else:
-                    for name, src in zip(names, args[1:]):
-                        self.copy(scope, indent, src, name)
-                    bound = f'T.min(T.max({self.ref(scope, args[0])}, 0), {a["max_steps"]})'
-                    iv = node.regions[0].arguments[0].name
-                    iterator = out + '_iteration'
-                    if op == 'while':
-                        # LayoutInference turns superlinear on python-while
-                        # bodies carrying fragment traffic (measured: ~24s of
-                        # a 62s compile on the mixed family). The bounded
-                        # while has no breaks and one trailing increment, so
-                        # a serial for-loop is semantically identical and
-                        # takes the normal layout path.
-                        loop = f'T.serial({bound})'
-                    else:
-                        loop = f'T.Pipelined({bound}, num_stages={self.stages})' if a.get('pipelined') else f'T.serial({bound})'
-                    self.add(indent, f'for {iterator} in {loop}:')
-                    self.add(indent + 1, f'{iv}[0] = {iterator}')
-                for i, child in enumerate(node.regions):
-                    if i:
-                        self.add(indent, 'else:')
-                    child_args = child.arguments if op == 'if' else child.arguments[1:]
-                    for arg, src in zip(child_args, args[1:] if op == 'if' else names):
-                        self.copy(scope, indent + 1, src, arg.name)
-                    self.lower(child, scope, indent + 1)
-                    for name, src in zip(names, child.returns):
-                        self.copy(scope, indent + 1, src, name)
-                continue
-            if op == 'call':
-                self.add(indent, f"{a['callee']}_{self.name}({', '.join(args + self.context + names)})")
-                continue
-            if op == 'barrier':
+            self.lower_operation(node, scope, indent)
+
+    def lower_operation(self, node, scope, indent):
+        op, args, a = node.op, node.operands, node.attrs
+        names = [v.name for v in node.results]
+        out = names[0] if names else None
+        if op in ('for', 'while', 'if'):
+            self.lower_control(node, scope, indent)
+        elif op == 'call':
+            self.add(indent, f"{a['callee']}_{self.name}({', '.join(args + self.context + names)})")
+        elif op == 'barrier':
+            self.add(indent, 'T.sync_threads()')
+        elif op == 'matmul':
+            self.add(indent, f'T.copy({args[0]}, {out}_a_shared)')
+            self.add(indent, f'T.copy({args[1]}, {out}_b_shared)')
+            self.add(indent, f'T.copy({args[2]}, {out})')
+            self.add(indent, f'T.gemm({out}_a_shared, {out}_b_shared, {out})')
+        elif op in ('scan_sum', 'scan_max'):
+            # Fragment scans stage through shared memory inside TileLang,
+            # which also normalizes a negative dim.
+            reverse = ', reverse=True' if a.get('reverse') else ''
+            fn = 'cumsum' if op == 'scan_sum' else 'cummax'
+            self.add(indent, f'T.{fn}({args[0]}, {out}, dim={spelled_axis(a, node.results[0].type)}{reverse})')
+        elif op in self.TARGET_REDUCTIONS:
+            self.lower_target_reduction(node, scope, indent)
+        elif op == 'reduce':
+            self.lower_reduce(node, scope, indent)
+        elif op in ('atomic_add', 'atomic_max', 'atomic_min'):
+            self.lower_atomic(node, scope, indent)
+        else:
+            if op in self.STAGED:
+                self.add(indent, f'T.copy({args[0]}, {out}_{self.STAGED[op]}_shared)')
                 self.add(indent, 'T.sync_threads()')
-                continue
-            if op == 'slice':
-                # A proper subset of a fragment is not a bijective layout
-                # transform. Materialize it so consumers may choose their own
-                # thread mapping (in particular when feeding an MMA operand).
-                self.add(indent, f'T.copy({args[0]}, {out}_view_shared)')
-                self.add(indent, 'T.sync_threads()')
-            if op == 'flip':
-                # Same contract as slice: the reversed read below happens on
-                # the staged shared copy, never on the source fragment.
-                self.add(indent, f'T.copy({args[0]}, {out}_flip_shared)')
-                self.add(indent, 'T.sync_threads()')
-            if op == 'matmul':
-                self.add(indent, f'T.copy({args[0]}, {out}_a_shared)')
-                self.add(indent, f'T.copy({args[1]}, {out}_b_shared)')
-                self.add(indent, f'T.copy({args[2]}, {out})')
-                self.add(indent, f'T.gemm({out}_a_shared, {out}_b_shared, {out})')
-                continue
-            if op in ('scan_sum', 'scan_max'):
-                # Fragment scans stage through shared memory inside TileLang,
-                # which also normalizes a negative dim.
-                reverse = ', reverse=True' if a.get('reverse') else ''
-                self.add(indent, f'T.{"cumsum" if op == "scan_sum" else "cummax"}({args[0]}, {out}, dim={spelled_axis(a, ty)}{reverse})')
-                continue
-            if op in ('reduce_abssum', 'reduce_absmax', 'reduce_bitand', 'reduce_bitor', 'reduce_bitxor'):
-                src_ty = self.ty(scope, args[0])
-                axis = target_axis(a, src_ty)
-                staged = len(src_ty.shape) == 2 and axis == 0
-                if staged:
-                    # The same column staging as reduce, for MMA producers.
-                    self.add(indent, f'T.copy({args[0]}, {out}_reduce_shared)')
-                    self.add(indent, 'T.sync_threads()')
-                level, indices = self.loop(indent, src_ty.shape)
-                src = f"{out}_reduce_shared[{', '.join(indices)}]" if staged else self.ref(scope, args[0], indices)
-                self.add(level, f"{out}_wide[{', '.join(indices)}] = {src}")
-                dim = spelled_axis(a, src_ty)
-                if op in ('reduce_abssum', 'reduce_absmax'):
-                    self.add(indent, f'T.clear({out})')
-                    self.add(indent, f'T.{op}({out}_wide, {out}, dim={dim})')
-                else:
-                    self.add(indent, f'T.{op}({out}_wide, {out}, dim={dim}, clear=True)')
-                continue
-            if op == 'reduce':
-                src_ty = self.ty(scope, args[0])
-                staged = len(src_ty.shape) == 2 and a['axis'] == 0
-                if staged:
-                    # The column reduction may require a different fragment
-                    # layout from an MMA accumulator and its row consumers.
-                    self.add(indent, f'T.copy({args[0]}, {out}_reduce_shared)')
-                    self.add(indent, 'T.sync_threads()')
-                level, indices = self.loop(indent, src_ty.shape)
-                src = f"{out}_reduce_shared[{', '.join(indices)}]" if staged else self.ref(scope, args[0], indices)
-                self.add(level, f"{out}_wide[{', '.join(indices)}] = T.cast({src}, '{ty.dtype}')")
-                self.add(indent, f"T.reduce_{a['kind']}({out}_wide, {out}, dim={a['axis']}, clear=True)")
-                if src_ty.dtype.startswith('float') and a['kind'] in ('max', 'min'):
-                    if staged:
-                        # A second reduction connected to both the source and
-                        # output overconstrains column layouts after MMA. Scan
-                        # the already staged input per output lane for NaNs;
-                        # the actual numeric operation stays a tile reduction.
-                        level, indices = self.loop(indent, ty.shape)
-                        self.add(level, f'for nan_row in T.serial({src_ty.shape[0]}):')
-                        src = f"{out}_reduce_shared[nan_row, {indices[0]}]"
-                        # TIR simplifies self-comparisons algebraically. Use
-                        # its NaN intrinsic so this check survives lowering.
-                        self.add(level + 1, f'if T.isnan({src}):')
-                        self.add(level + 2, f"{self.ref(scope, out, indices)} = T.cast(float('nan'), '{ty.dtype}')")
-                        continue
-                    level, indices = self.loop(indent, src_ty.shape)
-                    src = f"{out}_wide[{', '.join(indices)}]"
-                    self.add(level, f"{out}_nan[{', '.join(indices)}] = T.if_then_else(T.isnan({src}), 1, 0)")
-                    self.add(indent, f"T.reduce_sum({out}_nan, {out}_nan_count, dim={a['axis']}, clear=True)")
-                    level, indices = self.loop(indent, ty.shape)
-                    ref = self.ref(scope, out, indices)
-                    self.add(level, f"{ref} = T.if_then_else({out}_nan_count[{', '.join(indices) or '0'}] > 0, T.cast(float('nan'), '{ty.dtype}'), {ref})")
-                continue
-            if op in ('atomic_add', 'atomic_max', 'atomic_min'):
-                buf = self.buffers[a['buffer']]
-                root = self.buffers[buf.base or buf.name]
-                shape = self.ty(scope, args[0]).shape
-                level, indices = self.loop(indent, shape)
-                refs = [self.ref(scope, arg, indices) for arg in args]
-                address = f'{root.name}[bid, {16 + buf.offset} + {refs[0]} * {buf.stride}]'
-                fn = op.split('_', 1)[1]
-                # Bounds are guarded by the branch, like stores; masked lanes
-                # never reach the atomic at all.
-                mask = f'({refs[1]} and {refs[0]} >= 0 and {refs[0]} < {buf.size})'
-                self.add(level, f'if {mask}:')
-                self.add(level + 1, f'T.atomic_{fn}({address}, {refs[2]}, memory_order="relaxed")')
-                continue
-            shape = ty.shape if ty is not None else self.ty(scope, args[0]).shape
-            level, indices = self.loop(indent, shape)
-            references = [self.ref(scope, arg, indices) for arg in args] if op not in ('reshape', 'transpose', 'slice', 'flip') else []
-            linear = '0' if not shape else indices[0] if len(shape) == 1 else f'({indices[0]} * {shape[1]} + {indices[1]})'
-            if op == 'constant':
-                expression = repr(a['value'])
-            elif op == 'index':
-                expression = linear
-                if a.get('reverse'):
-                    expression = f'({ty.size - 1} - {expression})'
-                expression = f"(({expression} + {a.get('shift', 0)}) % {ty.size})"
-            elif op == 'parameter':
-                expression = {'steps':'steps', 'limit':'limit', 'block':'bid'}[a['name']]
-            elif op in ('cast', 'broadcast'):
-                expression = references[0]
-            elif op == 'reshape':
-                old = self.ty(scope, args[0]).shape
-                ix = () if not old else (linear,) if len(old) == 1 else (f'({linear}) // {old[1]}', f'({linear}) % {old[1]}')
-                expression = self.ref(scope, args[0], ix)
-            elif op == 'transpose':
-                expression = self.ref(scope, args[0], indices[::-1])
-            elif op == 'flip':
-                # Reverse one dimension (the minor one unless an axis is
-                # named); a copied permutation remains a permutation for later
-                # store/unique checks. The source was staged in shared memory
-                # (fragment reversal has no layout).
-                axis = a.get('axis', -1) % len(shape)
-                reversed_indices = tuple(f'{size - 1} - {index}' if i == axis else index
-                                         for i, (size, index) in enumerate(zip(shape, indices)))
-                expression = f"{out}_flip_shared[{', '.join('0' if size == 1 else index for size, index in zip(shape, reversed_indices))}]"
-            elif op == 'slice':
-                positions = ', '.join(f'({i} + {offset})' for i, offset in zip(indices, a['offsets']))
-                expression = f'{out}_view_shared[{positions}]'
-            elif op in ('add', 'sub', 'mul', 'bitand', 'bitxor', 'lt', 'eq', 'and', 'or'):
-                symbol = {'add':'+', 'sub':'-', 'mul':'*', 'bitand':'&', 'bitxor':'^', 'lt':'<', 'eq':'==', 'and':'and', 'or':'or'}[op]
-                expression = f'({references[0]} {symbol} {references[1]})'
-            elif op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
-                expression = elementwise_expr(op, references[0], references[1] if len(references) > 1 else '',
-                                              '', a, '')
-            elif op == 'fma':
-                # TileLang has no scalar fma (T.fma2 is packed x2 only); the
-                # plain contraction may or may not fuse under the compiler's
-                # pass pipeline, and the fma checker accepts both outcomes.
-                expression = f'({references[0]} * {references[1]} + {references[2]})'
-            elif op == 'dsl_sigmoid':
-                expression = f'T.sigmoid({references[0]})'
-            elif op == 'dsl_clamp':
-                expression = f'T.clamp({references[0]}, -0.5, 0.5)'
-            elif op == 'mod':
-                expression = f'T.floormod({references[0]}, T.max(T.abs({references[1]}), 1))'
-            elif op == 'select':
-                expression = f"T.if_then_else({', '.join(references)})"
-            elif op in ('load', 'store'):
-                buf = self.buffers[a['buffer']]
-                root = self.buffers[buf.base or buf.name]
-                address = f'{root.name}[bid, {16 + buf.offset} + {references[0]} * {buf.stride}]'
-                mask = f'({references[1]} and {references[0]} >= 0 and {references[0]} < {buf.size})'
-                if op == 'store':
-                    self.add(level, f'if {mask}:')
-                    self.add(level + 1, f'{address} = {references[2]}')
-                    continue
-                expression = f'T.if_then_else({mask}, {address}, T.cast(0, "{ty.dtype}"))'
+            self.lower_elementwise(node, scope, indent)
+
+    def lower_control(self, node, scope, indent):
+        """if/for/while; carried values live in buffers copied in and out."""
+        op, args, a = node.op, node.operands, node.attrs
+        names = [v.name for v in node.results]
+        if op == 'if':
+            self.add(indent, f'if {self.ref(scope, args[0])}:')
+        else:
+            for name, src in zip(names, args[1:]):
+                self.copy(scope, indent, src, name)
+            bound = f'T.min(T.max({self.ref(scope, args[0])}, 0), {a["max_steps"]})'
+            iv = node.regions[0].arguments[0].name
+            iterator = names[0] + '_iteration'
+            if op == 'while':
+                # LayoutInference turns superlinear on python-while bodies
+                # carrying fragment traffic (measured: ~24s of a 62s compile on
+                # the mixed family). The bounded while has no breaks and one
+                # trailing increment, so a serial for-loop is semantically
+                # identical and takes the normal layout path.
+                loop = f'T.serial({bound})'
             else:
-                raise ValueError('Unsupported TileLang operation: ' + op)
-            self.add(level, f'{self.ref(scope, out, indices)} = T.cast({expression}, "{ty.dtype}")')
+                loop = f'T.Pipelined({bound}, num_stages={self.stages})' if a.get('pipelined') else f'T.serial({bound})'
+            self.add(indent, f'for {iterator} in {loop}:')
+            self.add(indent + 1, f'{iv}[0] = {iterator}')
+        for i, child in enumerate(node.regions):
+            if i:
+                self.add(indent, 'else:')
+            child_args = child.arguments if op == 'if' else child.arguments[1:]
+            for arg, src in zip(child_args, args[1:] if op == 'if' else names):
+                self.copy(scope, indent + 1, src, arg.name)
+            self.lower(child, scope, indent + 1)
+            for name, src in zip(names, child.returns):
+                self.copy(scope, indent + 1, src, name)
+
+    def stage_columns(self, node, scope, indent, axis):
+        """Copy the source of a column reduction to shared memory; returns its element reader.
+
+        A column reduction may require a different fragment layout from an
+        MMA accumulator and its row consumers.
+        """
+        src_ty = self.ty(scope, node.operands[0])
+        out = node.results[0].name
+        staged = len(src_ty.shape) == 2 and axis == 0
+        if staged:
+            self.add(indent, f'T.copy({node.operands[0]}, {out}_reduce_shared)')
+            self.add(indent, 'T.sync_threads()')
+        level, indices = self.loop(indent, src_ty.shape)
+        src = (f"{out}_reduce_shared[{', '.join(indices)}]" if staged
+               else self.ref(scope, node.operands[0], indices))
+        return staged, level, indices, src
+
+    def lower_target_reduction(self, node, scope, indent):
+        op, a, out = node.op, node.attrs, node.results[0].name
+        src_ty = self.ty(scope, node.operands[0])
+        _, level, indices, src = self.stage_columns(node, scope, indent, target_axis(a, src_ty))
+        self.add(level, f"{out}_wide[{', '.join(indices)}] = {src}")
+        dim = spelled_axis(a, src_ty)
+        if op in ('reduce_abssum', 'reduce_absmax'):
+            self.add(indent, f'T.clear({out})')
+            self.add(indent, f'T.{op}({out}_wide, {out}, dim={dim})')
+        else:
+            self.add(indent, f'T.{op}({out}_wide, {out}, dim={dim}, clear=True)')
+
+    def lower_reduce(self, node, scope, indent):
+        a, out, ty = node.attrs, node.results[0].name, node.results[0].type
+        src_ty = self.ty(scope, node.operands[0])
+        staged, level, indices, src = self.stage_columns(node, scope, indent, a['axis'])
+        self.add(level, f"{out}_wide[{', '.join(indices)}] = T.cast({src}, '{ty.dtype}')")
+        self.add(indent, f"T.reduce_{a['kind']}({out}_wide, {out}, dim={a['axis']}, clear=True)")
+        if not (src_ty.dtype.startswith('float') and a['kind'] in ('max', 'min')):
+            return
+        # The shared IR propagates any NaN through max/min.
+        nan = f"T.cast(float('nan'), '{ty.dtype}')"
+        if staged:
+            # A second reduction connected to both the source and output
+            # overconstrains column layouts after MMA. Scan the already staged
+            # input per output lane for NaNs; the actual numeric operation
+            # stays a tile reduction.
+            level, indices = self.loop(indent, ty.shape)
+            self.add(level, f'for nan_row in T.serial({src_ty.shape[0]}):')
+            # TIR simplifies self-comparisons algebraically. Use its NaN
+            # intrinsic so this check survives lowering.
+            self.add(level + 1, f'if T.isnan({out}_reduce_shared[nan_row, {indices[0]}]):')
+            self.add(level + 2, f"{self.ref(scope, out, indices)} = {nan}")
+            return
+        level, indices = self.loop(indent, src_ty.shape)
+        self.add(level, f"{out}_nan[{', '.join(indices)}] = T.if_then_else(T.isnan({out}_wide[{', '.join(indices)}]), 1, 0)")
+        self.add(indent, f"T.reduce_sum({out}_nan, {out}_nan_count, dim={a['axis']}, clear=True)")
+        level, indices = self.loop(indent, ty.shape)
+        ref = self.ref(scope, out, indices)
+        self.add(level, f"{ref} = T.if_then_else({out}_nan_count[{', '.join(indices) or '0'}] > 0, {nan}, {ref})")
+
+    def global_access(self, buffer, index, mask):
+        """Element reference and bounds mask of an indexed access to a (possibly aliased) buffer."""
+        buf = self.buffers[buffer]
+        root = self.buffers[buf.base or buf.name]
+        address = f'{root.name}[bid, {16 + buf.offset} + {index} * {buf.stride}]'
+        return address, f'({mask} and {index} >= 0 and {index} < {buf.size})'
+
+    def lower_atomic(self, node, scope, indent):
+        args = node.operands
+        level, indices = self.loop(indent, self.ty(scope, args[0]).shape)
+        refs = [self.ref(scope, arg, indices) for arg in args]
+        address, mask = self.global_access(node.attrs['buffer'], refs[0], refs[1])
+        # Bounds are guarded by the branch, like stores; masked lanes never
+        # reach the atomic at all.
+        self.add(level, f'if {mask}:')
+        self.add(level + 1, f'T.atomic_{node.op.split("_", 1)[1]}({address}, {refs[2]}, memory_order="relaxed")')
+
+    def lower_elementwise(self, node, scope, indent):
+        """A T.Parallel loop that writes one element of the result per index."""
+        op, args, a = node.op, node.operands, node.attrs
+        ty = node.results[0].type if node.results else None
+        out = node.results[0].name if node.results else None
+        shape = ty.shape if ty is not None else self.ty(scope, args[0]).shape
+        level, indices = self.loop(indent, shape)
+        references = ([self.ref(scope, arg, indices) for arg in args]
+                      if op not in ('reshape', 'transpose', 'slice', 'flip') else [])
+        linear = '0' if not shape else indices[0] if len(shape) == 1 else f'({indices[0]} * {shape[1]} + {indices[1]})'
+        if op in self.ELEMENTWISE:
+            expression = self.ELEMENTWISE[op].format(*references)
+        elif op == 'constant':
+            expression = repr(a['value'])
+        elif op == 'index':
+            expression = linear
+            if a.get('reverse'):
+                expression = f'({ty.size - 1} - {expression})'
+            expression = f"(({expression} + {a.get('shift', 0)}) % {ty.size})"
+        elif op == 'parameter':
+            expression = {'steps': 'steps', 'limit': 'limit', 'block': 'bid'}[a['name']]
+        elif op == 'reshape':
+            old = self.ty(scope, args[0]).shape
+            ix = () if not old else (linear,) if len(old) == 1 else (f'({linear}) // {old[1]}', f'({linear}) % {old[1]}')
+            expression = self.ref(scope, args[0], ix)
+        elif op == 'transpose':
+            expression = self.ref(scope, args[0], indices[::-1])
+        elif op == 'flip':
+            # Reverse one dimension (the minor one unless an axis is named);
+            # a copied permutation remains a permutation for later
+            # store/unique checks. The source was staged in shared memory
+            # (fragment reversal has no layout).
+            axis = a.get('axis', -1) % len(shape)
+            reversed_indices = tuple(f'{size - 1} - {index}' if i == axis else index
+                                     for i, (size, index) in enumerate(zip(shape, indices)))
+            expression = (f"{out}_flip_shared"
+                          f"[{', '.join('0' if size == 1 else index for size, index in zip(shape, reversed_indices))}]")
+        elif op == 'slice':
+            positions = ', '.join(f'({i} + {offset})' for i, offset in zip(indices, a['offsets']))
+            expression = f'{out}_view_shared[{positions}]'
+        elif op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
+            expression = elementwise_expr(op, references[0], references[1] if len(references) > 1 else '', '', a, '')
+        elif op in ('load', 'store'):
+            address, mask = self.global_access(a['buffer'], references[0], references[1])
+            if op == 'store':
+                self.add(level, f'if {mask}:')
+                self.add(level + 1, f'{address} = {references[2]}')
+                return
+            expression = f'T.if_then_else({mask}, {address}, T.cast(0, "{ty.dtype}"))'
+        else:
+            raise ValueError('Unsupported TileLang operation: ' + op)
+        self.add(level, f'{self.ref(scope, out, indices)} = T.cast({expression}, "{ty.dtype}")')
 
     def emit(self):
         self.add(0, '@tilelang.jit')
