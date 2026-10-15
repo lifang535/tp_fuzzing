@@ -55,170 +55,169 @@ class ExtendedLowering:
         return self.slice_axis(prefix + ('_hi' if offset >= half else '_lo'), shape,
                                axis, offset % half, size, prefix + '_next', indent)
 
+    # Operations lowered by one expression template over the operand names
+    # ({0}, {1}, ...) and the result type t.
+    TEMPLATES = {
+        'cast': '{0}.to(tl.{t.dtype})',
+        'reshape': 'tl.reshape({0}, {t.shape!r})',
+        'broadcast': 'tl.broadcast_to({0}, {t.shape!r})',
+        'transpose': 'tl.trans({0})',
+        'select': 'tl.where({0}, {1}, {2})',
+        'fma': 'tl.fma({0}, {1}, {2})',
+        'interleave': 'tl.interleave({0}, {1})',
+        'join': 'tl.join({0}, {1})',
+        'histogram': 'tl.histogram({0}, 16)',
+        'dsl_sigmoid': 'tl.sigmoid({0})',
+        'dsl_clamp': 'tl.clamp({0}, -0.5, 0.5)',
+        'gather': 'tl.gather({0}, {1}, 0)',
+        **{op: f'({{0}} {symbol} {{1}})' for op, symbol in (
+            ('add', '+'), ('sub', '-'), ('mul', '*'), ('bitand', '&'), ('bitxor', '^'), ('lt', '<'),
+            ('eq', '=='), ('and', '&'), ('or', '|'))},
+    }
+
     def lower(self, block, scope, indent):
         for node in block.operations:
-            op, args, a = node.op, node.operands, node.attrs
-            names = [v.name for v in node.results]
-            out = names[0] if names else None
-            t = node.results[0].type if names else None
-            expression = None
-            if op == 'constant':
-                expression = f"tl.full({t.shape!r}, {a['value']!r}, tl.{t.dtype})"
-            elif op == 'index':
-                expression = self.indices(t.shape)
-                if a.get('reverse'):
-                    expression = f'({t.size - 1} - {expression})'
-                expression = f"(({expression} + {a.get('shift', 0)}) % {t.size})"
-            elif op == 'parameter':
-                expression = {'steps':'steps', 'limit':'limit', 'block':'bid'}[a['name']]
-            elif op == 'cast':
-                expression = f'{args[0]}.to(tl.{t.dtype})'
-            elif op == 'reshape':
-                expression = f'tl.reshape({args[0]}, {t.shape!r})'
-            elif op == 'broadcast':
-                expression = f'tl.broadcast_to({args[0]}, {t.shape!r})'
-            elif op == 'transpose':
-                expression = f'tl.trans({args[0]})'
-            elif op == 'slice':
-                source = args[0]
-                shape = list(self.ty(scope, source).shape)
-                for axis, (offset, size) in enumerate(zip(a['offsets'], t.shape)):
-                    if offset == 0 and size == shape[axis]:
-                        continue
-                    source = self.slice_axis(source, shape, axis, offset, size,
-                                             out + f'_slice{axis}', indent)
-                    shape[axis] = size
-                expression = source
-            elif op in ('add', 'sub', 'mul', 'bitand', 'bitxor', 'lt', 'eq', 'and', 'or'):
-                symbol = {'add':'+', 'sub':'-', 'mul':'*', 'bitand':'&', 'bitxor':'^', 'lt':'<', 'eq':'==', 'and':'&', 'or':'|'}[op]
-                expression = f'({args[0]} {symbol} {args[1]})'
-            elif op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
-                expression = elementwise_expr(op, args[0], args[1] if len(args) > 1 else '',
-                                              '', a, '')
-            elif op == 'mod':
-                rem = f'({args[0]} % tl.maximum(tl.abs({args[1]}), 1))'
-                expression = f'tl.where({rem} < 0, {rem} + tl.maximum(tl.abs({args[1]}), 1), {rem})'
-            elif op == 'select':
-                expression = f"tl.where({', '.join(args)})"
-            elif op == 'reduce':
-                dtype = t.dtype
-                expression = f"tl.{a['kind']}({args[0]}.to(tl.{dtype}), {a['axis']})"
-                # Triton's default max/min prefer numbers over NaNs, whereas
-                # the shared IR propagates any NaN, like the CPU interpreter.
-                if dtype.startswith('float') and a['kind'] in ('max', 'min'):
-                    expression = f"tl.where(tl.sum(({args[0]} != {args[0]}).to(tl.int32), {a['axis']}) > 0, float('nan'), {expression})"
-            elif op == 'matmul':
-                # The accumulator dtype selects the accumulation width; the
-                # tf32 sweep swaps the input precision on the ieee baseline.
-                # Triton defaults out_dtype to float32, which rejects an fp16
-                # accumulator, so name it explicitly for the precision pair.
-                if t.dtype == 'int32':
-                    # int8 operands accumulate in int32; int inputs reject the
-                    # input_precision argument entirely.
-                    expression = f'tl.dot({args[0]}, {args[1]}, {args[2]}, out_dtype=tl.int32)'
-                else:
-                    out_dtype = f', out_dtype=tl.{t.dtype}' if t.dtype == 'float16' else ''
-                    expression = f"tl.dot({args[0]}, {args[1]}, {args[2]}, input_precision='{self.input_precision}'{out_dtype})"
-            elif op == 'fma':
-                expression = f'tl.fma({args[0]}, {args[1]}, {args[2]})'
-            elif op == 'flip':
-                # Always name the axis: the dim=None default is a confirmed
-                # Triton 3.8 front-end bug (triton_flip_default_axis) that
-                # would mask the rest of every program containing a flip.
-                axis = a.get('axis', -1) % len(t.shape)
-                expression = f'tl.flip({args[0]}, {axis})'
-            elif op == 'interleave':
-                expression = f'tl.interleave({args[0]}, {args[1]})'
-            elif op == 'join':
-                expression = f'tl.join({args[0]}, {args[1]})'
-            elif op == 'split':
-                # Two results bypass the single-expression tail; the elements
-                # keep their dtype.
-                self.add(indent, f'{names[0]}, {names[1]} = tl.split({args[0]})')
-            elif op in ('scan_sum', 'scan_product', 'scan_max'):
-                fn = {'scan_sum': 'cumsum', 'scan_product': 'cumprod', 'scan_max': 'cummax'}[op]
-                # A negative axis is printed as spelled, for the front end
-                # to normalize.
-                reverse = ', reverse=True' if a.get('reverse') else ''
-                expression = f'tl.{fn}({args[0]}, {spelled_axis(a, t)}{reverse})'
-            elif op == 'sort':
-                # Triton sorts only the minor dimension.
-                expression = f"tl.sort({args[0]}, descending={a.get('descending', False)})"
-            elif op == 'histogram':
-                expression = f'tl.histogram({args[0]}, 16)'
-            elif op in ('argmax', 'argmin', 'xor_sum'):
-                expression = f'tl.{op}({args[0]}, {spelled_axis(a, self.ty(scope, args[0]))})'
-            elif op == 'dsl_sigmoid':
-                expression = f'tl.sigmoid({args[0]})'
-            elif op == 'dsl_clamp':
-                expression = f'tl.clamp({args[0]}, -0.5, 0.5)'
-            elif op == 'softmax':
-                axis = spelled_axis(a, t)
-                # Keep the reduced dimension when broadcasting a row reduction.
-                # Also repair older saved programs that requested keep_dims=False.
-                keep = a.get('keep_dims') or (len(t.shape) == 2 and axis % 2 == 1)
-                if axis == 0 and not a.get('keep_dims'):
-                    # Also valid on Triton 3.0, whose only softmax positional
-                    # is ieee_rounding and which always normalizes axis 0.
-                    expression = f'tl.softmax({args[0]}, 0)'
-                else:
-                    keep_dims = ', keep_dims=True' if keep else ''
-                    expression = f'tl.softmax({args[0]}, dim={axis}{keep_dims})'
-            elif op == 'topk':
-                # Only the minor dimension; descending=True is the default.
-                descending = '' if a.get('descending', True) else ', descending=False'
-                expression = f'tl.topk({args[0]}, {a["k"]}, dim={len(t.shape) - 1}{descending})'
-            elif op == 'gather':
-                expression = f'tl.gather({args[0]}, {args[1]}, 0)'
-            elif op in ('atomic_add', 'atomic_max', 'atomic_min',
-                        'atomic_and', 'atomic_or', 'atomic_xor'):
-                buf = self.buffers[a['buffer']]
-                root = self.buffers[buf.base or buf.name]
-                address = f'{root.name} + bid * {root.size + 32} + {16 + buf.offset} + {args[0]} * {buf.stride}'
-                mask = f'({args[1]} & ({args[0]} >= 0) & ({args[0]} < {buf.size}))'
-                self.add(indent, f'tl.atomic_{op.split("_", 1)[1]}({address}, {args[2]}, {mask})')
-            elif op in ('load', 'store'):
-                buf = self.buffers[a['buffer']]
-                root = self.buffers[buf.base or buf.name]
-                address = f'{root.name} + bid * {root.size + 32} + {16 + buf.offset} + {args[0]} * {buf.stride}'
-                mask = f'({args[1]} & ({args[0]} >= 0) & ({args[0]} < {buf.size}))'
-                if op == 'load':
-                    expression = f'tl.load({address}, {mask}, other=0)'
-                else:
-                    self.add(indent, f'tl.store({address}, {args[2]}, {mask})')
-            elif op == 'barrier':
-                self.add(indent, 'tl.debug_barrier()')
-            elif op == 'call':
-                self.add(indent, f"{', '.join(names)} = {a['callee']}_{self.name}({', '.join(args + self.context)})")
-            elif op in ('for', 'while', 'if'):
-                if op == 'if':
-                    self.add(indent, f'if {args[0]}:')
-                else:
-                    for name, source in zip(names, args[1:]):
-                        self.add(indent, f'{name} = {source}')
-                    bound = f'tl.minimum(tl.maximum({args[0]}, 0), {a["max_steps"]})'
-                    iv = node.regions[0].arguments[0].name
-                    if op == 'while':
-                        self.add(indent, f'{iv} = tl.full((), 0, tl.int32)')
-                        self.add(indent, f'while {iv} < {bound}:')
-                    else:
-                        iterator = f'tl.range(0, {bound}, num_stages={self.stages})' if a.get('pipelined') else f'range({bound})'
-                        self.add(indent, f'for {iv} in {iterator}:')
-                for i, child in enumerate(node.regions):
-                    if i:
-                        self.add(indent, 'else:')
-                    child_args = child.arguments if op == 'if' else child.arguments[1:]
-                    for arg, source in zip(child_args, args[1:] if op == 'if' else names):
-                        self.add(indent + 1, f'{arg.name} = {source}')
-                    self.lower(child, scope, indent + 1)
-                    for name, source in zip(names, child.returns):
-                        self.add(indent + 1, f'{name} = {source}')
-                    if op == 'while':
-                        self.add(indent + 1, f'{iv} += 1')
-            else:
-                raise ValueError('Unsupported Triton operation: ' + op)
+            expression = self.lower_operation(node, scope, indent)
             if expression is not None:
-                self.add(indent, f'{out} = ({expression}).to(tl.{t.dtype})')
+                t = node.results[0].type
+                self.add(indent, f'{node.results[0].name} = ({expression}).to(tl.{t.dtype})')
+
+    def lower_operation(self, node, scope, indent):
+        """The expression of a single-result operation; other operations emit statements."""
+        op, args, a = node.op, node.operands, node.attrs
+        names = [v.name for v in node.results]
+        t = node.results[0].type if names else None
+        if op in self.TEMPLATES:
+            return self.TEMPLATES[op].format(*args, t=t)
+        if op == 'constant':
+            return f"tl.full({t.shape!r}, {a['value']!r}, tl.{t.dtype})"
+        if op == 'index':
+            expression = self.indices(t.shape)
+            if a.get('reverse'):
+                expression = f'({t.size - 1} - {expression})'
+            return f"(({expression} + {a.get('shift', 0)}) % {t.size})"
+        if op == 'parameter':
+            return {'steps': 'steps', 'limit': 'limit', 'block': 'bid'}[a['name']]
+        if op == 'slice':
+            source, shape = args[0], list(self.ty(scope, args[0]).shape)
+            for axis, (offset, size) in enumerate(zip(a['offsets'], t.shape)):
+                if offset == 0 and size == shape[axis]:
+                    continue
+                source = self.slice_axis(source, shape, axis, offset, size, names[0] + f'_slice{axis}', indent)
+                shape[axis] = size
+            return source
+        if op in FLOAT_UNARY_OPS + FLOAT_BINARY_OPS:
+            return elementwise_expr(op, args[0], args[1] if len(args) > 1 else '', '', a, '')
+        if op == 'mod':
+            # A non-negative remainder by a divisor of magnitude >= 1.
+            divisor = f'tl.maximum(tl.abs({args[1]}), 1)'
+            remainder = f'({args[0]} % {divisor})'
+            return f'tl.where({remainder} < 0, {remainder} + {divisor}, {remainder})'
+        if op == 'reduce':
+            expression = f"tl.{a['kind']}({args[0]}.to(tl.{t.dtype}), {a['axis']})"
+            # Triton's default max/min prefer numbers over NaNs, whereas the
+            # shared IR propagates any NaN, like the CPU interpreter.
+            if t.dtype.startswith('float') and a['kind'] in ('max', 'min'):
+                expression = (f"tl.where(tl.sum(({args[0]} != {args[0]}).to(tl.int32), {a['axis']}) > 0, "
+                              f"float('nan'), {expression})")
+            return expression
+        if op == 'matmul':
+            # The accumulator dtype selects the accumulation width; the tf32
+            # sweep swaps the input precision on the ieee baseline.
+            if t.dtype == 'int32':
+                # int8 operands accumulate in int32; int inputs reject the
+                # input_precision argument entirely.
+                return f'tl.dot({args[0]}, {args[1]}, {args[2]}, out_dtype=tl.int32)'
+            # Triton defaults out_dtype to float32, which rejects an fp16
+            # accumulator, so name it explicitly for the precision pair.
+            out_dtype = f', out_dtype=tl.{t.dtype}' if t.dtype == 'float16' else ''
+            return f"tl.dot({args[0]}, {args[1]}, {args[2]}, input_precision='{self.input_precision}'{out_dtype})"
+        if op == 'flip':
+            # Always name the axis: the dim=None default is a confirmed Triton
+            # 3.8 front-end bug (triton_flip_default_axis) that would mask the
+            # rest of every program containing a flip.
+            return f"tl.flip({args[0]}, {a.get('axis', -1) % len(t.shape)})"
+        if op in ('scan_sum', 'scan_product', 'scan_max'):
+            fn = {'scan_sum': 'cumsum', 'scan_product': 'cumprod', 'scan_max': 'cummax'}[op]
+            # A negative axis is printed as spelled, for the front end to normalize.
+            reverse = ', reverse=True' if a.get('reverse') else ''
+            return f'tl.{fn}({args[0]}, {spelled_axis(a, t)}{reverse})'
+        if op == 'sort':
+            # Triton sorts only the minor dimension.
+            return f"tl.sort({args[0]}, descending={a.get('descending', False)})"
+        if op in ('argmax', 'argmin', 'xor_sum'):
+            return f'tl.{op}({args[0]}, {spelled_axis(a, self.ty(scope, args[0]))})'
+        if op == 'softmax':
+            axis = spelled_axis(a, t)
+            if axis == 0 and not a.get('keep_dims'):
+                # Also valid on Triton 3.0, whose only softmax positional is
+                # ieee_rounding and which always normalizes axis 0.
+                return f'tl.softmax({args[0]}, 0)'
+            # Keep the reduced dimension when broadcasting a row reduction;
+            # this also repairs saved programs that requested keep_dims=False.
+            keep = a.get('keep_dims') or (len(t.shape) == 2 and axis % 2 == 1)
+            return f"tl.softmax({args[0]}, dim={axis}{', keep_dims=True' if keep else ''})"
+        if op == 'topk':
+            # Only the minor dimension; descending=True is the default.
+            descending = '' if a.get('descending', True) else ', descending=False'
+            return f'tl.topk({args[0]}, {a["k"]}, dim={len(t.shape) - 1}{descending})'
+        if op == 'load':
+            address, mask = self.global_access(a['buffer'], args[0], args[1])
+            return f'tl.load({address}, {mask}, other=0)'
+        if op == 'store':
+            address, mask = self.global_access(a['buffer'], args[0], args[1])
+            self.add(indent, f'tl.store({address}, {args[2]}, {mask})')
+        elif op.startswith('atomic_'):
+            address, mask = self.global_access(a['buffer'], args[0], args[1])
+            self.add(indent, f'tl.atomic_{op.split("_", 1)[1]}({address}, {args[2]}, {mask})')
+        elif op == 'split':
+            # Two results; the elements keep their dtype.
+            self.add(indent, f'{names[0]}, {names[1]} = tl.split({args[0]})')
+        elif op == 'barrier':
+            self.add(indent, 'tl.debug_barrier()')
+        elif op == 'call':
+            self.add(indent, f"{', '.join(names)} = {a['callee']}_{self.name}({', '.join(args + self.context)})")
+        elif op in ('for', 'while', 'if'):
+            self.lower_control(node, scope, indent)
+        else:
+            raise ValueError('Unsupported Triton operation: ' + op)
+        return None
+
+    def global_access(self, buffer, index, mask):
+        """Address and bounds mask of an indexed access to a (possibly aliased) buffer."""
+        buf = self.buffers[buffer]
+        root = self.buffers[buf.base or buf.name]
+        address = f'{root.name} + bid * {root.size + 32} + {16 + buf.offset} + {index} * {buf.stride}'
+        return address, f'({mask} & ({index} >= 0) & ({index} < {buf.size}))'
+
+    def lower_control(self, node, scope, indent):
+        """if/for/while: carried values are plain variables copied in and out."""
+        op, args, a = node.op, node.operands, node.attrs
+        names = [v.name for v in node.results]
+        if op == 'if':
+            self.add(indent, f'if {args[0]}:')
+        else:
+            for name, source in zip(names, args[1:]):
+                self.add(indent, f'{name} = {source}')
+            bound = f'tl.minimum(tl.maximum({args[0]}, 0), {a["max_steps"]})'
+            iv = node.regions[0].arguments[0].name
+            if op == 'while':
+                self.add(indent, f'{iv} = tl.full((), 0, tl.int32)')
+                self.add(indent, f'while {iv} < {bound}:')
+            else:
+                iterator = f'tl.range(0, {bound}, num_stages={self.stages})' if a.get('pipelined') else f'range({bound})'
+                self.add(indent, f'for {iv} in {iterator}:')
+        for i, child in enumerate(node.regions):
+            if i:
+                self.add(indent, 'else:')
+            child_args = child.arguments if op == 'if' else child.arguments[1:]
+            for arg, source in zip(child_args, args[1:] if op == 'if' else names):
+                self.add(indent + 1, f'{arg.name} = {source}')
+            self.lower(child, scope, indent + 1)
+            for name, source in zip(names, child.returns):
+                self.add(indent + 1, f'{name} = {source}')
+            if op == 'while':
+                self.add(indent + 1, f'{iv} += 1')
 
     def parameters(self):
         """Kernel parameter names, in launch order (see `signature`)."""
