@@ -57,6 +57,21 @@ HIP_TARGETS = tuple(name for name, (vendor, _, _) in _SLICE_TARGETS.items() if v
 AMD_CONFIGS = tuple(_SLICE_AMD)  # Triton's AMD lowering choices; inert on CUDA targets
 
 
+def drop_inert_configs(params):
+    """Reset configuration knobs the program's target ignores, in place.
+
+    Triton's AMD lowering choices only reach HIP targets; on a CUDA target
+    the knob is inert, so keeping it would make semantically identical
+    programs look new to the pair-cell coverage. Sampling, knob mutation and
+    reduction all build programs through make_program, which applies this.
+    It stays out of legalize(): the reducer's core() asks legalize() whether
+    a knob is forced, and a reset tied to cfg_target would make the target
+    look necessary to every program that sets cfg_amd."""
+    if params.get('cfg_amd', 'none') != 'none' and params.get('cfg_target', 'native') not in HIP_TARGETS:
+        params['cfg_amd'] = 'none'
+    return params
+
+
 def launch_options(params, backend):
     """Compiler options of a program's configuration knobs."""
     if backend == 'tilelang':
@@ -188,8 +203,7 @@ class Slice:
         if 'cfg_target' in space:
             params['cfg_target'] = (rng.choice(space['cfg_target'][1:]) if rng.random() < TARGET_PROB
                                     else 'native')
-        if 'cfg_amd' in space and params['cfg_target'] not in HIP_TARGETS:
-            params['cfg_amd'] = 'none'
+        drop_inert_configs(params)
         return params
 
     # ---- legalization -------------------------------------------------------

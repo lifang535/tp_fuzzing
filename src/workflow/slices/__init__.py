@@ -14,6 +14,7 @@ from .mathfn import MathSlice
 from .layout import LayoutSlice
 from .loop import LoopSlice
 from .memory import MemorySlice
+from .base import drop_inert_configs
 
 SLICES = {s.name: s for s in (CastSlice(), ReduceSlice(), ScanSlice(), GemmSlice(), AtomicSlice(), RoundSlice(),
                               MathSlice(), LayoutSlice(), LoopSlice(), MemorySlice())}
@@ -35,6 +36,7 @@ def validate_program(program):
         raise ValueError(f'Slice {program.slice} does not support backend {program.backend!r}')
     params = dict(program.params)
     slice_.legalize(params, program.backend)
+    drop_inert_configs(params)
     if params != program.params:
         raise ValueError('Slice parameters are not a legalized assignment')
 
@@ -48,6 +50,7 @@ def make_program(name, params, backend):
     for _ in range(4):
         before = dict(params)
         SLICES[name].legalize(params, backend)
+        drop_inert_configs(params)
         if params == before:
             break
     else:

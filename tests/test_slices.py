@@ -703,6 +703,30 @@ class TargetTests(unittest.TestCase):
         self.assertEqual(reduced.params['cfg_target'], 'native')
         self.assertNotIn('cfg_target', core)
 
+    def test_amd_configs_never_reach_a_cuda_target(self):
+        """The b1eded9f campaign ran 2818 Triton programs with an AMD lowering
+        choice on a CUDA target: knob mutation bypassed sample()'s reset, and
+        those inert knobs inflated the pair-cell coverage."""
+        from src.workflow.slices.base import HIP_TARGETS
+        rng = random.Random(44)
+        for name, slice_ in SLICES.items():
+            if 'triton' not in slice_.backends:
+                continue
+            params = dict(slice_.sample(rng, 'triton'), cfg_target='gfx942', cfg_amd='kpack2')
+            hip = make_program(name, params, 'triton')
+            if hip.params['cfg_target'] in HIP_TARGETS:
+                self.assertEqual(hip.params['cfg_amd'], 'kpack2')
+            mutated = make_program(name, dict(hip.params, cfg_target='sm90'), 'triton')
+            self.assertEqual(mutated.params['cfg_amd'], 'none', name)
+            with self.assertRaises(ValueError):
+                validate_program(SliceProgram(name, dict(mutated.params, cfg_amd='kpack2'), 'triton'))
+        scheduler = SliceScheduler('triton', candidates=4)
+        for _ in range(400):
+            program = scheduler.next(rng)
+            if program.params['cfg_target'] not in HIP_TARGETS:
+                self.assertEqual(program.params['cfg_amd'], 'none')
+            scheduler.observe(program, seconds=0.1)
+
     def test_what_a_foreign_target_lacks_is_noise(self):
         amd = ("TILESMITH_TARGET=gfx942:compile-only\nerror: Unsupported conversion from 'f8E4M3FN' to 'f64'\n"
                'RuntimeError: PassManager::run failed')
