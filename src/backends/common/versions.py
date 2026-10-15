@@ -3,8 +3,8 @@
 The harness is written against one pair of upstream releases and records that
 pair in every campaign's summary.json. Upstream moves internal layout between
 releases (TileLang 0.1.14 moved the device-compile callback out of
-engine/lower.py; Triton 3.8 requires string signature keys), so two kinds of
-coupling exist:
+engine/lower.py; 0.1.15 added pass-config keys that older releases reject;
+Triton 3.8 requires string signature keys), so two kinds of coupling exist:
 
 * adaptive shims, resolved at run time in the generated harnesses
   (`backends/tilelang/extended.py`, `backends/triton/extended.py`), which work
@@ -22,9 +22,10 @@ import importlib
 import importlib.metadata
 import sys
 
-# `tp_fuzzing_latest` on both campaign servers: the pair this revision is
-# validated against.
-TARGET_TILELANG = '0.1.14'
+# The pair this revision is validated against. TileLang 0.1.14 (the
+# b1eded9f cross-target campaign) still passes the same checks; knobs that
+# only 0.1.15 declares are offered where the installed release has them.
+TARGET_TILELANG = '0.1.15'
 TARGET_TRITON = '3.8.0'
 TARGET_TORCH = '2.4.0'
 # `tp_fuzzing`: the pair the previous revision was written against. The

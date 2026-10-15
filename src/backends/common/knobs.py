@@ -1,10 +1,10 @@
 """MLIRSmith-style random pass-pipeline sampling pools.
 
 Version marking (see backends/common/versions.py): the pools are shared by the
-target pair (tilelang 0.1.14 / triton 3.8.0 — every key below was re-checked
-to still exist as a declared PassConfigKey and to still have consumers in
-cuda/pipeline.py, backend/pass_pipeline/, jit/ and C++ src/transform) and the
-legacy pair (tilelang 0.1.11 / triton 3.0.0). Pool membership stays static so
+target pair (tilelang 0.1.15 / triton 3.8.0; every key below was re-checked
+on 0.1.14 and 0.1.15 to still exist as a declared PassConfigKey and to still
+have consumers in cuda/pipeline.py, backend/pass_pipeline/, jit/ and C++
+src/transform) and the legacy pair (tilelang 0.1.11 / triton 3.0.0). Pool membership stays static so
 that sampling is a pure function of (program, config): a local Random seeded
 from sha256(program sig + config.seed). Never the global random state —
 evidence reads and timeout scaling re-derive extended_variants(program,
@@ -24,8 +24,12 @@ tl.device_compile_flags (arbitrary injection). The deterministic sweep tiers
 (tirx.disable_vectorize for depth 1, tl.disable_loop_unswitching for depth 2)
 are also excluded so a sampled config always exercises a fresh combination.
 """
+import functools
 import hashlib
+import importlib.util
 import random
+import re
+from pathlib import Path
 
 # Concurrent device compiles per harness (region harnesses carry the same
 # cap as the compile_threads local inside _run_region in
@@ -115,17 +119,29 @@ def missing_pool_keys():
     Empty on a supported release. A non-empty result means the key silently
     became a no-op — its consumer no longer reads it, so the sampled variant
     compiles exactly like the baseline and the coverage it was meant to add is
-    gone. None when tilelang is not importable here (the harness machine need
-    not have the DSL installed at all).
+    gone. None when tilelang is not installed here (the harness machine need
+    not have the DSL at all).
     """
+    declared = declared_pass_keys()
+    return None if declared is None else pool_keys() - declared
+
+
+@functools.lru_cache(maxsize=None)
+def declared_pass_keys():
+    """Pass-config keys the installed tilelang declares, read without importing it.
+
+    None when tilelang is not installed. Importing tilelang initializes its
+    native libraries; the campaign process only needs the key names, which
+    tilelang/transform/pass_config.py spells as the PassConfigKey members.
+    """
+    spec = importlib.util.find_spec('tilelang')
+    if spec is None or not spec.submodule_search_locations:
+        return None
+    path = Path(next(iter(spec.submodule_search_locations))) / 'transform' / 'pass_config.py'
     try:
-        from tilelang import PassConfigKey
-    except Exception:
-        try:
-            from tilelang.transform.pass_config import PassConfigKey
-        except Exception:
-            return None
-    return pool_keys() - {member.value for member in PassConfigKey}
+        return frozenset(re.findall(r'^\s+[A-Z][A-Z0-9_]*\s*=\s*"([^"]+)"', path.read_text(), re.MULTILINE))
+    except OSError:
+        return None
 
 
 def missing_option_fields():

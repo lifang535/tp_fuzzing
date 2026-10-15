@@ -170,7 +170,7 @@ class VersionMarkingTests(unittest.TestCase):
         self.assertIsNone(installed('definitely-not-a-package-xyz'))
 
     def test_target_and_legacy_pairs_are_recorded(self):
-        self.assertEqual(TARGET_TILELANG, '0.1.14')
+        self.assertEqual(TARGET_TILELANG, '0.1.15')
         self.assertEqual(TARGET_TRITON, '3.8.0')
         self.assertEqual((LEGACY_TILELANG, LEGACY_TRITON), ('0.1.11', '3.0.0'))
 

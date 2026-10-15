@@ -1,13 +1,11 @@
-# Core
-torch==2.4.0+cu124
+# The pair this branch is validated against (src/backends/common/versions.py).
+# torch's CUDA 12.4 wheel comes from the PyTorch index:
+#   pip install torch==2.4.0 --index-url https://download.pytorch.org/whl/cu124
+# torch 2.4 pins triton 3.0; install triton 3.8 afterwards, e.g. with --no-deps.
+torch==2.4.0
+triton==3.8.0
+tilelang==0.1.15
+apache-tvm-ffi>=0.1.11,<0.1.13
 
-# TileLang backend
-apache-tvm-ffi==0.1.11
-tilelang==0.1.11
-
-# Triton backend (optional — only needed when using --backend triton)
-triton==3.0.0
-
-# Hardware detection (optional — improves shared memory limit accuracy)
-# Falls back to a lookup table if not installed
+# Optional: exact shared-memory limits (falls back to a lookup table)
 pynvml

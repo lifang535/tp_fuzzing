@@ -3,6 +3,8 @@ import math
 
 from .chain import OPS, legalize_steps, triton_step, tilelang_step
 from .dtypes import DTYPES, STORAGE, value_regimes
+from src.backends.common.knobs import declared_pass_keys
+
 from .runtime import SOURCES, _SLICE_AMD, _SLICE_TARGETS
 
 GUARD = 64  # guard elements on each side of every output allocation
@@ -29,6 +31,14 @@ TILELANG_PASSES = {
     'reducer_baseline': {'tl.reducer_force_baseline': True}, 'io_aware': {'tl.layout_cost_model': 'io-aware'},
     'alias': {'tirx.noalias': False}, 'regs0': {'tl.ptxas_register_usage_level': 0},
     'regs10': {'tl.ptxas_register_usage_level': 10}}
+# Configurations introduced after TileLang 0.1.14, which rejects their unknown
+# keys ("Invalid config option"): offered only where the installed release
+# declares them. The automatic warp-specialization scheduler (0.1.15) splits
+# producer and consumer warps of pipelined kernels on sm_90 and newer, so the
+# cross-target programs reach it; on sm_89 it is a no-op.
+VERSIONED_PASSES = {'auto_ws': {'tl.enable_auto_warp_specialization': 'role_based'}}
+TILELANG_PASSES.update({name: configs for name, configs in VERSIONED_PASSES.items()
+                        if set(configs) <= (declared_pass_keys() or set())})
 CONFIG_KNOBS = tuple(TRITON_CONFIGS) + ('cfg_pass', 'cfg_amd')
 DEFAULT_CONFIG_PROB = 0.5  # share of sampled programs compiled under the default configuration
 

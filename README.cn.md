@@ -43,7 +43,7 @@ tests/                            单元测试、离线编译及 GPU smoke
 
 ## 运行方式
 
-在项目目录运行。本分支针对 **TileLang 0.1.14**、**Triton 3.8.0** 和 **PyTorch 2.4.0+cu124**；两台已审计服务器的 `tp_fuzzing_latest` 环境使用 Python 3.11。仓库中的 [requirements.txt](requirements.txt) 仍固定*旧版* TileLang 0.1.11 / Triton 3.0.0，不能原样用于复现本分支实验。安装带 `+cu124` 的 PyTorch wheel 还需使用对应的 PyTorch CUDA wheel 索引，不能只依赖普通 PyPI 镜像。运行前检查当前环境：
+在项目目录运行。本分支针对 **TileLang 0.1.15**、**Triton 3.8.0** 和 **PyTorch 2.4.0+cu124**；跑 b1eded9f 实验的 TileLang 0.1.14 同样通过全部测试，只有 0.1.15 才声明的 pass 配置会在已安装版本支持时启用。[requirements.txt](requirements.txt) 固定了这组版本；带 `+cu124` 的 PyTorch wheel 需用 PyTorch 的 CUDA wheel 索引，且 torch 2.4 声明依赖 triton 3.0，需之后再装 Triton 3.8。运行前检查当前环境：
 
 ```bash
 python -c "import sys; from importlib.metadata import version; print(sys.version.split()[0], {name: version(name) for name in ('torch', 'tilelang', 'triton')})"
@@ -182,7 +182,7 @@ extend 的输入是**已实例化且执行通过的 ExtendedProgram JSON**，不
 
 数值扩展保留父样例的原有检查输出，额外返回 DSL 专属操作结果。浮点输入由父结果导出并限幅；直方图和按位归约优先使用父程序的精确整数值，否则使用依赖运行时参数的整数索引，初始直方图输入限制在 0–15；变异后允许越界，参考解释器按 Triton 语义忽略负数及大于等于 16 的值。二维 Triton softmax 沿行归约时强制保留归约维度，以正确广播；旧保存程序在重新发射时也会修正。这样避免把父程序容差内的浮点误差放大成离散结果误报。表中仍是有界子集，不能声称覆盖全部 API；异步/TMA 等硬件专属指令、自定义扫描组合函数及任意 dtype/形状组合尚未纳入。
 
-用 `python -m tools.api_coverage --backend triton --summary results/<扩展实验>/summary.json --passed-code-dir results/<共用实验>/passed --output triton_api.json`（TileLang 将后端改为 `tilelang`）审计当前 Conda 环境导出的 CUDA 语言 API。清单逐项记录安装版本与状态：`executed_pass` 表示扩展实验至少有一个通过样例；`seen_in_passing_code` 表示保存的通过样例代码中有该 DSL 的直接调用；`implemented_no_run` 表示有生成代码但缺少实验通过证据；`unmapped` 表示清单尚无证据，不代表 fuzzer 其它阶段从未调用。单一样例也不代表覆盖该 API 的全部参数、数据类型与硬件路径。应在目标版本 Triton 3.8、TileLang 0.1.14 的环境分别生成清单。
+用 `python -m tools.api_coverage --backend triton --summary results/<扩展实验>/summary.json --passed-code-dir results/<共用实验>/passed --output triton_api.json`（TileLang 将后端改为 `tilelang`）审计当前 Conda 环境导出的 CUDA 语言 API。清单逐项记录安装版本与状态：`executed_pass` 表示扩展实验至少有一个通过样例；`seen_in_passing_code` 表示保存的通过样例代码中有该 DSL 的直接调用；`implemented_no_run` 表示有生成代码但缺少实验通过证据；`unmapped` 表示清单尚无证据，不代表 fuzzer 其它阶段从未调用。单一样例也不代表覆盖该 API 的全部参数、数据类型与硬件路径。应在目标版本 Triton 3.8、TileLang 0.1.15 的环境分别生成清单。
 
 MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Extended 程序加入全局内存原子操作（在刻意竞态的地址上做可交换 add/max/min）、带数据依赖操作数的标量 FMA 链、triton 形状原语（flip/interleave/join/split）以及 int32 累加的 int8 × int8 matmul。普通 Region 加入超越函数元素操作（tanh/erf/log/log2/exp2/rsqrt/sin/cos/floor/ceil）和 int8 GEMM-only 程序（规格来自预校验网格：block_K ∈ {32, 64}、int32 累加、精确整数参考）。fp32 GEMM 永不与边界台阶 op（ceil/floor/round/cast）组合：TF32 张量核计算相对精确 fp32 参考会翻动取整边界，使 oracle 淹没在无法与 bug 区分的噪声里。
 
@@ -226,7 +226,7 @@ MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Exten
 | 累加器宽度扫掠 | 开（`--no-extended-precision` 关闭） | 每个基础配置的 fp16 累加副本（tilelang `T.gemm` fp16 fragment、triton `tl.dot` fp16 累加），解释器按每 k=16 的 MMA 舍入建模；triton 另加 ieee→tf32 输入精度变体 | `precision_mismatch` |
 | 代数恒等式扫掠 | 开（`--no-extended-identities` 关闭） | 无 matmul 程序中 `mul(x, add/sub(y, z))` 改写为分配律形式，按变换后程序单独计算期望 | `algebraic_identity` |
 
-tilelang 的 `opt_level` 无法穿透 `tilelang.compile`（所有 s_tir pass 声明 `opt_level=0`），因此 RC2 pass 管线差异用已核实的 `pass_configs` 键实现；`tl.enable_fast_math` 会改变数值，默认关闭。随机采样池（`src/backends/common/knobs.py`）只含针对目标 TileLang 0.1.14 重新核实过消费者的键（排除竞态、去掉安全合法化、Hopper-only 和 debug 键），且采样是（程序签名, seed）的纯函数——证据读取和超时缩放会重新推导同一变体列表。
+tilelang 的 `opt_level` 无法穿透 `tilelang.compile`（所有 s_tir pass 声明 `opt_level=0`），因此 RC2 pass 管线差异用已核实的 `pass_configs` 键实现；`tl.enable_fast_math` 会改变数值，默认关闭。随机采样池（`src/backends/common/knobs.py`）只含在 TileLang 0.1.14 和目标版本 0.1.15 上重新核实过消费者的键（排除竞态、去掉安全合法化、Hopper-only 和 debug 键），且采样是（程序签名, seed）的纯函数——证据读取和超时缩放会重新推导同一变体列表。
 
 每个失败报告的定位信息保存在 summary.json 的新键 `root_cause_locations`（`root_cause → 位置 → 次数`）中：位置依次取不变性标签本身、崩溃前最后一个 `TILESMITH_STAGE` 标记、TVM pass 名或报错源文件。`root_causes` 键保持 `{str: int}` 形状不变，`failed/` 目录命名不变。
 
