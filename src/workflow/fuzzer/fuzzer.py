@@ -143,110 +143,15 @@ class TileSmith:
 
     def _load_history(self):
         """Load previous results from resume directory to avoid re-testing."""
-        passed_count = 0
-        failed_count = 0
-        report_times = {}  # bucket -> earliest timestamp among its saved reports
-        origin_restored = False
-
-        for passed_dir in (self.output_dir / 'passed', self.output_dir / 'compiled'):
-            for json_file in passed_dir.glob("*.json"):
-                try:
-                    with open(json_file) as f:
-                        d = json.load(f)
-                    sig = self._make_sig_from_dict(d)
-                    self.tested_configs.add(sig)
-                    passed_count += 1
-                except (json.JSONDecodeError, KeyError):
-                    pass
-
-        failed_dir = self.output_dir / "failed"
-        if failed_dir.exists():
-            for root_cause_dir in failed_dir.iterdir():
-                if not root_cause_dir.is_dir():
-                    continue
-                root_cause = root_cause_dir.name
-                dir_count = 0
-                for json_file in root_cause_dir.rglob("*.json"):
-                    try:
-                        with open(json_file) as f:
-                            d = json.load(f)
-                        sig = self._make_sig_from_dict(d)
-                        self.tested_configs.add(sig)
-                        failed_count += 1
-                        dir_count += 1
-                        bucket, bucket_key = self._history_bucket(d, root_cause)
-                        self.failure_buckets[bucket] += 1
-                        self.failure_bucket_keys.setdefault(bucket, bucket_key)
-                        if root_cause != 'oracle_unstable':
-                            self.root_cause_locations.setdefault(root_cause, Counter())[d.get('location', '')] += 1
-                        timestamp = d.get('timestamp')
-                        if isinstance(timestamp, (int, float)):
-                            first = report_times.setdefault(bucket, timestamp)
-                            report_times[bucket] = min(first, timestamp)
-                    except (json.JSONDecodeError, KeyError):
-                        pass
-                # Skipped numeric checks are oracle noise, not a failure
-                # category: they never count as bugs, before or after resuming.
-                if root_cause == 'oracle_unstable':
-                    self.stats.oracle_unstable = dir_count
-                elif dir_count > 0:
-                    self.known_root_causes[root_cause] = self.known_root_causes.get(root_cause, 0) + dir_count
-
-        total_count = passed_count + failed_count
+        passed_count = self._load_passed()
+        failed_count, report_times = self._load_failed()
         # Reports are deduplicated/limited, so their file count may be much
         # smaller than the actual number of historical executions.
-        summary_path = self.output_dir / "summary.json"
-        if summary_path.exists():
-            try:
-                with open(summary_path) as f:
-                    summary = json.load(f)
-            except (OSError, json.JSONDecodeError):
-                summary = {}
-            if "input_seed" in summary and summary["input_seed"] != self.config.input_seed:
-                raise ValueError(f"Resume input seed mismatch: use --input-seed {summary['input_seed']}")
-            if summary.get('compile_only', False) != self.config.compile_only:
-                raise ValueError('Cannot mix compile-only and execution results in one campaign')
-            self.stats.programs_compiled = summary.get('programs_compiled', 0)
-            self.stats.programs_passed = summary.get('programs_passed', passed_count if not self.config.compile_only else 0)
-            total_count = max(total_count, summary.get("total_tested", 0))
-            self.stats.oracle_unstable = max(self.stats.oracle_unstable, summary.get('oracle_unstable', 0))
-            for cause, count in summary.get("root_causes", {}).items():
-                if cause != 'oracle_unstable':
-                    self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
-            for bucket, count in summary.get('failure_buckets', {}).items():
-                if type(count) is int:
-                    self.failure_buckets[bucket] = max(self.failure_buckets[bucket], count)
-            for bucket, bucket_key in summary.get('failure_bucket_keys', {}).items():
-                self.failure_bucket_keys.setdefault(bucket, bucket_key)
-            if isinstance(summary.get('timeline_origin'), dict):
-                self.timeline_origin, origin_restored = summary['timeline_origin'], True
-                self._historical_seconds = float(summary.get('campaign_seconds') or 0)
-            for bucket, first in summary.get('failure_bucket_first_seen', {}).items():
-                if isinstance(first, dict):
-                    self.failure_bucket_first_seen.setdefault(bucket, first)
-            for cause, counts in summary.get("root_cause_locations", {}).items():
-                if isinstance(counts, dict) and counts:
-                    current = self.root_cause_locations.get(cause, Counter())
-                    if sum(counts.values()) > sum(current.values()):
-                        self.root_cause_locations[cause] = Counter(counts)
-            routes = summary.get('route_stats')
-            if isinstance(routes, dict):
-                self.route_stats = {route: dict(values) for route, values in routes.items()}
-            # DSL drift between segments: the harness adapts to both pairs, so
-            # this is a warning, not a refusal. The counting matters though —
-            # a root cause that vanished after an upgrade reads as "fixed"
-            # unless the versions differ.
-            from src.backends.common.versions import environment
-            recorded = summary.get('environment')
-            if isinstance(recorded, dict):
-                current = environment()
-                drift = [f'{name}: {recorded[name]} -> {current.get(name)}'
-                         for name in sorted(recorded)
-                         if recorded[name] != current.get(name)]
-                if drift:
-                    print('[resume] WARNING: environment changed since this campaign started '
-                          '(' + '; '.join(drift) + '); counts before and after are not comparable')
-
+        total_count = passed_count + failed_count
+        origin_restored = False
+        summary = self._read_summary()
+        if summary is not None:
+            total_count, origin_restored = self._merge_summary(summary, passed_count, total_count)
         self.stats.total_tested = total_count
         self.stats.total_generated = self.stats.total_tested
         if not self._backfill_timeline(report_times, origin_restored):
@@ -261,6 +166,132 @@ class TileSmith:
         print(f"[resume] Known root causes: {self.known_root_causes}")
         print(f"[resume] Previous tests: {self.stats.total_tested}")
         print()
+
+    @staticmethod
+    def _read_record(path):
+        """A saved program record, or None when it is unreadable."""
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            return None
+
+    def _load_passed(self) -> int:
+        count = 0
+        for directory in (self.output_dir / 'passed', self.output_dir / 'compiled'):
+            for path in directory.glob("*.json"):
+                record = self._read_record(path)
+                try:
+                    if record is not None:
+                        self.tested_configs.add(self._make_sig_from_dict(record))
+                        count += 1
+                except KeyError:
+                    pass
+        return count
+
+    def _load_failed(self):
+        """Count saved failures per root cause and bucket; returns (count, earliest report time per bucket)."""
+        count, report_times = 0, {}
+        failed_dir = self.output_dir / "failed"
+        if not failed_dir.exists():
+            return count, report_times
+        for cause_dir in failed_dir.iterdir():
+            if not cause_dir.is_dir():
+                continue
+            root_cause, in_cause = cause_dir.name, 0
+            for path in cause_dir.rglob("*.json"):
+                record = self._read_record(path)
+                try:
+                    if record is None:
+                        continue
+                    self.tested_configs.add(self._make_sig_from_dict(record))
+                    count += 1
+                    in_cause += 1
+                    bucket, bucket_key = self._history_bucket(record, root_cause)
+                    self.failure_buckets[bucket] += 1
+                    self.failure_bucket_keys.setdefault(bucket, bucket_key)
+                    if root_cause != 'oracle_unstable':
+                        self.root_cause_locations.setdefault(root_cause, Counter())[record.get('location', '')] += 1
+                    timestamp = record.get('timestamp')
+                    if isinstance(timestamp, (int, float)):
+                        report_times[bucket] = min(report_times.setdefault(bucket, timestamp), timestamp)
+                except KeyError:
+                    pass
+            # Skipped numeric checks are oracle noise, not a failure category:
+            # they never count as bugs, before or after resuming.
+            if root_cause == 'oracle_unstable':
+                self.stats.oracle_unstable = in_cause
+            elif in_cause > 0:
+                self.known_root_causes[root_cause] = self.known_root_causes.get(root_cause, 0) + in_cause
+        return count, report_times
+
+    def _read_summary(self):
+        """summary.json of the campaign being resumed; {} when unreadable, None when absent."""
+        path = self.output_dir / "summary.json"
+        if not path.exists():
+            return None
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return {}
+
+    def _merge_summary(self, summary, passed_count, total_count):
+        """Take the larger of the recorded and the recounted statistics.
+
+        Returns (total tested, whether the timeline origin was restored).
+        """
+        if "input_seed" in summary and summary["input_seed"] != self.config.input_seed:
+            raise ValueError(f"Resume input seed mismatch: use --input-seed {summary['input_seed']}")
+        if summary.get('compile_only', False) != self.config.compile_only:
+            raise ValueError('Cannot mix compile-only and execution results in one campaign')
+        self.stats.programs_compiled = summary.get('programs_compiled', 0)
+        self.stats.programs_passed = summary.get('programs_passed', passed_count if not self.config.compile_only else 0)
+        total_count = max(total_count, summary.get("total_tested", 0))
+        self.stats.oracle_unstable = max(self.stats.oracle_unstable, summary.get('oracle_unstable', 0))
+        for cause, count in summary.get("root_causes", {}).items():
+            if cause != 'oracle_unstable':
+                self.known_root_causes[cause] = max(self.known_root_causes.get(cause, 0), count)
+        for bucket, count in summary.get('failure_buckets', {}).items():
+            if type(count) is int:
+                self.failure_buckets[bucket] = max(self.failure_buckets[bucket], count)
+        for bucket, bucket_key in summary.get('failure_bucket_keys', {}).items():
+            self.failure_bucket_keys.setdefault(bucket, bucket_key)
+        origin_restored = False
+        if isinstance(summary.get('timeline_origin'), dict):
+            self.timeline_origin, origin_restored = summary['timeline_origin'], True
+            self._historical_seconds = float(summary.get('campaign_seconds') or 0)
+        for bucket, first in summary.get('failure_bucket_first_seen', {}).items():
+            if isinstance(first, dict):
+                self.failure_bucket_first_seen.setdefault(bucket, first)
+        for cause, counts in summary.get("root_cause_locations", {}).items():
+            if isinstance(counts, dict) and counts:
+                current = self.root_cause_locations.get(cause, Counter())
+                if sum(counts.values()) > sum(current.values()):
+                    self.root_cause_locations[cause] = Counter(counts)
+        routes = summary.get('route_stats')
+        if isinstance(routes, dict):
+            self.route_stats = {route: dict(values) for route, values in routes.items()}
+        self._warn_environment_drift(summary.get('environment'))
+        return total_count, origin_restored
+
+    @staticmethod
+    def _warn_environment_drift(recorded):
+        """DSL drift between segments is a warning, not a refusal.
+
+        The harness adapts to both pairs, but the counting matters: a root
+        cause that vanished after an upgrade reads as "fixed" unless the
+        versions differ.
+        """
+        from src.backends.common.versions import environment
+        if not isinstance(recorded, dict):
+            return
+        current = environment()
+        drift = [f'{name}: {recorded[name]} -> {current.get(name)}'
+                 for name in sorted(recorded) if recorded[name] != current.get(name)]
+        if drift:
+            print('[resume] WARNING: environment changed since this campaign started '
+                  '(' + '; '.join(drift) + '); counts before and after are not comparable')
 
     def _backfill_timeline(self, report_times, origin_restored):
         """Complete first sightings the summary lacks, and say whether the
