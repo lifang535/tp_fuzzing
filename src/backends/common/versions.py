@@ -73,7 +73,9 @@ def mismatches() -> list:
     notes = []
     for name, target in DISTRIBUTIONS.items():
         found = installed(name)
-        if found is not None and found != target:
+        # A local version label names the build, not the release:
+        # torch 2.4.0+cu124 is torch 2.4.0.
+        if found is not None and found.split('+')[0] != target:
             notes.append(f'{name} {found} (target {target})')
     return notes
 
