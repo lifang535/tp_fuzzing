@@ -49,6 +49,21 @@ def _bounded(message, limit=2000):
     return '\n'.join(kept + [tail]) if kept else tail
 
 
+def _process_error(result) -> str:
+    """The diagnostic of a failed subprocess, with the signal that killed it."""
+    message = result.stderr.strip() or result.stdout.strip()
+    if not message:
+        message = f'Process exited with return code {result.returncode}'
+    if result.returncode < 0:
+        signum = -result.returncode
+        try:
+            name = signal.Signals(signum).name
+        except ValueError:
+            name = "unknown"
+        message += f"\nProcess terminated by signal {signum} ({name})"
+    return message
+
+
 def _take_lowering(stdout):
     """(lowering features, stdout without them) of a slice harness run; the
     harness prints its compiled kernels' features on one stdout line."""
@@ -161,36 +176,21 @@ class Oracle:
         return evidence
 
     def test(self, program) -> Optional[BugReport]:
-        """Test a Region or Extended program."""
+        """Run a Region, Extended or slice program in a subprocess; None when it passes."""
+        from src.ir.extended import ExtendedProgram
+        from src.ir.slice import SliceProgram
         code = self._emit_code(program)
         self.last_compilation = []
         self.compilation_complete = False
         self.last_artifact_dir = None
         self.last_lowering = None
-        from src.ir.extended import ExtendedProgram
-        from src.ir.slice import SliceProgram
         extended = isinstance(program, ExtendedProgram)
         sliced = isinstance(program, SliceProgram)
         if self.config.compile_only and not extended:
             raise ValueError('compile_only requires an extended program')
-        temporary_artifacts = None
         options = dict(self.backend_impl.execution_options(self.config))
-        if extended:
-            if not self.config.save_artifacts or self.artifact_root is None:
-                temporary_artifacts = tempfile.TemporaryDirectory(prefix='tilesmith_compilation_')
-                artifact_dir = Path(temporary_artifacts.name)
-            else:
-                artifact_dir = Path(self.artifact_root) / hashlib.sha256(code.encode()).hexdigest()[:24]
-                artifact_dir.mkdir(parents=True, exist_ok=True)
-            self.last_artifact_dir = artifact_dir
-            for name in ('compilation.json', 'progress.json'):
-                (artifact_dir / name).unlink(missing_ok=True)
-            (artifact_dir / 'repro.py').write_text(code)
-            (artifact_dir / 'program.json').write_text(json.dumps(program.to_dict(), indent=2))
-            options['env'] = dict(options.get('env', os.environ),
-                                  TILESMITH_ARTIFACT_DIR=str(artifact_dir.resolve()),
-                                  TILESMITH_COMPILE_ONLY=str(int(self.config.compile_only)))
-
+        artifact_dir, temporary_artifacts = (self._artifact_dir(program, code, options) if extended
+                                             else (None, None))
         # Compilers leave temporaries in TMPDIR when they fail or are killed
         # on timeout (Triton keeps its ptxas input and output, megabytes per
         # kernel), so every test gets a private TMPDIR removed with it.
@@ -199,35 +199,17 @@ class Oracle:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False, prefix="tilesmith_") as f:
             f.write(code)
             tmp_path = f.name
-
         try:
             from .process import run_isolated
-            execute = run_isolated if extended else subprocess.run
             if not extended:
                 options.update(capture_output=True, text=True)
-            result = execute(
-                self.backend_impl.execution_command(tmp_path),
-                timeout=self.config.compile_timeout * (len(self.backend_impl.extended_variants(program, self.config)) if extended
-                                                      else _slice_timeout_multiplier(program) if sliced
-                                                      else _region_timeout_multiplier(program, self.config, self.backend_impl))
-                        + self.config.execute_timeout,
-                **options,
-            )
+            result = (run_isolated if extended else subprocess.run)(
+                self.backend_impl.execution_command(tmp_path), timeout=self._timeout(program), **options)
             if extended:
                 evidence = self._read_extended_evidence(program, artifact_dir)
-                progress = evidence.progress
-                output = result.stdout + result.stderr
-                if result.returncode:
-                    output += f'\nProcess exited with return code {result.returncode}\n'
-                evidence_error = ''
-                if result.returncode == 0:
-                    mode = 'compile_only' if self.config.compile_only else 'execute'
-                    if not evidence.completed(mode, result.stdout):
-                        evidence_error = 'Incomplete extended compilation/execution evidence'
-                        if evidence.diagnostic:
-                            evidence_error += ': ' + evidence.diagnostic
-                        output += '\n' + evidence_error + '\n'
-                (artifact_dir / 'run.log').write_text(output)
+                error = self._extended_outcome(result, evidence, artifact_dir)
+                if error is not None:
+                    return self._failure(program, code, error, progress=evidence.progress)
             else:
                 if sliced:
                     self.last_lowering, result.stdout = _take_lowering(result.stdout)
@@ -238,95 +220,10 @@ class Oracle:
                 # marker, so they still count as compiled.
                 self.compilation_complete = (result.returncode == 0
                                              or 'TILESMITH_STAGE=execute' in (result.stderr or ''))
-
-            if result.returncode != 0 or (extended and evidence_error):
-                error_msg = (evidence_error if extended and evidence_error else
-                             result.stderr.strip() or result.stdout.strip())
-                if not error_msg:
-                    error_msg = f'Process exited with return code {result.returncode}'
-                if result.returncode < 0:
-                    signum = -result.returncode
-                    try:
-                        signame = signal.Signals(signum).name
-                    except ValueError:
-                        signame = "unknown"
-                    error_msg += f"\nProcess terminated by signal {signum} ({signame})"
-                bug_type = self._classify_error(error_msg)
-                if extended:
-                    # A skipped numeric check (the oracle trust gate) also
-                    # ends in the execute stage but is not a crash.
-                    if (progress.get('stage') in ('execute', 'complete') and not self.config.compile_only
-                            and bug_type not in (BugType.WRONG_RESULT, BugType.ORACLE_UNSTABLE)):
-                        bug_type = BugType.RUNTIME_CRASH
-                params, dtype_str, compute_kind_str = self._get_meta(program)
-                params["input_seed"] = self.config.input_seed
-                report = BugReport(
-                    bug_type=bug_type,
-                    error_message=_bounded(error_msg),
-                    params=params,
-                    dtype=dtype_str,
-                    compute_kind=compute_kind_str,
-                    generated_code=code,
-                )
-                # Classify against the complete diagnostic before keeping its
-                # bounded tail; pass names can otherwise be truncated away.
-                from src.workflow.feedback import confirmed_failure
-                report.confirmed_signature = confirmed_failure(error_msg, self.backend) or ''
-                report.classify_root_cause(self.backend)
-                if extended and progress:
-                    # The progress manifest names the exact variant and stage
-                    # the subprocess reached, which beats message inference.
-                    report.location = f"{progress.get('stage')}:{progress.get('variant')}"
-                else:
-                    # Stage markers precede a traceback that can outgrow the
-                    # kept tail (region harnesses print the program).
-                    from src.backends.common.diagnostics import _failure_location
-                    report.location = _failure_location(error_msg)
-                from src.workflow.triage import failure_bucket, wrong_result_origin
-                # Every wrong value shares the checker's message; the operation
-                # producing the earliest one separates the mechanisms.
-                origin = (wrong_result_origin(params['extended_program'], error_msg)
-                          if extended and bug_type is BugType.WRONG_RESULT else '')
-                if sliced and bug_type is BugType.WRONG_RESULT:
-                    from src.workflow.slices import slice_origin
-                    origin = slice_origin(program)
-                report.failure_bucket, report.failure_key = failure_bucket(
-                    error_msg, report.root_cause, report.confirmed_signature, report.location, origin)
-                return report
-
+                if result.returncode != 0:
+                    return self._failure(program, code, _process_error(result))
         except subprocess.TimeoutExpired as exc:
-            if extended:
-                def decode(value):
-                    return value.decode(errors='replace') if isinstance(value, bytes) else value or ''
-                (artifact_dir / 'run.log').write_text(decode(exc.stdout) + decode(exc.stderr) + '\nExecution timed out')
-            params, dtype_str, compute_kind_str = self._get_meta(program)
-            params["input_seed"] = self.config.input_seed
-            report = BugReport(
-                bug_type=BugType.TIMEOUT,
-                error_message="Execution timed out",
-                params=params,
-                dtype=dtype_str,
-                compute_kind=compute_kind_str,
-                generated_code=code,
-            )
-            report.root_cause = "timeout"
-            if extended:
-                progress = self._read_extended_evidence(program, artifact_dir).progress
-                if progress:
-                    report.location = f"{progress.get('stage')}:{progress.get('variant')}"
-            else:
-                # Region/probe harnesses print TILESMITH_STAGE markers; the
-                # last one names where the subprocess hung (prepare, execute,
-                # reference, ...). Previously always '' for non-extended.
-                from src.backends.common.diagnostics import _failure_location
-                stderr = exc.stderr
-                if isinstance(stderr, bytes):
-                    stderr = stderr.decode(errors='replace')
-                report.location = _failure_location(stderr or '')
-            from src.workflow.triage import failure_bucket
-            report.failure_bucket, report.failure_key = failure_bucket(
-                report.error_message, report.root_cause, location=report.location)
-            return report
+            return self._timeout_report(program, code, exc, artifact_dir if extended else None)
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
             if extended:
@@ -339,8 +236,121 @@ class Oracle:
                 os.unlink(tmp_path)
             except OSError:
                 pass
-
         return None
+
+    def _artifact_dir(self, program, code, options):
+        """Directory the Extended harness writes its evidence to, and its owner if temporary."""
+        temporary = None
+        if not self.config.save_artifacts or self.artifact_root is None:
+            temporary = tempfile.TemporaryDirectory(prefix='tilesmith_compilation_')
+            directory = Path(temporary.name)
+        else:
+            directory = Path(self.artifact_root) / hashlib.sha256(code.encode()).hexdigest()[:24]
+            directory.mkdir(parents=True, exist_ok=True)
+        self.last_artifact_dir = directory
+        for name in ('compilation.json', 'progress.json'):
+            (directory / name).unlink(missing_ok=True)
+        (directory / 'repro.py').write_text(code)
+        (directory / 'program.json').write_text(json.dumps(program.to_dict(), indent=2))
+        options['env'] = dict(options.get('env', os.environ),
+                              TILESMITH_ARTIFACT_DIR=str(directory.resolve()),
+                              TILESMITH_COMPILE_ONLY=str(int(self.config.compile_only)))
+        return directory, temporary
+
+    def _timeout(self, program) -> float:
+        """Compile budget per compiled variant plus the execution budget."""
+        from src.ir.extended import ExtendedProgram
+        from src.ir.slice import SliceProgram
+        if isinstance(program, ExtendedProgram):
+            variants = len(self.backend_impl.extended_variants(program, self.config))
+        elif isinstance(program, SliceProgram):
+            variants = _slice_timeout_multiplier(program)
+        else:
+            variants = _region_timeout_multiplier(program, self.config, self.backend_impl)
+        return self.config.compile_timeout * variants + self.config.execute_timeout
+
+    def _extended_outcome(self, result, evidence, artifact_dir):
+        """Error message of an Extended run (None when it passed); writes run.log."""
+        output = result.stdout + result.stderr
+        if result.returncode:
+            output += f'\nProcess exited with return code {result.returncode}\n'
+        evidence_error = ''
+        if result.returncode == 0:
+            mode = 'compile_only' if self.config.compile_only else 'execute'
+            if not evidence.completed(mode, result.stdout):
+                evidence_error = 'Incomplete extended compilation/execution evidence'
+                if evidence.diagnostic:
+                    evidence_error += ': ' + evidence.diagnostic
+                output += '\n' + evidence_error + '\n'
+        (artifact_dir / 'run.log').write_text(output)
+        if evidence_error:
+            return evidence_error
+        return _process_error(result) if result.returncode != 0 else None
+
+    def _report(self, program, code, bug_type, message) -> BugReport:
+        params, dtype, compute_kind = self._get_meta(program)
+        params["input_seed"] = self.config.input_seed
+        return BugReport(bug_type=bug_type, error_message=message, params=params, dtype=dtype,
+                         compute_kind=compute_kind, generated_code=code)
+
+    def _failure(self, program, code, error_msg, progress=None) -> BugReport:
+        """Classify a failed run: bug type, root cause, location and failure bucket."""
+        from src.ir.extended import ExtendedProgram
+        from src.ir.slice import SliceProgram
+        from src.workflow.feedback import confirmed_failure
+        from src.workflow.triage import failure_bucket, wrong_result_origin
+        extended = isinstance(program, ExtendedProgram)
+        bug_type = self._classify_error(error_msg)
+        # A skipped numeric check (the oracle trust gate) also ends in the
+        # execute stage but is not a crash.
+        if (extended and progress.get('stage') in ('execute', 'complete') and not self.config.compile_only
+                and bug_type not in (BugType.WRONG_RESULT, BugType.ORACLE_UNSTABLE)):
+            bug_type = BugType.RUNTIME_CRASH
+        report = self._report(program, code, bug_type, _bounded(error_msg))
+        # Classify against the complete diagnostic before keeping its bounded
+        # tail; pass names can otherwise be truncated away.
+        report.confirmed_signature = confirmed_failure(error_msg, self.backend) or ''
+        report.classify_root_cause(self.backend)
+        if extended and progress:
+            # The progress manifest names the exact variant and stage the
+            # subprocess reached, which beats message inference.
+            report.location = f"{progress.get('stage')}:{progress.get('variant')}"
+        else:
+            # Stage markers precede a traceback that can outgrow the kept
+            # tail (region harnesses print the program).
+            from src.backends.common.diagnostics import _failure_location
+            report.location = _failure_location(error_msg)
+        # Every wrong value shares the checker's message; the operation
+        # producing the earliest one separates the mechanisms.
+        origin = (wrong_result_origin(report.params['extended_program'], error_msg)
+                  if extended and bug_type is BugType.WRONG_RESULT else '')
+        if isinstance(program, SliceProgram) and bug_type is BugType.WRONG_RESULT:
+            from src.workflow.slices import slice_origin
+            origin = slice_origin(program)
+        report.failure_bucket, report.failure_key = failure_bucket(
+            error_msg, report.root_cause, report.confirmed_signature, report.location, origin)
+        return report
+
+    def _timeout_report(self, program, code, exc, artifact_dir) -> BugReport:
+        from src.workflow.triage import failure_bucket
+        def decode(value):
+            return value.decode(errors='replace') if isinstance(value, bytes) else value or ''
+        if artifact_dir is not None:
+            (artifact_dir / 'run.log').write_text(decode(exc.stdout) + decode(exc.stderr) + '\nExecution timed out')
+        report = self._report(program, code, BugType.TIMEOUT, "Execution timed out")
+        report.root_cause = "timeout"
+        if artifact_dir is not None:
+            progress = self._read_extended_evidence(program, artifact_dir).progress
+            if progress:
+                report.location = f"{progress.get('stage')}:{progress.get('variant')}"
+        else:
+            # Region/probe harnesses print TILESMITH_STAGE markers; the last
+            # one names where the subprocess hung (prepare, execute, ...).
+            from src.backends.common.diagnostics import _failure_location
+            report.location = _failure_location(decode(exc.stderr))
+        report.failure_bucket, report.failure_key = failure_bucket(
+            report.error_message, report.root_cause, location=report.location)
+        return report
 
     def _classify_error(self, error_msg: str) -> BugType:
         return self.backend_impl.classify_error(error_msg)
