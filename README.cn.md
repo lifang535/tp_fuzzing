@@ -168,8 +168,8 @@ python main.py --backend triton --extended-prob 1 -n 10000
 python main.py --backend triton --extended-prob 0.5 --dsl-extend-prob 0.4 -n 10000
 # 也可以单独对既有 passed/ 结果运行 extend
 # 第二阶段：读取第一阶段的 passed/*.json，定向测试目标 DSL 的操作
-python extend.py --backend triton --passed-dir results/<campaign>/passed -n 10000
-python extend.py --backend tilelang --passed-dir results/<campaign>/passed -n 10000
+python -m tools.extend --backend triton --passed-dir results/<campaign>/passed -n 10000
+python -m tools.extend --backend tilelang --passed-dir results/<campaign>/passed -n 10000
 # 可用 --op 指定下表中的一项操作
 ```
 
@@ -182,7 +182,7 @@ extend 的输入是**已实例化且执行通过的 ExtendedProgram JSON**，不
 
 数值扩展保留父样例的原有检查输出，额外返回 DSL 专属操作结果。浮点输入由父结果导出并限幅；直方图和按位归约优先使用父程序的精确整数值，否则使用依赖运行时参数的整数索引，初始直方图输入限制在 0–15；变异后允许越界，参考解释器按 Triton 语义忽略负数及大于等于 16 的值。二维 Triton softmax 沿行归约时强制保留归约维度，以正确广播；旧保存程序在重新发射时也会修正。这样避免把父程序容差内的浮点误差放大成离散结果误报。表中仍是有界子集，不能声称覆盖全部 API；异步/TMA 等硬件专属指令、自定义扫描组合函数及任意 dtype/形状组合尚未纳入。
 
-用 `python api_coverage.py --backend triton --summary results/<扩展实验>/summary.json --passed-code-dir results/<共用实验>/passed --output triton_api.json`（TileLang 将后端改为 `tilelang`）审计当前 Conda 环境导出的 CUDA 语言 API。清单逐项记录安装版本与状态：`executed_pass` 表示扩展实验至少有一个通过样例；`seen_in_passing_code` 表示保存的通过样例代码中有该 DSL 的直接调用；`implemented_no_run` 表示有生成代码但缺少实验通过证据；`unmapped` 表示清单尚无证据，不代表 fuzzer 其它阶段从未调用。单一样例也不代表覆盖该 API 的全部参数、数据类型与硬件路径。应在目标版本 Triton 3.8、TileLang 0.1.14 的环境分别生成清单。
+用 `python -m tools.api_coverage --backend triton --summary results/<扩展实验>/summary.json --passed-code-dir results/<共用实验>/passed --output triton_api.json`（TileLang 将后端改为 `tilelang`）审计当前 Conda 环境导出的 CUDA 语言 API。清单逐项记录安装版本与状态：`executed_pass` 表示扩展实验至少有一个通过样例；`seen_in_passing_code` 表示保存的通过样例代码中有该 DSL 的直接调用；`implemented_no_run` 表示有生成代码但缺少实验通过证据；`unmapped` 表示清单尚无证据，不代表 fuzzer 其它阶段从未调用。单一样例也不代表覆盖该 API 的全部参数、数据类型与硬件路径。应在目标版本 Triton 3.8、TileLang 0.1.14 的环境分别生成清单。
 
 MLIRSmith 式 op 面扩张在两层 IR 之上新增编译器代码路径。Extended 程序加入全局内存原子操作（在刻意竞态的地址上做可交换 add/max/min）、带数据依赖操作数的标量 FMA 链、triton 形状原语（flip/interleave/join/split）以及 int32 累加的 int8 × int8 matmul。普通 Region 加入超越函数元素操作（tanh/erf/log/log2/exp2/rsqrt/sin/cos/floor/ceil）和 int8 GEMM-only 程序（规格来自预校验网格：block_K ∈ {32, 64}、int32 累加、精确整数参考）。fp32 GEMM 永不与边界台阶 op（ceil/floor/round/cast）组合：TF32 张量核计算相对精确 fp32 参考会翻动取整边界，使 oracle 淹没在无法与 bug 区分的噪声里。
 

@@ -14,8 +14,8 @@ from src.workflow.generator.extended import ExtendedGenerator
 from src.workflow.generator.grids import GridState
 from src.workflow.emitter.extended_runtime import extended_inputs, extended_reference
 from src.workflow.oracle import BugReport, BugType
-from extend import main, passing_sources
-from api_coverage import audit, campaign_passes, passing_code_calls
+from tools.extend import main, passing_sources
+from tools.api_coverage import audit, campaign_passes, passing_code_calls
 
 
 class DslExtensionTests(unittest.TestCase):
@@ -152,7 +152,7 @@ class DslExtensionTests(unittest.TestCase):
                 def _emit_code(self, program):
                     return 'pass\n'
 
-            with patch('extend.Oracle', StubOracle):
+            with patch('tools.extend.Oracle', StubOracle):
                 self.assertEqual(main(['--backend', 'triton', '--passed-dir', str(passed),
                                        '--op', 'join', '-n', '1', '--output', str(root / 'extended')]), 0)
             records = list((root / 'extended' / 'passed').glob('*.json'))
@@ -167,7 +167,7 @@ class DslExtensionTests(unittest.TestCase):
                     return BugReport(BugType.WRONG_RESULT, 'baseline mismatch',
                                      root_cause='wrong_result')
 
-            with patch('extend.Oracle', FailingBaseline):
+            with patch('tools.extend.Oracle', FailingBaseline):
                 with self.assertRaisesRegex(RuntimeError, 'Could not reach requested count'):
                     main(['--backend', 'triton', '--passed-dir', str(passed),
                           '--op', 'join', '-n', '1', '--output', str(root / 'rejected')])

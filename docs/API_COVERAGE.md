@@ -6,7 +6,7 @@ backends (ROCm, CPU, Metal) and host-side compiler/autotuning APIs are separate
 surfaces. An API name is not a semantic test case: each API also has an input,
 dtype, shape, attribute, schedule, and GPU-architecture domain.
 
-`api_coverage.py` inventories this facade dynamically and keeps three states:
+`tools/api_coverage.py` inventories this facade dynamically and keeps three states:
 
 - `unmapped`: the target-specific extend stage has no mapping. Some of these
   names may already be exercised in the shared generator or Region stage.
@@ -23,8 +23,8 @@ Run the inventory *inside each target environment* and retain the JSON with
 the experiment evidence:
 
 ```bash
-python api_coverage.py --backend triton --summary results/EXTENSION/summary.json --passed-code-dir results/COMMON/passed --output triton_api.json
-python api_coverage.py --backend tilelang --summary results/EXTENSION/summary.json --passed-code-dir results/COMMON/passed --output tilelang_api.json
+python -m tools.api_coverage --backend triton --summary results/EXTENSION/summary.json --passed-code-dir results/COMMON/passed --output triton_api.json
+python -m tools.api_coverage --backend tilelang --summary results/EXTENSION/summary.json --passed-code-dir results/COMMON/passed --output tilelang_api.json
 ```
 
 The first extension wave tests scans, reductions, sort/histogram, simple math,

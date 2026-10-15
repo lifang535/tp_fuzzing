@@ -1,7 +1,7 @@
 """Run DSL-specific extensions of previously passing common Extended IR.
 
 Example:
-  python extend.py --backend triton --passed-dir results/RUN/passed -n 10000
+  python -m tools.extend --backend triton --passed-dir results/RUN/passed -n 10000
 
 Only execute-mode Extended JSON records from passed/ are accepted. Every
 source is rechecked for each input seed before its derivative is attributed to

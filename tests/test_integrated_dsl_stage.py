@@ -14,7 +14,7 @@ from src.workflow.feedback import StructuralFeedback, key
 from src.workflow.generator.dsl_extend import eligible_ops, is_common_seed
 from src.workflow.generator.extended import ExtendedGenerator
 from src.workflow.generator.grids import GridState
-from api_coverage import campaign_passes
+from tools.api_coverage import campaign_passes
 
 
 class IntegratedDSLStageTests(unittest.TestCase):
