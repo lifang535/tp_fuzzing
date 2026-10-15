@@ -259,15 +259,15 @@ finally: _slice_lowering() 打印降级特征（PTX 操作码、TTGIR 操作、C
 
 ## 12. 参考的相关工作
 
-下表只列在代码注释或设计文档中明确引用、并实际影响了实现的工作；“对应实现”给出代码位置。FFTG 和 tile bug 实证研究两项按项目已有文档（`reports/2026.10.09/feature_slices/REPORT.md`）引用，出处信息未重新核对。
+下表只列在代码注释或设计文档中明确引用、并实际影响了实现的工作；“对应实现”给出代码位置。FFTG 和 tile bug 实证研究两项最初按项目已有文档引用，10-14 已核对出处（见对应行）；实证研究中的百分比仍是旧文档的说法，未对照原文。
 
 ### 12.1 程序生成
 
 | 工作 | 思想 | 在 TileSmith 中的对应 |
 |---|---|---|
 | **MLIRSmith**（MLIR 随机程序生成，ASE'23） | 面向多层 IR 的随机生成；DiversityCriteria：优先选择从未覆盖的结构；对同一程序扫描多种 pass 流水线、调度和精度配置 | Region 生成器与结构反馈（`feedback.py`，`--uncovered-boost`）；调度扫描、pass 配置扫描、累加精度扫描、代数恒等式扫描、随机 pass 流水线采样（`config.py`、`backends/common/knobs.py`）；小实例域枚举（`generator/grids.py`） |
-| **FFTG**（聚焦特性的测试生成，ASE'26） | 每个 bug 密集的特性用一个聚焦的生成器，其余维度保持简单 | 特征切片（`slices/`，10 个切片） |
-| **tile 编译器 bug 实证研究**（ISSTA'26） | 数据类型语义约占 tile 代码生成 bug 的 19%，类型/算子合计约 49% | 切片优先覆盖 dtype 转换链、fp8/bf16/fp64/窄整数（`slices/cast.py`、`round.py`、`mathfn.py`） |
+| **FFTG**（“Feature-Focused Test Generation”，ASE'26，doi 10.1145/3832783.3837479） | 基于规约的测试生成：从规约提取特性模型，由测试者选定要聚焦的特性，生成只聚焦这些特性的测试切片（原型 Compás）；本身不是编译器 fuzzing，TileSmith 借用“按特性切片、其余维度保持简单”的思路 | 特征切片（`slices/`，10 个切片） |
+| **tile 程序 bug 实证研究**（“Characterizing Real-World Bugs in Tile Programs for Automated Bug Detection”，ISSTA'26，arXiv 2605.19652） | 301 个真实 tile 程序代码生成 bug（8 个框架）的根因、症状与 oracle 分类；旧文档称数据类型语义约占 19%、类型/算子合计约 49%（未对照原文） | 切片优先覆盖 dtype 转换链、fp8/bf16/fp64/窄整数（`slices/cast.py`、`round.py`、`mathfn.py`） |
 | **YARPGen**（Livinskii, Babokin, Regehr, OOPSLA'20） | 生成时跟踪取值范围，保证程序无未定义行为 | 切片的静态值域传递：只保留结果精确可表示的步骤，使参考精确、可逐位比较（`slices/dtypes.py`、`chain.py`） |
 | **Swarm testing**（Groce 等，ISSTA'12） | 每个测试随机关掉一部分特性，反而能更深地测剩下的特性 | `--swarm-prob 0.5`：原生 Region 只从随机一半的操作中抽取（`region_generator.py`） |
 

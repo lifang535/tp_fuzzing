@@ -1,4 +1,4 @@
-# TileSmith 发现的真实 bug 总表（截至 2026-10-14）
+# TileSmith 发现的真实 bug 总表（截至 2026-10-15）
 
 本表汇总 TileSmith 从 2026-09 起所有实验（早期 hard-shape 实验、特征切片三轮 82c18be2 / b9e08b4c / 637deff6、跨架构 b1eded9f→ea9ecc41）以及本地探测中确认的真实 bug，按 bug 本身组织，不按发现轮次。
 
@@ -8,25 +8,25 @@
 
 | 分组 | 数量 |
 |---|---|
-| Triton | **17**（Triton#1–#17） |
-| TileLang | **21**（TileLang#1–#21） |
-| 合计确认 | **38**（其中 4 种只在非本机目标出现：Triton#15、TileLang#19–#21） |
-| 候选（证据不足，未计入） | 16（老候选 4 + 跨架构候选 12） |
+| Triton | **21**（Triton#1–#21） |
+| TileLang | **30**（TileLang#1–#30） |
+| 合计确认 | **51**（其中 13 种只在非本机目标出现：Triton#15、Triton#18–#21、TileLang#19–#26） |
+| 候选（证据不足，未计入） | 0（老候选和跨架构候选已于 10-15 全部清理，见第三节） |
 
-编号规则：每个 DSL 单独编号，按确认时间排序：9 月 hard-shape 实验的早期发现 → 特征切片第一至三轮（82c18be2 / b9e08b4c / 637deff6）→ 跨架构上线前的本地冒烟 → 第四轮跨架构实验。总表最后一列是旧编号（`#N` 为 `reports/2026.10.09/feature_slices/REPORT.md` 中跨 DSL 的确认序号；`E1`–`E5` 为早期发现，即 `reports/2026.09.26/REPORT.md` 的 TL-01/02/03、TR-01 和 09-30 的 RemoveLayoutConversions；`X1`–`X4` 为本地冒烟）。`CHECKS.md`、`known_mechanisms.json` 和其他报告仍用旧编号。
+编号规则：每个 DSL 单独编号，按确认时间排序：9 月 hard-shape 实验的早期发现 → 特征切片第一至三轮（82c18be2 / b9e08b4c / 637deff6）→ 跨架构上线前的本地冒烟 → 第四轮跨架构实验。总表最后一列是旧编号（`#N` 为 `reports/2026.10.09/feature_slices/REPORT.md` 中跨 DSL 的确认序号；`E1`–`E5` 为早期发现，即 `reports/2026.09.26/REPORT.md` 的 TL-01/02/03、TR-01 和 09-30 的 RemoveLayoutConversions；`X1`–`X4` 为本地冒烟；Triton#18–#21、TileLang#22–#30 是 10-15 清理积压时确认的，没有旧编号）。`CHECKS.md`、`known_mechanisms.json` 和其他报告仍用旧编号。
 
 按后果分：
 
 | 后果 | 数量 | 编号 |
 |---|---|---|
-| **静默错误结果**（编译运行都“成功”，数值错） | 14 | Triton：Triton#3、Triton#4、Triton#9、Triton#10、Triton#13、Triton#17；TileLang：TileLang#4、TileLang#8、TileLang#9、TileLang#10、TileLang#14、TileLang#15、TileLang#16、TileLang#18 |
-| 运行时错误（越界写、非法访存、对齐错误；运行时） | 2 | Triton#16、TileLang#4 |
-| 编译器崩溃 / 断言 / LLVM abort（编译时） | 8 | Triton：Triton#2、Triton#5、Triton#6、Triton#7、Triton#12、Triton#14；TileLang：TileLang#2、TileLang#17 |
-| 生成的代码被下游拒绝（nvcc/LLVM/codegen 报错；编译时） | 15 | Triton：Triton#1、Triton#8、Triton#11、Triton#15；TileLang：TileLang#1、TileLang#3、TileLang#5、TileLang#6、TileLang#7、TileLang#11、TileLang#12、TileLang#13、TileLang#19、TileLang#20、TileLang#21 |
+| **静默错误结果**（编译运行都“成功”，数值错） | 16 | Triton：Triton#3、Triton#4、Triton#9、Triton#10、Triton#13、Triton#17、Triton#18；TileLang：TileLang#4、TileLang#8、TileLang#9、TileLang#10、TileLang#14、TileLang#15、TileLang#16、TileLang#18、TileLang#29 |
+| 运行时错误（越界写、非法访存、对齐错误、device assert；运行时） | 3 | Triton#16、TileLang#4、TileLang#22 |
+| 编译器崩溃 / 断言 / LLVM abort（编译时） | 14 | Triton：Triton#2、Triton#5、Triton#6、Triton#7、Triton#12、Triton#14、Triton#20、Triton#21；TileLang：TileLang#2、TileLang#17、TileLang#23、TileLang#24、TileLang#28、TileLang#30 |
+| 生成的代码被下游拒绝（nvcc/LLVM/codegen 报错；编译时） | 19 | Triton：Triton#1、Triton#8、Triton#11、Triton#15、Triton#19；TileLang：TileLang#1、TileLang#3、TileLang#5、TileLang#6、TileLang#7、TileLang#11、TileLang#12、TileLang#13、TileLang#19、TileLang#20、TileLang#21、TileLang#25、TileLang#26、TileLang#27 |
 
 TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；TileLang#18 以错误结果为主，也有编译失败形式。
 
-按责任方分：Triton 编译器 12 种；NVIDIA 工具链（ptxas / libdevice）经 Triton 触发 5 种（Triton#3、Triton#9、Triton#13、Triton#16、Triton#17）；TileLang/TVM 21 种。
+按责任方分：Triton 编译器 15 种；NVIDIA 工具链（ptxas / libdevice）经 Triton 触发 5 种（Triton#3、Triton#9、Triton#13、Triton#16、Triton#17）；LLVM AMDGPU 后端经 Triton 触发 1 种（Triton#19）；TileLang/TVM 30 种。
 
 上游状态：TileLang#1、TileLang#3、Triton#1 上游已有相同报告（TileLang #2206、#2172，Triton #10790），不算首次发现；其余尚未系统查重或提交。
 
@@ -34,7 +34,7 @@ TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；
 
 后果：**错误结果** = 编译运行都成功但数值错；**运行时错误** = 越界、非法访存等；**崩溃** = 编译器断言 / abort / unreachable；**代码被拒** = 生成的代码被下游（nvcc、LLVM、codegen）拒绝。目标“sm_89”表示在本机（4090 / vGPU / 4060）上触发。详细说明见第一、二节。
 
-### Triton（17 种）
+### Triton（21 种）
 
 | 编号 | 现象 | 后果 | 责任方 / 位置 | 触发条件 | 目标 | 复现 | 旧编号 |
 |---|---|---|---|---|---|---|---|
@@ -55,10 +55,14 @@ TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；
 | Triton#15 | `tl.atomic_xchg` 全部无法编译 | 代码被拒 | Triton AMD buffer atomic 降级（`exch` 内建不存在） | 任意类型 `atomic_xchg` | gfx942 / gfx950 | `tr_amd_atomic_xchg.py` | X1 |
 | Triton#16 | f16 dot 在 `maxnreg=128` 下非法访存 | 运行时错误 | ptxas 12.4 / 12.9（-O2 起提前改写地址寄存器） | 32×64@64×128、num_warps=1、maxnreg=128 | sm_89 | `tr_maxnreg_spill_illegal_access.py` | #28 |
 | Triton#17 | bf16 原子加在 `maxnreg=32` 下丢失更新 | 错误结果 | ptxas 12.9（CAS 循环寄存器分配；12.4 未测） | sem=acquire/acq_rel、num_warps=1、maxnreg=32 | sm_89 | `tr_maxnreg_atomic_cas_lost_update.py` | #29 |
+| Triton#18 | sm<89 上 f16→fp8e5 转换：平局一律进位，NaN 变成 inf 或 −0.0 | 错误结果 | Triton sm<89 软件转换（`and 0xfffefffe; add 0x00800080` 后取高字节，没有 RNE 和 NaN 处理） | `x.to(tl.float8e5)`（默认 rtne）；`padding_option='nan'` 的 fp8e5 加载 | sm80（在 sm_89 上真实执行） | `tr_sm80_f16_to_e5m2_ties.py`、`tr_sm80_nan_to_e5m2.py`、`tr_sm80_fp8_padding_nan.py` | — |
+| Triton#19 | fp16 反向 cumsum 无法生成 hsaco（报 LLD 错） | 代码被拒 | Triton 自带 LLVM 的 AMDGPU 后端（DPP 合并生成 GFX11 不允许的 `v_bfe_i32_e64_dpp …, 0, 16`，被自己的汇编器拒绝）；Triton 把汇编错误吞掉，只报 LLD 错 | `tl.cumsum(x_f16, reverse=True)` | gfx1100 | `tr_gfx1100_scan_lld.py` | — |
+| Triton#20 | fp32 `tl.dot` 加 `kpack=2` 断言 `idx < size()` | 崩溃 | Triton AMD 降级（ConvertTritonAMDGPUToLLVM） | fp32 dot、K=16、`kpack=2`（K=32 或 kpack=1 正常） | gfx942 | `tr_gfx942_kpack2_dot.py` | — |
+| Triton#21 | warp specialize 循环加展开时断言 `dyn_cast on a non-existent value` | 崩溃 | Triton TritonGPUAutomaticWarpSpecialization | `tl.range(..., loop_unroll_factor≥2, warp_specialize=True)` + block pointer 加载 | sm100 / sm120（sm90 正常） | `tr_blackwell_ws_unroll.py` | — |
 
-小计（按主要表现）：错误结果 6（Triton#3 Triton#4 Triton#9 Triton#10 Triton#13 Triton#17）、运行时错误 1（Triton#16）、崩溃 6（Triton#5 Triton#6 Triton#7 Triton#12 Triton#14 Triton#2）、代码被拒 4（Triton#8 Triton#11 Triton#1 Triton#15）。责任方：Triton 12 种，NVIDIA 工具链 5 种（Triton#3 Triton#9 Triton#13 Triton#16 Triton#17）。
+小计（按主要表现）：错误结果 7（Triton#3 Triton#4 Triton#9 Triton#10 Triton#13 Triton#17 Triton#18）、运行时错误 1（Triton#16）、崩溃 8（Triton#2 Triton#5 Triton#6 Triton#7 Triton#12 Triton#14 Triton#20 Triton#21）、代码被拒 5（Triton#1 Triton#8 Triton#11 Triton#15 Triton#19）。责任方：Triton 15 种，NVIDIA 工具链 5 种（Triton#3 Triton#9 Triton#13 Triton#16 Triton#17），LLVM AMDGPU 1 种（Triton#19）。
 
-### TileLang（21 种）
+### TileLang（30 种）
 
 | 编号 | 现象 | 后果 | 责任方 / 位置 | 触发条件 | 目标 | 复现 | 旧编号 |
 |---|---|---|---|---|---|---|---|
@@ -83,8 +87,17 @@ TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；
 | TileLang#19 | int16 逐元素运算无法打印 int16x16 | 代码被拒 | CUDA 类型打印（Blackwell 256 位向量化） | 最简单的 int16 逐元素运算 | sm100 / sm120 | `tl_blackwell_256bit_vector_type.py` | X2 |
 | TileLang#20 | 标准流水线 GEMM 用了 sm_120 没有的 setmaxnreg | 代码被拒 | warp specialization（未按目标关闭） | `T.Pipelined` + `T.gemm` | sm120 | `tl_sm120_setmaxnreg.py` | X3 |
 | TileLang#21 | IEEE 舍入内建在 AMD 上无降级规则 | 代码被拒 | HIP 内建降级规则缺失 | `T.ieee_add/mul/fdiv/...` | gfx942 / gfx950 | `tl_hip_ieee_unresolved.py` | X4 |
+| TileLang#22 | 编译到 sm_80 的 fp8 `T.gemm` 用了 sm_89 才有的 MMA，运行时 device assert | 运行时错误 | gemm 指令选择（不按目标架构检查 fp8 MMA，应在编译时拒绝） | float8_e4m3 `T.gemm`、target sm_80 | sm80 | `tl_sm80_fp8_gemm.py` | — |
+| TileLang#23 | `clear_accum=(k==0)` 加 loop unswitching 后 IR 不再是 SSA | 崩溃 | `tl.loop_unswitching_allow_non_trivial_else` 复制循环体，`accum` 被定义两次 | int8 或 fp8 gemm、`clear_accum=(k==0)`、该 pass 配置（f16 正常） | sm75 | `tl_unswitch_else_ssa.py` | — |
+| TileLang#24 | 窄 N 的 f16 gemm 触发 `Not a canonical GMMA_MN layout` 断言 | 崩溃 | WGMMA 描述符计算（`compute_gmma_descriptor`） | 64×32@32×16、threads=256（N=8、threads=128 时是另一条 WGMMA 断言；N≥32 正常） | sm90 | `tl_sm90_gmma_narrow_n.py` | — |
+| TileLang#25 | HIP 后端 fp8 处理缺口：e5m2 常量无法打印；`float8_e4m3` gemm 报 KeyError | 代码被拒 | HIP codegen `PrintConst`（不支持 e5m2/e5m2fnuz 常量）；MFMA 类型表缺 `float8_e4m3`（CUDA 后端两者都支持） | 含 e5m2 常量的表达式；float8_e4m3 `T.gemm` | gfx942 / gfx950 | `tl_amd_probe.py fp8_const …`、`tl_amd_probe.py fp8_gemm …` | — |
+| TileLang#26 | 8 位整数 xor 在 HIP codegen 中 `Check failed: (p)` | 代码被拒 | HIP codegen（`VisitExpr_`） | int8/uint8 `^`（int16/int32、CUDA 正常） | gfx942 / gfx950 / gfx1100 | `tl_amd_narrow_select.py <target> uint8 xor` | — |
+| TileLang#27 | bf16 `T.pow` 报 `power only applies to float` | 代码被拒 | TVM `pow` 的类型检查（`is_float()` 不含 bfloat16；bf16 的 exp/sqrt/log 正常） | bf16 `T.pow(x, y)`、浮点指数 | sm_89 | `tl_pow_bf16.py bfloat16 pow` | 老候选 |
+| TileLang#28 | 显式 order/stage 的 `T.Pipelined` 把 fragment 多缓冲，随后报“只允许 fragment[0]”或 `Layout::Forward` 维数不符 | 崩溃 | 软件流水线（显式 stage 时对 fragment 做多缓冲；同一程序只给 num_stages 时正确） | 循环体把全局数据拷到 fragment 再计算，`order`/`stage` 显式给出 | sm_89 | `tl_pipelined_stage_fragment.py fragment explicit 2`、`tl_pipelined_stage_reduce.py fragment explicit` | 老候选 ×2 |
+| TileLang#29 | 浮点 `x - x`、`x * 0` 被化简成 0，inf/NaN 输入得 0 而不是 NaN | 错误结果 | TVM 算术化简器（未开 fast math 也按实数化简） | 任何浮点 `x - x` / `x * 0`，x 为 inf 或 NaN | sm_89 | `tl_float_x_minus_x.py float32` | — |
+| TileLang#30 | gemm 累加器加上另一个 fragment 的行和时布局推断失败（`has_best`） | 崩溃 | 布局推断（未把 gemm 决定的布局传播到可自由选择布局的 fragment） | `stat = reduce_sum(wide)`，`wide` 来自全局内存而非 acc，再算 `stat[i] + acc[i, j]` | sm_89 | `tl_layout_has_best.py 256 other` | 老候选（09-27） |
 
-小计（按主要表现）：错误结果 8（TileLang#4 TileLang#8 TileLang#9 TileLang#10 TileLang#14 TileLang#15 TileLang#16 TileLang#18；TileLang#4 也会越界写，TileLang#18 也有编译失败形式）、崩溃 2（TileLang#17 TileLang#2）、代码被拒 11（TileLang#5 TileLang#6 TileLang#7 TileLang#11 TileLang#12 TileLang#13 TileLang#1 TileLang#3 TileLang#19 TileLang#20 TileLang#21）。
+小计（按主要表现）：错误结果 9（TileLang#4 TileLang#8 TileLang#9 TileLang#10 TileLang#14 TileLang#15 TileLang#16 TileLang#18 TileLang#29；TileLang#4 也会越界写，TileLang#18 也有编译失败形式）、运行时错误 1（TileLang#22）、崩溃 6（TileLang#2 TileLang#17 TileLang#23 TileLang#24 TileLang#28 TileLang#30）、代码被拒 14（TileLang#1 TileLang#3 TileLang#5 TileLang#6 TileLang#7 TileLang#11 TileLang#12 TileLang#13 TileLang#19 TileLang#20 TileLang#21 TileLang#25 TileLang#26 TileLang#27）。TileLang#22–#30 在 0.1.15 上复验仍然存在。
 
 ---
 
@@ -166,6 +179,24 @@ TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；
 - 现象：i32/i64/f32/f64 的 `tl.atomic_xchg` 报 `LLVM Translation failed`。
 - 根因：buffer atomic 降级生成 LLVM 内建 `llvm.amdgcn.raw.ptr.buffer.atomic.exch`，Triton 自带的 LLVM 里只有 `...buffer.atomic.swap`。gfx90a/gfx1100 不走 buffer atomics，能编译；`AMDGCN_USE_BUFFER_ATOMICS=0` 也能编译。
 - 复现：`tr_amd_atomic_xchg.py`。
+
+**Triton#18 sm<89 上 f16→fp8e5 的软件转换：平局舍入错，NaN 变成 inf 或 −0.0**
+- 现象：目标为 sm_80（在 sm_89 上真实执行），`x.to(tl.float8e5)`（默认 rtne）对全部 248 个“正好在中间”的有限 f16 中的 124 个舍入错误，也就是所有应舍到偶数的那一半都进位了，如 3.8147e-05→4.5776e-05（应 3.0518e-05）。1024 个 f16 NaN 中 256 个没变成 NaN：尾数小的变成 inf（0x7c01→inf），尾数大的进位溢出到符号位变成 −0.0（0x7fff→−0.0）。fp8e5 块指针加载用 `padding_option='nan'` 时填充值是 −0.0，也是这个原因。本机目标（sm_89）用 `cvt.rn.satfinite.e5m2x2.f16x2`，结果正确。
+- 根因：sm<89 没有 fp8 转换指令，Triton 用内联 PTX `and.b32 a, x, 0xfffefffe; add.u32 a, a, 0x00800080; prmt …0x7531` 取高字节，等于“加 0x80 再截断”，平局一律远离零，也没有 NaN 判断。
+- 复现：`tr_sm80_f16_to_e5m2_ties.py 80`（对照 `native`）、`tr_sm80_nan_to_e5m2.py 80`、`tr_sm80_fp8_padding_nan.py 80 float8_e5m2`。合并了两个跨架构候选（f16→f8e5 平局、fp8e5 `padding=nan`）。
+
+**Triton#19 gfx1100 上 fp16 反向 cumsum 无法生成代码**（责任方：Triton 自带 LLVM 的 AMDGPU 后端）
+- 现象：`tl.cumsum(x_f16, axis=0, reverse=True)`（32 或 128 个元素，num_warps 1 或 4）编译到 gfx1100，报 `LLD failed to link hsaco … target emulation unknown`。正向 cumsum、fp32、bf16、gfx942 都正常。
+- 根因：Triton 生成的 LLVM IR 合法（`llvm.amdgcn.update.dpp.i32` 后做 16 位符号扩展）；LLVM 的 DPP 合并把它们合成 `v_bfe_i32_e64_dpp v2, v2, 0, 16 row_xmask:8 …`，GFX11 的 VOP3-DPP 不允许 src1 是立即数，LLVM 自己的汇编器报 `src1 immediate operand invalid for instruction`。Triton 没有把汇编错误报出来，只留下随后的 LLD 错误。
+- 复现：`tr_gfx1100_scan_lld.py gfx1100 fp16 1 32 4`（只编译）。加 `TRITON_KERNEL_DUMP=1` 可以看到 `.amdgcn` 中的指令。
+
+**Triton#20 gfx942 上 fp32 `tl.dot` 加 `kpack=2` 断言**
+- 现象：16×16 @ 16×64 的 fp32 `tl.dot`，启动选项 `kpack=2`（gfx942 上文档化的选项，只在 gfx950 上被废弃并改回 1），ConvertTritonAMDGPUToLLVM 中 `SmallVector::operator[]` 断言 `idx < size()`，进程被杀。K=32、kpack=1、fp16/bf16 都正常。
+- 复现：`tr_gfx942_kpack2_dot.py fp32 2 1 16`（只编译）。
+
+**Triton#21 Blackwell 上 warp specialization 循环加展开时断言**
+- 现象：`tl.range(0, n, loop_unroll_factor=2, warp_specialize=True)`，循环体通过 block pointer 加载并 `tl.advance`，编译到 sm100 或 sm120 时 TritonGPUAutomaticWarpSpecialization 断言 `detail::isPresent(Val) && "dyn_cast on a non-existent value"`。不展开、改用普通指针、sm90 都正常。
+- 复现：`tr_blackwell_ws_unroll.py 100 2 1`（只编译）。
 
 ---
 
@@ -249,35 +280,83 @@ TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；
 
 **TileLang#21 AMD 上 IEEE 舍入内建没有降级规则**：gfx942/gfx950 上 `T.ieee_add/sub/mul/fmaf/fsqrt/frcp/fdiv` 报 `Unresolved call tl.ieee_*`（CUDA 正常）。与 TileLang#13 同类（缺少降级规则），但在 HIP 后端。复现：`tl_hip_ieee_unresolved.py`。
 
+
+**TileLang#22 编译到 sm_80 的 fp8 gemm 使用 sm_89 的 MMA**
+- 现象：target `sm_80` 的 float8_e4m3 `T.gemm` 编译、nvcc 构建都成功，但代码用的是 `cute::SM89_16x8x32_F32E4M3E4M3F32_TN`，运行时触发 `Attempting to use SM89_16x8x32_F32E4M3E4M3F32_TN without CUTE_ARCH_MMA_F32_SM89_ENABLED` 的 device assert。sm_80 没有 fp8 MMA，应在编译时拒绝或换实现；target sm_89 正常。
+- 复现：`tl_sm80_fp8_gemm.py sm_80 float8_e4m3`（在 sm_89 GPU 上运行）。
+
+**TileLang#23 `clear_accum=(k==0)` 加 loop unswitching 后 IR 不再是 SSA**
+- 现象：sm75 上 int8 或 fp8 的 `T.gemm(..., clear_accum=(k == 0))` 位于 `T.Pipelined` 中，开文档化的 pass 配置 `tl.loop_unswitching_allow_non_trivial_else` 后报 `buffer accum has already been defined, the Stmt is not SSA`。不开配置、f16、sm80/sm89 都正常。unswitching 把循环复制成 if/else 两份，sm75 上 int8/fp8 gemm 走的实现在循环体内定义了 `accum`，于是被定义两次。
+- 复现：`tl_unswitch_else_ssa.py sm_75 int8 1`（只降级）。
+
+**TileLang#24 sm90 上窄 N 的 gemm 触发 WGMMA 断言**
+- 现象：f16 `T.gemm`，64×32 @ 32×16、threads=256，sm_90a 上 `compute_gmma_descriptor` 报 `AssertionError: Not a canonical GMMA_MN layout: stride<1,0>=2 != W=1`；N=8、threads=128 时报另一条 WGMMA 布局断言。threads=128 且 N=16、N≥32、sm_89 都正常。N=16 是 WGMMA 合法的 N，应能选择合适的划分或退回 MMA。
+- 复现：`tl_sm90_gmma_narrow_n.py 16 256`（只降级）。
+
+**TileLang#25 HIP 后端的 fp8 处理缺口**
+- 现象 1：表达式中出现 e5m2 常量（如 `T.if_then_else(c, x, T.cast(0, "float8_e5m2"))`）时，HIP codegen 报 `Bad bit-width for float: float8_e5m2`（`PrintConst`）；gfx942 和 gfx950、e5m2 和 e5m2fnuz 都一样，e4m3 常量正常，CUDA 正常。
+- 现象 2：gfx950 上 `float8_e4m3` 的 `T.gemm` 报 `KeyError: "dtype('float8_e4m3')"`（`_initialize_mfma_prefix`），MFMA 类型表只有 `float8_e4m3fn`；CUDA 后端接受 `float8_e4m3`。这一条也可能被上游视为“类型不支持但报错不友好”。
+- 复现：`tl_amd_probe.py fp8_const gfx950 float8_e5m2`、`tl_amd_probe.py fp8_gemm gfx950 float8_e4m3`（只降级）。
+
+**TileLang#26 8 位整数 xor 在 HIP codegen 中失败**
+- 现象：int8/uint8 的 `a ^ b`（如 `T.cast(X[i, j], "uint8") ^ T.cast(3, "uint8")`）在 gfx942、gfx950、gfx1100 上报 `Check failed: (p) is false:`（空消息，`VisitExpr_`）。int16/int32 和 CUDA 正常。
+- 复现：`tl_amd_narrow_select.py gfx942 uint8 xor`（只降级）。
+
+以上 TileLang#22–#26 在 TileLang 0.1.15 上复验仍然存在。
+
+### 10-15 清理老候选和非切片待定桶时确认（sm_89）
+
+**TileLang#27 bf16 `T.pow` 被拒绝**（原老候选）
+- 现象：`T.pow(x, y)`（x 为 bfloat16、y 为浮点）报 `Check failed: (x.dtype().is_float()) is false: power only applies to float`。同样的 bf16 输入用 `T.exp`、`T.sqrt`、`T.log` 都正常，`T.pow` 的文档也没有类型限制。
+- 根因：TVM 的 `pow` 用 `is_float()` 检查类型，而 TVM 中 bfloat16 不算 `is_float()`。整数指数走 `pow_of_int`，不受影响。0.1.14、0.1.15 都存在。另外，0.1.14 上 f16 `T.pow` 生成未定义的 `hpow`（属 TileLang#12 一族），0.1.15 已修。
+- 复现：`tl_pow_bf16.py bfloat16 pow`。
+
+**TileLang#28 显式 order/stage 的流水线把 fragment 多缓冲**（原老候选 ×2 合并）
+- 现象：`T.Pipelined(n, num_stages=2, order=[0, 1], stage=[0, 1])` 的循环体先 `T.copy` 到 fragment，再在 `T.Parallel` 中使用。编译报 `Fragment buffer access with non-zero index [1] is not supported. Only fragment[0] access is allowed within T.Parallel loop.`；循环体是“拷到 fragment → `T.reduce_sum` → 累加”时报 `Check failed: vars.size() == InputDim() (1 vs. 2)`（`Layout::Forward`）。同一程序去掉 order/stage、只给 `num_stages=2` 时编译运行都正确；暂存在共享内存时也正确。
+- 根因：显式 stage 时，流水线把在 stage 0 写、stage 1 读的 fragment 也做成双缓冲，多出来的一维违反了 fragment 只能用下标 0 访问的约束，也让布局维数对不上。用户代码中并没有这样的访问。0.1.14、0.1.15 都存在。
+- 复现：`tl_pipelined_stage_fragment.py fragment explicit 2`（对照 `fragment auto 2`）、`tl_pipelined_stage_reduce.py fragment explicit`。
+
+**TileLang#29 浮点 `x - x`、`x * 0` 被化简成 0**（来自非切片路线的 2 个待定桶）
+- 现象：float16/float32 的 `X[i] - X[i]`、`X[i] * 0`、`X[i] + 0 - X[i]` 被直接编译成常量 0（生成的 CUDA 为 `O[...] = 0x0p+0f`），x 为 inf、-inf、NaN 时得 0，按 IEEE 应为 NaN。`x / x` 没有被化简，结果正确。TileLang 默认不开 fast math（`tl.enable_fast_math` 默认 False）。
+- 实验中：TileLang 的 elementwise/control 程序里 `e24 = e23 - e23`（e23 为 NaN）得 0，`e75 = e74 - e74` 使后续结果为 -inf 而不是 NaN（32906 wrong_result:f62d92c68b、41790 wrong_result:d9dc98c83a）。
+- 根因：TVM 算术化简器按实数规则化简浮点表达式。上游可能认为这是 TVM 的既有行为，但与 TileLang 默认的 IEEE 语义不一致。0.1.14、0.1.15 都存在。
+- 复现：`tl_float_x_minus_x.py float32`。
+
+**TileLang#30 gemm 累加器与另一个 fragment 的行统计量组合时布局推断失败**（原老候选，09-27 起反复出现）
+- 现象：`T.gemm(As, Bs, acc)` 之后，把另一个从全局内存读入的 fragment `wide` 做 `T.reduce_sum(wide, stat, dim=1)`，再算 `out[i, j] = stat[i] + acc[i, j]`，报 `Check failed: (has_best) is false: no available layout found`。threads 为 128 或 256 都失败；`wide` 改为来自 `acc` 时正常。
+- 分析：`wide` 的布局不受约束，推断器本可以按 `acc`（gemm 决定）的布局为 `wide`、`stat` 选择兼容的布局，却在候选中找不到可行解。这是“行统计量 + 累加器”的常见写法。原始用例（fresh 路线 layout_inference:065f998191，3000 多行）经自动块删除约简到 51 行，再手工删到上面的形式。0.1.14、0.1.15 都存在。
+- 复现：`tl_layout_has_best.py 256 other`（对照 `256 acc`）。
 ---
 
 ## 三、候选（未计入确认数）
 
-### 老候选（实验中反复出现，但未证明是合法程序）
+### 老候选（10-15 清理）
 
-| DSL | 现象 | 未确认的原因 |
+| DSL | 现象 | 结论 |
 |---|---|---|
-| TileLang | `T.pow` 用于 bfloat16 报 `Check failed: x.dtype().is_float()`（TVM 中 bf16 不算 is_float） | 可能被上游视为不支持 |
-| TileLang | `T.Pipelined` + `num_stages=2` + sync 注解把片段暂存的拷贝多缓冲，报 `Fragment buffer access with non-zero index is not supported` | 未确认该组合是否合法 |
-| TileLang | `T.Pipelined` 带 order/stage、循环体是片段暂存的归约时，`Layout::Forward` 推断失败 | 同上 |
-| TileLang | 布局推断 `Check failed: (has_best) is false` | 09-27 已独立复现，但未证明是受支持的布局组合 |
+| TileLang | `T.pow` 用于 bfloat16 报 `Check failed: x.dtype().is_float()` | 确认，TileLang#27 |
+| TileLang | `T.Pipelined` + `num_stages=2` + order/stage 把 fragment 暂存的拷贝多缓冲，报 `Fragment buffer access with non-zero index is not supported` | 确认，TileLang#28 |
+| TileLang | `T.Pipelined` 带 order/stage、循环体是 fragment 暂存的归约时 `Layout::Forward` 失败 | 与上一条同根因，并入 TileLang#28 |
+| TileLang | 布局推断 `Check failed: (has_best) is false` | 确认，TileLang#30（约简到 gemm 累加器 + 另一 fragment 的行和） |
 
-### 跨架构候选（b1eded9f 实验中出现，未约简）
+### 跨架构候选（b1eded9f 实验中出现；10-15 已全部清理）
 
-| DSL | 目标 | 现象 |
-|---|---|---|
-| Triton | sm80（真实执行） | f16→f8e5 rtne 平局舍入错（28672 vs 24576） |
-| Triton | sm80（真实执行） | fp8e5 `padding=nan` 结果不是 nan（得 −0.0），两台服务器各自触发 |
-| Triton | gfx1100 | 生成的 AMDGCN 被汇编器拒绝（`src1 immediate operand invalid`），随后 LLD 报错（i16 `cmax` 扫描、i8 `flip`） |
-| Triton | sm120 | AutomaticWarpSpecialization 断言 |
-| Triton | gfx942 | `idx < size()` 断言（`kpack=2`） |
-| TileLang | sm80（真实执行） | fp8 `T.gemm` 选用 sm_89 才有的 `SM89_16x8x32` MMA，运行时 device assert |
-| TileLang | sm75 | 只在 sm75 + `tl.loop_unswitching_allow_non_trivial_else` 时报 `buffer accum has already been defined, the Stmt is not SSA` |
-| TileLang | sm90 | `Not a canonical GMMA_MN layout` 断言 |
-| TileLang | gfx950 | OCP fp8：`PrintConst` 失败 / `Bad bit-width for float: float8_e5m2` / `_initialize_mfma_prefix` KeyError |
-| TileLang | gfx942/950 | i16/u8 unroll 循环 `Check failed: (p) is false:`（空消息） |
-| TileLang | gfx942/950 | `PrintVecElemStore` 的 type_name 为空（可能属 TileLang#18 族） |
-| TileLang | gfx942 | gemm 化简器除零 |
+12 个跨架构候选都已在本地（RTX 4060，Triton 3.8.0 / TileLang 0.1.14 与 0.1.15）用最小脚本复现并归类：
+
+| DSL | 目标 | 原现象 | 结论 |
+|---|---|---|---|
+| Triton | sm80 | f16→f8e5 rtne 平局舍入错 | 确认，Triton#18 |
+| Triton | sm80 | fp8e5 `padding=nan` 得 −0.0 | 与上一条同根因，并入 Triton#18 |
+| Triton | gfx1100 | AMDGCN 被汇编器拒绝，随后 LLD 报错 | 确认，Triton#19（LLVM AMDGPU） |
+| Triton | sm100/sm120 | AutomaticWarpSpecialization 断言 | 确认，Triton#21 |
+| Triton | gfx942 | `idx < size()` 断言（`kpack=2`） | 确认，Triton#20 |
+| TileLang | sm80 | fp8 gemm 运行时 device assert | 确认，TileLang#22 |
+| TileLang | sm75 | `the Stmt is not SSA` | 确认，TileLang#23 |
+| TileLang | sm90 | `Not a canonical GMMA_MN layout` | 确认，TileLang#24 |
+| TileLang | gfx950 | OCP fp8 `PrintConst` / `_initialize_mfma_prefix` KeyError | 确认，TileLang#25 |
+| TileLang | gfx942/950 | `Check failed: (p)`（空消息） | 确认，TileLang#26（8 位整数 xor） |
+| TileLang | gfx942/950 | `PrintVecElemStore` 的 type_name 为空 | TileLang#18 的变体：只在 `tl.config_index_bitwidth=64` 时出现，同一配置在 CUDA 上报 `Cannot convert type int64x8` |
+| TileLang | gfx942 | gemm 化简器除零 | 不算 DSL bug：K=32 时 `k_pack=2` 本身非法（A 在共享内存时 TileLang 明确报 `block_K must be >= micro_size_k * k_pack`，A 在 fragment 时漏了这个检查，化简时除零）；属于 fuzzer 的合法化缺口，TileLang 只是缺少检查 |
 
 另有 nvcc 12.4 编译 sm_90a 时段错误（CUDA 工具链问题，不计入 DSL）。
 
@@ -289,6 +368,12 @@ TileLang#4 同时有错误结果和越界写两种表现，在两行都列出；
 
 - **harness / 参考模型错误（已修 11 类）**：如 Triton 窄类型 `tl.max/min` 的提升规则、libdevice 返回类型、cdiv 公式、flush-to-zero、近似函数参考溢出等，在 637deff6 之前修复，`known_mechanisms.json` 中以 `_FIXED` 结尾，若重现会报警。
 - **错误信息截断**：目标明确不支持的程序（如 sm80 不支持 fp8e4nv）因拒绝标记被截掉而被记为失败；d6046da9 已修。
-- **合法化缺口**：fuzzer 为目标生成了它不支持的参数（AMD 上 tf32 gemm、TileLang AMD 的 block_K 已修；TileLang HIP 的 nan_propagate、MFMA k_dim、Triton gfx90a 上强开 async copy 未修）。
+- **合法化缺口**：fuzzer 为目标生成了它不支持的参数（AMD 上 tf32 gemm、TileLang AMD 的 block_K 已修；TileLang HIP 的 nan_propagate、MFMA k_dim、Triton gfx90a 上强开 async copy、TileLang AMD 上 A 在 fragment 时 K < micro_size_k × k_pack 未修）。
 - **进程崩溃**：layout 切片合法化不幂等导致 vGPU Triton 进程退出，ea9ecc41 已修。
+- **非切片路线的数值判定不稳定（10-15 清理，11 个待定桶）**：b1eded9f 中 fresh/mutate 路线的 precision、identity、schedule/pass-config 不变性、structured reference 不一致，除 TileLang#29 的两个外都属于这一类。本地全部稳定复现，但误差来自判定本身：
+  - pass-config 不变性（Triton，af0ff50a66）：变体只差 `enable_fp_fusion=True`；程序中 `x*x - x*x` 被合并成 FMA 后得到 x² 的舍入误差（不再是 0），再被循环放大到 0.25。FMA 合并是该选项的本意（也是 Triton 的默认值），检查应允许它。
+  - structured reference（Triton，20d6491ff5）：`sqrt(|行和|)` 在行和接近 0 时条件数极差，求和顺序不同就造成较大相对误差；独立脚本 `tr_structured_605af3d.py` 中去掉 scratch 写入或 barrier 结果一样。
+  - schedule 不变性等（764d8d706c 等）：float16 累加之后接 `round`/`floor`/`max` 等不连续运算，不同调度的累加顺序使值跨过取整边界。
+  - precision（`_prec` 变体，fp16 累加）和 identity：float16 累加顺序不同带来的差异超过 2% 容差。
+  - 这些属于 fuzzer 缺陷（判定没有覆盖 FMA 合并、病态运算和不连续运算），按约定只记录，不在实验中修改。
 - **噪声**：共享内存超限、warp 划分不合法、超时、oracle 不稳定、Blackwell 上寄存器上限过低等，按资源限制处理。
