@@ -8,9 +8,15 @@ product is the reference. An epilogue chain then converts the accumulator.
 from .base import HIP_TARGETS, Slice, zero
 from .chain import OPS, cast_allowed, cast_domain, legalize_steps
 from .dtypes import DTYPES, STORAGE, Domain, value_regimes
+from src.backends.common.knobs import declared_parameters
 
 MMA = ('f16', 'bf16', 'f8e4', 'f8e5', 'i8', 'f32')
 ACCUMULATORS = ('f32', 'f16', 'i32')
+# TileLang 0.1.15 moved k_pack out of the common T.gemm into the ROCm dialect,
+# which passes it on as the "k_pack" annotation; the common T.gemm takes that
+# annotation too. Releases up to 0.1.14 take the keyword. Without tilelang
+# installed, the target release's spelling is emitted.
+KPACK_KEYWORD = 'k_pack' in (declared_parameters('language.gemm_op', 'gemm') or ())
 
 
 def mma_k_min(dtype):
@@ -238,7 +244,8 @@ class GemmSlice(Slice):
         options = [f'transpose_A={bool(ta)}', f'transpose_B={bool(tb)}',
                    f'policy=T.GemmWarpPolicy.{params["policy"]}']
         if params['kpack'] != 1:
-            options.append(f'k_pack={params["kpack"]}')
+            options.append(f'k_pack={params["kpack"]}' if KPACK_KEYWORD
+                           else f'annotations={{"k_pack": {params["kpack"]}}}')
         if params['clear_accum']:
             options.append('clear_accum=(k == 0)')
         lines = [f'As = T.alloc_shared({a_tile!r}, "{mma}")', f'Bs = T.alloc_shared({b_tile!r}, "{mma}")',

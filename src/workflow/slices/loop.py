@@ -22,6 +22,7 @@ from .base import Slice, parse_shape
 from .dtypes import DTYPES, Domain, bit_bound
 from .gemm import warp_partition
 from .layout import nd_offsets
+from src.backends.common.knobs import declared_parameters
 
 LOOP_DT = ('f32', 'f16', 'bf16', 'f64', 'i8', 'i16', 'i32', 'i64', 'u8')
 TRITON_LOOP_SHAPES = ('64', '128', '256', '1024', '16x16', '32x32', '16x64', '64x16')
@@ -70,6 +71,13 @@ def envelope(body, coef, trips, value, k, size, init):
     return worst_lo, worst_hi
 
 
+# Manual T.Pipelined schedules. TileLang 0.1.15 dropped the sync and group
+# metadata (only order and stage remain), so they are offered only where the
+# installed release still declares them.
+PIPELINE_SCHEDULES = ('none', 'order', 'reorder') + tuple(
+    sched for sched in ('sync', 'group') if sched in (declared_parameters('language.loop', 'Pipelined') or ()))
+
+
 class LoopSlice(Slice):
     name = 'loop'
     CONFIGS = ('cfg_stages',)
@@ -91,7 +99,7 @@ class LoopSlice(Slice):
                          warps2=(1, 2, 4, 8))
         else:
             space.update(loop=('pipelined', 'serial', 'unroll', 'unroll_explicit', 'while', 'break'),
-                         stages=(0, 1, 2, 3), sched=('none', 'order', 'reorder', 'sync', 'group'),
+                         stages=(0, 1, 2, 3), sched=PIPELINE_SCHEDULES,
                          body=TILELANG_BODIES, inputs=(1, 2), stage_in=('shared', 'fragment'),
                          shape=TILELANG_LOOP_SHAPES, threads=(32, 64, 128, 256), threads2=(32, 64, 128, 256))
             space['trips'] = (1, 2, 3, 4, 6)

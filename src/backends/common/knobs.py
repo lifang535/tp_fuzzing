@@ -24,6 +24,7 @@ tl.device_compile_flags (arbitrary injection). The deterministic sweep tiers
 (tirx.disable_vectorize for depth 1, tl.disable_loop_unswitching for depth 2)
 are also excluded so a sampled config always exercises a fresh combination.
 """
+import ast
 import functools
 import hashlib
 import importlib.util
@@ -143,6 +144,29 @@ def declared_pass_keys():
     except OSError:
         return None
 
+
+@functools.lru_cache(maxsize=None)
+def declared_parameters(module, function):
+    """Parameter names of a top-level function of the installed tilelang,
+    read without importing it (see declared_pass_keys).
+
+    `module` is dotted below the package, e.g. 'language.loop'. None when
+    tilelang is not installed or the function is gone. Slices use it to offer
+    a keyword only where the installed release still takes it.
+    """
+    spec = importlib.util.find_spec('tilelang')
+    if spec is None or not spec.submodule_search_locations:
+        return None
+    path = Path(next(iter(spec.submodule_search_locations))).joinpath(*module.split('.')).with_suffix('.py')
+    try:
+        tree = ast.parse(path.read_text())
+    except (OSError, SyntaxError):
+        return None
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name == function:
+            args = node.args
+            return frozenset(a.arg for a in args.posonlyargs + args.args + args.kwonlyargs)
+    return None
 
 def missing_option_fields():
     """Triton compile options the installed CUDAOptions does not declare.

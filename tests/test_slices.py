@@ -727,6 +727,27 @@ class TargetTests(unittest.TestCase):
                 self.assertEqual(program.params['cfg_amd'], 'none')
             scheduler.observe(program, seconds=0.1)
 
+    def test_tilelang_keywords_match_the_installed_release(self):
+        """TileLang 0.1.15 moved k_pack out of the common T.gemm and dropped
+        T.Pipelined's sync and group; the 20261016 campaign emitted them anyway
+        and lost about a fifth of its gemm and loop tests to the TypeError."""
+        from src.backends.common.knobs import declared_parameters
+        gemm_params = declared_parameters('language.gemm_op', 'gemm')
+        pipelined = declared_parameters('language.loop', 'Pipelined')
+        if gemm_params is None or pipelined is None:
+            self.skipTest('tilelang is not installed')
+        program = make_program('gemm', {'kpack': 2, 'cfg_target': 'gfx942'}, 'tilelang')
+        self.assertEqual(program.params['kpack'], 2)
+        call = next(line for line in emit_slice(program, None).splitlines() if 'T.gemm(' in line)
+        self.assertIn('k_pack=2' if 'k_pack' in gemm_params else 'annotations={"k_pack": 2}', call)
+        offered = set(SLICES['loop'].space('tilelang')['sched'])
+        self.assertEqual(offered & {'sync', 'group'}, {'sync', 'group'} & pipelined)
+        for sched in offered - {'none'}:
+            program = make_program('loop', {'loop': 'pipelined', 'sched': sched, 'stages': 2}, 'tilelang')
+            self.assertEqual(program.params['sched'], sched)
+            head = next(line for line in emit_slice(program, None).splitlines() if 'T.Pipelined(' in line)
+            self.assertTrue(set(re.findall(r'(\w+)=', head)) <= pipelined, head)
+
     def test_what_a_foreign_target_lacks_is_noise(self):
         amd = ("TILESMITH_TARGET=gfx942:compile-only\nerror: Unsupported conversion from 'f8E4M3FN' to 'f64'\n"
                'RuntimeError: PassManager::run failed')
