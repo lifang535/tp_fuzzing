@@ -1,0 +1,7 @@
+# The complete audit archive remains local; the publication is under data/,
+# repro/ and validation/ with both reports at this directory's top level.
+/evidence/
+/summary.json
+/classification.csv
+/numeric_pending.csv
+/validation/tl26_cuda124.json.meta.json

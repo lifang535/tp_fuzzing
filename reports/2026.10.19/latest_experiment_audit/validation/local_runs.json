@@ -1,0 +1,30 @@
+[
+  {
+    "script": "repro/triton_abs.py",
+    "exit_code": 0,
+    "seconds": 5.817,
+    "finished_at": "2026-10-19T18:25:05.680106+08:00",
+    "output": "validation/triton_abs.py.txt"
+  },
+  {
+    "script": "repro/triton_masked_load.py",
+    "exit_code": 0,
+    "seconds": 2.201,
+    "finished_at": "2026-10-19T18:25:07.881861+08:00",
+    "output": "validation/triton_masked_load.py.txt"
+  },
+  {
+    "script": "repro/tilelang_self_subtract.py",
+    "exit_code": 0,
+    "seconds": 5.054,
+    "finished_at": "2026-10-19T18:25:12.294176+08:00",
+    "output": "validation/tilelang_self_subtract.py.txt"
+  },
+  {
+    "script": "repro/tilelang_pow_bf16.py",
+    "exit_code": 0,
+    "seconds": 6.04,
+    "finished_at": "2026-10-19T18:25:18.333842+08:00",
+    "output": "validation/tilelang_pow_bf16.py.txt"
+  }
+]

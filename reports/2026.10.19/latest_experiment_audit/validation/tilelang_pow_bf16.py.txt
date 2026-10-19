@@ -1,0 +1,62 @@
+2026-10-19 18:25:14  [TileLang:tilelang.language.eager.builder:CRITICAL] (builder.py:1797): Failed to build prim_func from kernel
+args={'X': X, 'Y': Y, 'O': O}
+source=def make_closure(operation):
+
+    def kernel(__tb):
+        __tb_fl = '/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.10.19/latest_experiment_audit/repro/tilelang_pow_bf16.py'
+        __tb_fn = 'kernel'
+        __tb.set_fileline(__tb_fl, 11, __tb_fn)
+
+        def kernel(X, Y, O, **__kwargs):
+            __tb.set_fileline(__tb_fl, 11, __tb_fn)
+            X = __tb.arg('X', X)
+            __tb.set_fileline(__tb_fl, 11, __tb_fn)
+            Y = __tb.arg('Y', Y)
+            __tb.set_fileline(__tb_fl, 11, __tb_fn)
+            O = __tb.arg('O', O)
+            __tb.set_fileline(__tb_fl, 1, __tb_fn)
+            if __tb.skip_kernel_ctx():
+                __tb.set_fileline(__tb_fl, 1, __tb_fn)
+                return
+            __tb.set_fileline(__tb_fl, 12, __tb_fn)
+            with __tb.ctx_with(__tb.resolve_call(__tb.rval('T', T).Kernel)(1, threads=128)):
+                __tb.set_fileline(__tb_fl, 13, __tb_fn)
+                for __1 in __tb.ctx_for(__tb.iter_call(__tb.resolve_call(__tb.rval('T', T).Parallel), 128)):
+                    __tb.set_fileline(__tb_fl, 13, __tb_fn)
+                    i = __tb.bind('i', __1, loop_target=True)
+                    __tb.set_fileline(__tb_fl, 14, __tb_fn)
+                    for __0 in __tb.ctx_if(__tb.rval('operation', operation) == 'pow'):
+                        __tb.set_fileline(__tb_fl, 14, __tb_fn)
+                        for _ in __tb.ctx_then(__0):
+                            __tb.set_fileline(__tb_fl, 15, __tb_fn)
+                            __tb.assign_slice(__tb.rval('O', O), __tb.rval('i', i), __tb.resolve_call(__tb.rval('T', T).pow)(__tb.rval('X', X)[__tb.rval('i', i)], __tb.rval('Y', Y)[__tb.rval('i', i)]))
+                        __tb.set_fileline(__tb_fl, 14, __tb_fn)
+                        for _ in __tb.ctx_else(__0):
+                            __tb.set_fileline(__tb_fl, 17, __tb_fn)
+                            __tb.assign_slice(__tb.rval('O', O), __tb.rval('i', i), __tb.resolve_call(__tb.rval('T', T).exp)(__tb.rval('X', X)[__tb.rval('i', i)]))
+        return kernel
+    return kernel
+{
+  "id": "TileLang#22",
+  "results": [
+    {
+      "dtype": "bfloat16",
+      "operation": "pow",
+      "status": "rejected",
+      "exception": "InternalError",
+      "diagnostic": "Check failed: (x.dtype().is_float()) is false: power only applies to float"
+    },
+    {
+      "dtype": "float32",
+      "operation": "pow",
+      "status": "passed",
+      "first": 1.0
+    },
+    {
+      "dtype": "bfloat16",
+      "operation": "exp",
+      "status": "passed",
+      "first": 2.71875
+    }
+  ]
+}

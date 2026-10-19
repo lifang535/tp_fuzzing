@@ -1,0 +1,351 @@
+{
+  "previous_full_mechanisms": 46,
+  "previous_at_matched_duration_mechanisms": 46,
+  "current_mechanisms": 43,
+  "shared_mechanisms": 41,
+  "previous_total_tested": 204285,
+  "previous_wall_hours_approx": 97,
+  "previous_failure_records_reviewed": 8225,
+  "previous_only_descriptions": [
+    "fp16 atomic_add vectorization ignores index mapping",
+    "vectorized bitwise_not emits an invalid C++ operator",
+    "loop unswitching breaks SSA",
+    "maxnreg-constrained dot causes illegal memory accesses",
+    "AMD fp32 dot with kpack=2 asserts"
+  ],
+  "current_only_ids": [
+    "TileLang#13",
+    "Triton#7"
+  ],
+  "atomic_compatibility": {
+    "id": "TileLang#26",
+    "previous_records": 14,
+    "current_records": 21,
+    "previous_first_hours": 4.332743962075975
+  },
+  "method": "Saved failure records matched to independently verified catalogue mechanisms with audit corrections. No new remote replay. Live progress is separate from the 17:35 fixed failure audit.",
+  "previous_mechanism_index": [
+    {
+      "description": "fp16 atomic_add index mapping",
+      "current_report_id": null,
+      "records": 85,
+      "first_hours": 4.762072504295243,
+      "example_file": "failed_slice_atomic_16dc71a63724f18b.json"
+    },
+    {
+      "description": "编译到 sm_80 的 fp8 `T.gemm` 用了 sm_89 才有的 MMA，运行时 device assert",
+      "current_report_id": "TileLang#18",
+      "records": 33,
+      "first_hours": 2.332495326399803,
+      "example_file": "failed_slice_gemm_0104a87e047f3428.json"
+    },
+    {
+      "description": "gemm 累加器加上另一个 fragment 的行和时布局推断失败（`has_best`）",
+      "current_report_id": "TileLang#25",
+      "records": 20,
+      "first_hours": 3.9499178600973552,
+      "example_file": "failed_calls_main(f0+f0)__f0()_6fecfb18c46116eb.json"
+    },
+    {
+      "description": "while 循环拷贝到共享内存再 gemm 缺同步",
+      "current_report_id": "TileLang#8",
+      "records": 152,
+      "first_hours": 4.412003665765127,
+      "example_file": "failed_slice_loop_3b1d2ca9441b4849.json"
+    },
+    {
+      "description": "HIP 后端 fp8 处理缺口：e5m2 常量无法打印；`float8_e4m3` gemm 报 KeyError",
+      "current_report_id": "TileLang#20",
+      "records": 146,
+      "first_hours": 0.02089914083480835,
+      "example_file": "failed_slice_round_8f162c061e50c5c7.json"
+    },
+    {
+      "description": "显式 order/stage 的 `T.Pipelined` 把 fragment 多缓冲，随后报“只允许 fragment[0]”或 `Layout::Forward` 维数不符",
+      "current_report_id": "TileLang#23",
+      "records": 220,
+      "first_hours": 0.3046850334935718,
+      "example_file": "failed_slice_loop_ec4c0958224b83af.json"
+    },
+    {
+      "description": "流水线生成非法 2 字节 cp.async",
+      "current_report_id": "TileLang#3",
+      "records": 73,
+      "first_hours": 0.7654117637210422,
+      "example_file": "failed_slice_gemm_4a414247068c2e11.json"
+    },
+    {
+      "description": "自动选择的归约布局无法降级",
+      "current_report_id": "TileLang#2",
+      "records": 111,
+      "first_hours": 1.3094725168413586,
+      "example_file": "failed_calls_main(f0)__f0()_dbf4482dee5cb4df.json"
+    },
+    {
+      "description": "bool 向量 CUDA codegen 失败",
+      "current_report_id": "TileLang#1",
+      "records": 144,
+      "first_hours": 0.10292683323224386,
+      "example_file": "failed_extended_mixed_c2be9989383fa1b6.json"
+    },
+    {
+      "description": "8 位整数 xor 在 HIP codegen 中 `Check failed: (p)`",
+      "current_report_id": "TileLang#21",
+      "records": 155,
+      "first_hours": 0.6203174234761132,
+      "example_file": "failed_slice_loop_7e5730d12b301883.json"
+    },
+    {
+      "description": "`tl.config_index_bitwidth=64` 改写存储的值",
+      "current_report_id": "TileLang#15",
+      "records": 252,
+      "first_hours": 0.4180935504039129,
+      "example_file": "failed_slice_layout_8198f429f2152337.json"
+    },
+    {
+      "description": "int16 逐元素运算无法打印 int16x16",
+      "current_report_id": "TileLang#16",
+      "records": 112,
+      "first_hours": 1.4745198174979952,
+      "example_file": "failed_slice_layout_6ceec76b834c8e27.json"
+    },
+    {
+      "description": "loop unswitching SSA",
+      "current_report_id": null,
+      "records": 8,
+      "first_hours": 21.540363181034724,
+      "example_file": "failed_slice_gemm_4c7a4cfb04d4d604.json"
+    },
+    {
+      "description": "IEEE 舍入内建在 AMD 上无降级规则",
+      "current_report_id": "TileLang#17",
+      "records": 319,
+      "first_hours": 0.6892782117260827,
+      "example_file": "failed_slice_math_7bf40bff3340ad54.json"
+    },
+    {
+      "description": "缺降级规则的内建到达 codegen",
+      "current_report_id": "TileLang#11",
+      "records": 122,
+      "first_hours": 0.2127016630437639,
+      "example_file": "failed_slice_math_cb2b527f973c4697.json"
+    },
+    {
+      "description": "bf16 `T.pow` 报 `power only applies to float`",
+      "current_report_id": "TileLang#22",
+      "records": 16,
+      "first_hours": 7.227355238530371,
+      "example_file": "failed_slice_math_3aad5313d8f7e47e.json"
+    },
+    {
+      "description": "int64 `T.atomic_max/min/or` 被 nvcc 拒绝",
+      "current_report_id": "TileLang#6",
+      "records": 93,
+      "first_hours": 0.06659615079561869,
+      "example_file": "failed_slice_atomic_af271862fd2bac65.json"
+    },
+    {
+      "description": "sm75 bf16 atomic_min/max CUDA 12.4 compatibility",
+      "current_report_id": "TileLang#26",
+      "records": 14,
+      "first_hours": 4.332743962075975,
+      "example_file": "failed_slice_atomic_17223a4091b5db2c.json"
+    },
+    {
+      "description": "int64→f16/bf16 `T.cast` 被 nvcc 拒绝",
+      "current_report_id": "TileLang#5",
+      "records": 1380,
+      "first_hours": 0.18900793062316046,
+      "example_file": "failed_slice_scan_f07376adcbdd8009.json"
+    },
+    {
+      "description": "半精度 `nearbyint/fmod/tanh` 生成未定义函数",
+      "current_report_id": "TileLang#10",
+      "records": 123,
+      "first_hours": 0.024652857449319627,
+      "example_file": "failed_slice_math_006731d8b26a5de9.json"
+    },
+    {
+      "description": "vector bitwise_not",
+      "current_report_id": null,
+      "records": 43,
+      "first_hours": 1.2624852610958948,
+      "example_file": "failed_slice_math_31350f23476a761f.json"
+    },
+    {
+      "description": "浮点 `x - x`、`x * 0` 被化简成 0，inf/NaN 输入得 0 而不是 NaN",
+      "current_report_id": "TileLang#24",
+      "records": 2,
+      "first_hours": 39.389237263268896,
+      "example_file": "failed_extended_control_calls_6dabc2219335f5af.json"
+    },
+    {
+      "description": "共享内存取模下标重排丢掉列偏移",
+      "current_report_id": "TileLang#12",
+      "records": 125,
+      "first_hours": 1.680011301835378,
+      "example_file": "failed_slice_layout_3ac9675d9788222a.json"
+    },
+    {
+      "description": "窄整数运算后加宽不按窄类型回绕",
+      "current_report_id": "TileLang#9",
+      "records": 270,
+      "first_hours": 1.4695118768347635,
+      "example_file": "failed_slice_math_6d23f4be88b2d722.json"
+    },
+    {
+      "description": "int→bf16 截断而非就近舍入（259→258）",
+      "current_report_id": "TileLang#7",
+      "records": 40,
+      "first_hours": 16.993059007657898,
+      "example_file": "failed_slice_round_d0fa615f9c7e391f.json"
+    },
+    {
+      "description": "maxnreg dot illegal memory access",
+      "current_report_id": null,
+      "records": 1,
+      "first_hours": 14.040958208971553,
+      "example_file": "failed_slice_gemm_2322da73fae39ec7.json"
+    },
+    {
+      "description": "`tl.atomic_xchg` 全部无法编译",
+      "current_report_id": "Triton#13",
+      "records": 53,
+      "first_hours": 1.3704300113519032,
+      "example_file": "failed_slice_atomic_eb0e53951ac9d562.json"
+    },
+    {
+      "description": "fp16 反向 cumsum 无法生成 hsaco（报 LLD 错）",
+      "current_report_id": "Triton#16",
+      "records": 148,
+      "first_hours": 0.1615514553255505,
+      "example_file": "failed_slice_scan_47792e55b59e65f6.json"
+    },
+    {
+      "description": "`tl.fdiv` 用于 fp16/bf16 编译失败",
+      "current_report_id": "Triton#9",
+      "records": 41,
+      "first_hours": 1.1658873629570008,
+      "example_file": "failed_slice_math_2b1f6047a7ab2c24.json"
+    },
+    {
+      "description": "bf16 自定义 combine 的 reduce/scan 编译失败",
+      "current_report_id": "Triton#6",
+      "records": 156,
+      "first_hours": 0.018938553664419384,
+      "example_file": "failed_slice_reduce_a55dab91fc65095d.json"
+    },
+    {
+      "description": "f32→fp8 默认舍入错（0.53125006→0.5）",
+      "current_report_id": "Triton#2",
+      "records": 53,
+      "first_hours": 2.5788111927111945,
+      "example_file": "failed_slice_round_fd8ecc0e5ed4bb16.json"
+    },
+    {
+      "description": "f64↔fp8 转换 LLVM abort",
+      "current_report_id": "Triton#3",
+      "records": 783,
+      "first_hours": 0.05670981996589237,
+      "example_file": "failed_slice_round_e1a49e5f149cfb1f.json"
+    },
+    {
+      "description": "fp8→fp8 转换断言",
+      "current_report_id": "Triton#4",
+      "records": 262,
+      "first_hours": 0.0020553328593571982,
+      "example_file": "failed_slice_cast_e06c3d17ea566b7c.json"
+    },
+    {
+      "description": "AMD kpack2 fp32 dot assertion",
+      "current_report_id": null,
+      "records": 17,
+      "first_hours": 7.039085410700904,
+      "example_file": "failed_slice_loop_c26f6a105ed5fe57.json"
+    },
+    {
+      "description": "`tl.gather` 沿 axis 0 断言",
+      "current_report_id": "Triton#10",
+      "records": 23,
+      "first_hours": 2.2011625474029115,
+      "example_file": "failed_slice_layout_8729c6cc680e1db7.json"
+    },
+    {
+      "description": "warp specialize 循环加展开时断言 `dyn_cast on a non-existent value`",
+      "current_report_id": "Triton#17",
+      "records": 49,
+      "first_hours": 4.294687705768479,
+      "example_file": "failed_slice_loop_6a2a24185c49cfb4.json"
+    },
+    {
+      "description": "warp specialize 循环里有扫描时 unreachable",
+      "current_report_id": "Triton#12",
+      "records": 23,
+      "first_hours": 33.560412297911114,
+      "example_file": "failed_slice_loop_b387a7e013a14738.json"
+    },
+    {
+      "description": "`fp_downcast_rounding='rtz'` pass 崩溃",
+      "current_report_id": "Triton#5",
+      "records": 257,
+      "first_hours": 0.03104826311270396,
+      "example_file": "failed_slice_round_78fca0855cad2e51.json"
+    },
+    {
+      "description": "bf16 原子加在 `maxnreg=32` 下丢失更新",
+      "current_report_id": "Triton#14",
+      "records": 6,
+      "first_hours": 48.711918137934475,
+      "example_file": "failed_slice_atomic_7940e4cfee0628f8.json"
+    },
+    {
+      "description": "f16/bf16 `tl.abs` 有一半元素仍为负",
+      "current_report_id": "Triton#1",
+      "records": 85,
+      "first_hours": 7.97014257033666,
+      "example_file": "failed_slice_gemm_b505f9273ee81552.json"
+    },
+    {
+      "description": "有符号 `libdevice.mul24` 返回完整 48 位乘积",
+      "current_report_id": "Triton#11",
+      "records": 12,
+      "first_hours": 63.374366681045956,
+      "example_file": "failed_slice_math_7bced087eaa9ba9e.json"
+    },
+    {
+      "description": "sm<89 上 f16→fp8e5 转换：平局一律进位，NaN 变成 inf 或 −0.0",
+      "current_report_id": "Triton#15",
+      "records": 41,
+      "first_hours": 0.5828925621509552,
+      "example_file": "failed_slice_round_7ab992147863f352.json"
+    },
+    {
+      "description": "向量化窄整数掩码加载，负填充值读错",
+      "current_report_id": "Triton#8",
+      "records": 9,
+      "first_hours": 9.324928939011361,
+      "example_file": "failed_slice_memory_d5efe5acdb08b37d.json"
+    },
+    {
+      "description": "窄 N 的 f16 gemm 触发 `Not a canonical GMMA_MN layout` 断言",
+      "current_report_id": "TileLang#19",
+      "records": 17,
+      "first_hours": 13.901576015220748,
+      "example_file": "failed_slice_gemm_b4a60ab4d4bb4097.json"
+    },
+    {
+      "description": "嵌套整数 floordiv codegen 崩溃",
+      "current_report_id": "TileLang#4",
+      "records": 10,
+      "first_hours": 23.53478869517644,
+      "example_file": "failed_slice_cast_44fd57c493bc5e8c.json"
+    },
+    {
+      "description": "开 `tl.enable_lower_ldgstg` 后向量元素访问失败",
+      "current_report_id": "TileLang#14",
+      "records": 12,
+      "first_hours": 7.627163952920172,
+      "example_file": "failed_slice_math_fa5b3c8174176b05.json"
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "TileLang#24",
+  "inputs": [
+    "+inf",
+    "-inf",
+    "nan",
+    1.5
+  ],
+  "expected": [
+    "nan",
+    "nan",
+    "nan",
+    0.0
+  ],
+  "actual": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "mismatches": 3,
+  "generated_cuda": "#if defined(_MSC_VER) && !defined(__clang__) && _MSC_VER < 1940\n#define _tl_orig_alignas alignas\n#define alignas(N) _tl_orig_alignas((N) <= 64 ? (N) : 64)\n#include <cuda.h>\n#undef alignas\n#define alignas _tl_orig_alignas\n#endif\n#include <tl_templates/cuda/reduce.h>\n#include <tl_templates/cuda/scan.h>\n#include <tl_templates/cuda/ldsm.h>\n#include <tl_templates/cuda/threadblock_swizzle.h>\n#include <tl_templates/cuda/debug.h>\n#ifdef ENABLE_BF16\n#include <tl_templates/cuda/cuda_bf16_fallbacks.cuh>\n#endif\n\nextern \"C\" __global__ void kernel_kernel(float* __restrict__ O);\nextern \"C\" __global__ void __launch_bounds__(32, 1) kernel_kernel(float* __restrict__ O) {\n  if (((int)threadIdx.x) < 4) {\n    O[((int)threadIdx.x)] = 0x0p+0f/*0.000000e+00*/;\n  }\n}\n\n"
+}

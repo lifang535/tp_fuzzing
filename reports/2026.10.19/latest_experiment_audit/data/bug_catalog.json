@@ -1,0 +1,895 @@
+[
+  {
+    "id": "Triton#1",
+    "title_zh": "f16/bf16 `tl.abs` 有一半元素仍为负",
+    "title_en": "Half-precision abs retains negative signs in some lanes (ptxas 12.9)",
+    "backend": "triton",
+    "records": 73,
+    "records_by_port": {
+      "41790": 24,
+      "32906": 49
+    },
+    "diagnostic_buckets": [
+      "wrong_result:048d7f0343",
+      "wrong_result:0c933f44a9",
+      "wrong_result:0f20eb3040",
+      "wrong_result:15ac82aefa",
+      "wrong_result:2195ea76fd",
+      "wrong_result:3a28fc26ad",
+      "wrong_result:3bdea894bc",
+      "wrong_result:5bd6171bc2",
+      "wrong_result:6eec9ee057",
+      "wrong_result:7ae6a9d040",
+      "wrong_result:a30222e0cd",
+      "wrong_result:c1f0fcaa34",
+      "wrong_result:f41e36d6be"
+    ],
+    "example_file": "failed_slice_gemm_ea1922cdfabae50a.json",
+    "repro": "repro/triton_abs.py",
+    "evidence": "fresh independent example and controls"
+  },
+  {
+    "id": "Triton#2",
+    "title_zh": "f32→fp8 默认舍入错（0.53125006→0.5）",
+    "title_en": "Double rounding in float32 to fp8 conversion",
+    "backend": "triton",
+    "records": 17,
+    "records_by_port": {
+      "32906": 17
+    },
+    "diagnostic_buckets": [
+      "wrong_result:2f11399368",
+      "wrong_result:4218e65acd",
+      "wrong_result:9f0d4384ae",
+      "wrong_result:acbd5a598a"
+    ],
+    "example_file": "failed_slice_round_767b7ad0a296133d.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#3",
+    "title_zh": "f64↔fp8 转换 LLVM abort",
+    "title_en": "CUDA lowering failure or abort for float64 and fp8 conversions",
+    "backend": "triton",
+    "records": 636,
+    "records_by_port": {
+      "41790": 319,
+      "32906": 317
+    },
+    "diagnostic_buckets": [
+      "triton_pass_failure:4e7f279eb9",
+      "triton_pass_failure:80133534c0",
+      "triton_pass_failure:b5a5d18d0d",
+      "triton_pass_failure:b85c0e3d0d"
+    ],
+    "example_file": "failed_slice_round_e1a49e5f149cfb1f.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#4",
+    "title_zh": "fp8→fp8 转换断言",
+    "title_en": "Rounding-mode assertion for conversions between fp8 formats",
+    "backend": "triton",
+    "records": 197,
+    "records_by_port": {
+      "41790": 93,
+      "32906": 104
+    },
+    "diagnostic_buckets": [
+      "triton_pass_failure:6c3799f503"
+    ],
+    "example_file": "failed_slice_cast_5b5670d9d7ddaf0b.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#5",
+    "title_zh": "`fp_downcast_rounding='rtz'` pass 崩溃",
+    "title_en": "rtz downcast lowering crashes, including AMD maybeOutVals assertions",
+    "backend": "triton",
+    "records": 137,
+    "records_by_port": {
+      "41790": 65,
+      "32906": 72
+    },
+    "diagnostic_buckets": [
+      "triton_pass_failure:1e4f7c67a0",
+      "triton_pass_failure:39897bb355",
+      "triton_pass_failure:3abdc917af",
+      "triton_pass_failure:5beb64c935",
+      "triton_pass_failure:ad9e2298b9"
+    ],
+    "example_file": "failed_slice_round_78fca0855cad2e51.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#6",
+    "title_zh": "bf16 自定义 combine 的 reduce/scan 编译失败",
+    "title_en": "bf16 custom reduce/scan combine has an inconsistent promoted type",
+    "backend": "triton",
+    "records": 126,
+    "records_by_port": {
+      "41790": 52,
+      "32906": 74
+    },
+    "diagnostic_buckets": [
+      "triton_compile_error:0201187bb7",
+      "triton_compile_error:59ab0b7774"
+    ],
+    "example_file": "failed_slice_reduce_6334ecd4358053dd.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#7",
+    "title_zh": "常量折叠后转 fp8，部分 lane 是垃圾值",
+    "title_en": "Garbage lanes after conversion of folded constants to fp8 (ptxas)",
+    "backend": "triton",
+    "records": 6,
+    "records_by_port": {
+      "32906": 6
+    },
+    "diagnostic_buckets": [
+      "wrong_result:652ae2fbd2"
+    ],
+    "example_file": "failed_slice_gemm_be03828757591502.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#8",
+    "title_zh": "向量化窄整数掩码加载，负填充值读错",
+    "title_en": "Incorrect negative masked-load fill values for narrow integers",
+    "backend": "triton",
+    "records": 12,
+    "records_by_port": {
+      "32906": 12
+    },
+    "diagnostic_buckets": [
+      "wrong_result:a0483e4303"
+    ],
+    "example_file": "failed_slice_memory_108852c23f3233aa.json",
+    "repro": "repro/triton_masked_load.py",
+    "evidence": "fresh independent example and controls"
+  },
+  {
+    "id": "Triton#9",
+    "title_zh": "`tl.fdiv` 用于 fp16/bf16 编译失败",
+    "title_en": "Half-precision or IEEE fdiv has incompatible intrinsic widths or return types",
+    "backend": "triton",
+    "records": 37,
+    "records_by_port": {
+      "41790": 18,
+      "32906": 19
+    },
+    "diagnostic_buckets": [
+      "other:3bb67ac4a2",
+      "triton_pass_failure:51e632ff10"
+    ],
+    "example_file": "failed_slice_math_bcf45d28a591ed34.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#10",
+    "title_zh": "`tl.gather` 沿 axis 0 断言",
+    "title_en": "Gather layout triggers an isWarpLocal assertion",
+    "backend": "triton",
+    "records": 63,
+    "records_by_port": {
+      "41790": 26,
+      "32906": 37
+    },
+    "diagnostic_buckets": [
+      "triton_pass_failure:98f5946f66"
+    ],
+    "example_file": "failed_slice_layout_92f75705a370bbdc.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#11",
+    "title_zh": "有符号 `libdevice.mul24` 返回完整 48 位乘积",
+    "title_en": "Widened signed libdevice.mul24 returns an incorrect full product",
+    "backend": "triton",
+    "records": 11,
+    "records_by_port": {
+      "41790": 7,
+      "32906": 4
+    },
+    "diagnostic_buckets": [
+      "wrong_result:4a7d6279eb"
+    ],
+    "example_file": "failed_slice_math_070ec7830ef3be9c.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#12",
+    "title_zh": "warp specialize 循环里有扫描时 unreachable",
+    "title_en": "Scan inside a warp-specialized loop reaches an unreachable path",
+    "backend": "triton",
+    "records": 8,
+    "records_by_port": {
+      "41790": 8
+    },
+    "diagnostic_buckets": [
+      "triton_pass_failure:7294002f82"
+    ],
+    "example_file": "failed_slice_loop_359ef4c5fd0a563e.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#13",
+    "title_zh": "gfx942/gfx950 的 atomic_xchg 生成不存在的 exch 内建",
+    "title_en": "AMD atomic_xchg emits a nonexistent exch intrinsic",
+    "backend": "triton",
+    "records": 31,
+    "records_by_port": {
+      "41790": 15,
+      "32906": 16
+    },
+    "diagnostic_buckets": [
+      "other:3bb67ac4a2"
+    ],
+    "example_file": "failed_slice_atomic_035dc3701aceffa7.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#14",
+    "title_zh": "bf16 原子加在 `maxnreg=32` 下丢失更新",
+    "title_en": "bf16 atomic_add loses CAS updates with maxnreg=32 (ptxas)",
+    "backend": "triton",
+    "records": 5,
+    "records_by_port": {
+      "32906": 5
+    },
+    "diagnostic_buckets": [
+      "wrong_result:05e47ffef0"
+    ],
+    "example_file": "failed_slice_atomic_7647867aab64f721.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#15",
+    "title_zh": "sm<89 上 f16→fp8e5 转换：平局一律进位，NaN 变成 inf 或 −0.0",
+    "title_en": "sm80 fp8e5 software conversion mishandles ties and NaNs",
+    "backend": "triton",
+    "records": 33,
+    "records_by_port": {
+      "41790": 14,
+      "32906": 19
+    },
+    "diagnostic_buckets": [
+      "wrong_result:2777030c37",
+      "wrong_result:3fad07a3c2",
+      "wrong_result:98451f9acb",
+      "wrong_result:c1d361b691"
+    ],
+    "example_file": "failed_slice_memory_36c1467b1f455e61.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#16",
+    "title_zh": "gfx1100 的 fp16 反向 cumsum 被 LLVM 汇编器拒绝，外层报 LLD 失败",
+    "title_en": "LLVM rejects a gfx1100 DPP instruction; Triton reports an LLD failure",
+    "backend": "triton",
+    "records": 215,
+    "records_by_port": {
+      "41790": 95,
+      "32906": 120
+    },
+    "diagnostic_buckets": [
+      "other:ba46b7a4ad"
+    ],
+    "example_file": "failed_slice_scan_ac7eb9f378d34ce2.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "Triton#17",
+    "title_zh": "sm100/sm120 的 warp specialization + unroll 触发 dyn_cast 断言",
+    "title_en": "Blackwell warp specialization with unrolling hits a dyn_cast assertion",
+    "backend": "triton",
+    "records": 44,
+    "records_by_port": {
+      "41790": 19,
+      "32906": 25
+    },
+    "diagnostic_buckets": [
+      "triton_pass_failure:9f5fb26526"
+    ],
+    "example_file": "failed_slice_loop_0a5a12d773f40255.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#1",
+    "title_zh": "bool 向量 CUDA codegen 失败",
+    "title_en": "CUDA codegen cannot print vectorized bool types",
+    "backend": "tilelang",
+    "records": 111,
+    "records_by_port": {
+      "41790": 43,
+      "32906": 68
+    },
+    "diagnostic_buckets": [
+      "tilelang_bool_cuda_type"
+    ],
+    "example_file": "failed_extended_mixed_f8b393ab12af6e89.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#2",
+    "title_zh": "自动选择的归约布局无法降级",
+    "title_en": "An inferred reduction layout cannot be lowered",
+    "backend": "tilelang",
+    "records": 90,
+    "records_by_port": {
+      "41790": 38,
+      "32906": 52
+    },
+    "diagnostic_buckets": [
+      "tilelang_reduce_layout"
+    ],
+    "example_file": "failed_calls_main(f1)__f0()__f1(f0)_2966f8f325e903cf.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#3",
+    "title_zh": "流水线生成非法 2 字节 cp.async",
+    "title_en": "cp.async is emitted with an illegal transfer size",
+    "backend": "tilelang",
+    "records": 57,
+    "records_by_port": {
+      "41790": 17,
+      "32906": 40
+    },
+    "diagnostic_buckets": [
+      "tilelang_two_byte_cp_async"
+    ],
+    "example_file": "failed_slice_gemm_1b42ef9abdd0babd.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#4",
+    "title_zh": "嵌套整数 floordiv codegen 崩溃",
+    "title_en": "Vectorized nested integer division causes a conflicting Let binding",
+    "backend": "tilelang",
+    "records": 8,
+    "records_by_port": {
+      "41790": 2,
+      "32906": 6
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:3de206fba6"
+    ],
+    "example_file": "failed_slice_cast_fa77283ba97bd9bc.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#5",
+    "title_zh": "int64→f16/bf16 `T.cast` 被 nvcc 拒绝",
+    "title_en": "Ambiguous C++ constructors for int64/uint64 to f16/bf16 casts",
+    "backend": "tilelang",
+    "records": 1039,
+    "records_by_port": {
+      "41790": 352,
+      "32906": 687
+    },
+    "diagnostic_buckets": [
+      "tilelang_cuda_compile_error:27fc71d345",
+      "tilelang_cuda_compile_error:2df480fcb8",
+      "tilelang_cuda_compile_error:376ff67039",
+      "tilelang_cuda_compile_error:45c51e304e",
+      "tilelang_cuda_compile_error:4c4da02698",
+      "tilelang_cuda_compile_error:689443b245",
+      "tilelang_cuda_compile_error:6b8e869776",
+      "tilelang_cuda_compile_error:72c191ef1b",
+      "tilelang_cuda_compile_error:73f051549d",
+      "tilelang_cuda_compile_error:8860b5baf8",
+      "tilelang_cuda_compile_error:a106889289",
+      "tilelang_cuda_compile_error:e86f50a861",
+      "tilelang_cuda_compile_error:f715bc413a",
+      "tilelang_cuda_compile_error:fb977e50e7"
+    ],
+    "example_file": "failed_slice_reduce_893251c7cb3f74cf.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#6",
+    "title_zh": "int64 `T.atomic_max/min/or` 被 nvcc 拒绝",
+    "title_en": "CUDA template type mismatch for int64 atomic min/max/or",
+    "backend": "tilelang",
+    "records": 102,
+    "records_by_port": {
+      "41790": 45,
+      "32906": 57
+    },
+    "diagnostic_buckets": [
+      "tilelang_cuda_compile_error:1744b9c79b"
+    ],
+    "example_file": "failed_slice_atomic_978591c0503821ce.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#7",
+    "title_zh": "int→bf16 截断而非就近舍入（259→258）",
+    "title_en": "Integer to bf16 conversion truncates instead of rounding to nearest",
+    "backend": "tilelang",
+    "records": 44,
+    "records_by_port": {
+      "41790": 9,
+      "32906": 35
+    },
+    "diagnostic_buckets": [
+      "wrong_result:868d9c1210",
+      "wrong_result:ac74b6e188",
+      "wrong_result:ae2044f4b6",
+      "wrong_result:e9876816c8"
+    ],
+    "example_file": "failed_slice_round_11652b6028f337fe.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#8",
+    "title_zh": "while 循环拷贝到共享内存再 gemm 缺同步",
+    "title_en": "Missing synchronization in while-loop shared-memory copies followed by GEMM",
+    "backend": "tilelang",
+    "records": 150,
+    "records_by_port": {
+      "41790": 38,
+      "32906": 112
+    },
+    "diagnostic_buckets": [
+      "nondeterminism:01039078d8",
+      "nondeterminism:071e72a3ca",
+      "nondeterminism:0e70da689a",
+      "nondeterminism:21af8001af",
+      "nondeterminism:5651ea4dfd",
+      "nondeterminism:6236cbb7fb",
+      "nondeterminism:742a103b58",
+      "nondeterminism:7e6d7804c3",
+      "nondeterminism:88f36f2062",
+      "nondeterminism:9a63f6b78f",
+      "nondeterminism:9ebc9d656c",
+      "nondeterminism:9f93b19a23",
+      "nondeterminism:a53a1f4df9",
+      "nondeterminism:b1e1412211",
+      "nondeterminism:c93235889b",
+      "nondeterminism:de72707f63",
+      "nondeterminism:ef20867e21",
+      "wrong_result:0375486c7b",
+      "wrong_result:0bd66a4764",
+      "wrong_result:110cb3ab42",
+      "wrong_result:22dd36b071",
+      "wrong_result:25c0e4eaf0",
+      "wrong_result:3192ea65d3",
+      "wrong_result:35eefa1ebf",
+      "wrong_result:439161c479",
+      "wrong_result:4ee300d75a",
+      "wrong_result:5276f7a7d4",
+      "wrong_result:55b1893190",
+      "wrong_result:58888f9be8",
+      "wrong_result:60c09376a9",
+      "wrong_result:6f58906952",
+      "wrong_result:8413c567e1",
+      "wrong_result:86996e5019",
+      "wrong_result:8d04861a66",
+      "wrong_result:96f6647abf",
+      "wrong_result:992eafc0d4",
+      "wrong_result:a88856f6a5",
+      "wrong_result:aa9f392963",
+      "wrong_result:ab09fd20f0",
+      "wrong_result:ae6d14abde",
+      "wrong_result:ae7f7b391f",
+      "wrong_result:bac3f90469",
+      "wrong_result:dab74227b7",
+      "wrong_result:f46db12a02",
+      "wrong_result:fa28e91d0a",
+      "wrong_result:fa92c76fd7",
+      "wrong_result:fd73c0e001"
+    ],
+    "example_file": "failed_slice_loop_91477eca68c49d7c.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#9",
+    "title_zh": "窄整数运算后加宽不按窄类型回绕",
+    "title_en": "Narrow integer arithmetic loses wraparound when widened",
+    "backend": "tilelang",
+    "records": 225,
+    "records_by_port": {
+      "41790": 73,
+      "32906": 152
+    },
+    "diagnostic_buckets": [
+      "wrong_result:0393ed6795",
+      "wrong_result:0accd44813",
+      "wrong_result:0d9404df54",
+      "wrong_result:17c5a503eb",
+      "wrong_result:1ffc1e9e8f",
+      "wrong_result:3f1033b30c",
+      "wrong_result:46150d815a",
+      "wrong_result:584fde255c",
+      "wrong_result:644826054a",
+      "wrong_result:6a31040003",
+      "wrong_result:72669c55d2",
+      "wrong_result:7362a7a05c",
+      "wrong_result:835476c0e3",
+      "wrong_result:8d22282aac",
+      "wrong_result:9951c48e85",
+      "wrong_result:9b6512d486",
+      "wrong_result:ab398e16dc",
+      "wrong_result:ab429955a5",
+      "wrong_result:b3974f6b81",
+      "wrong_result:b4ccd4d31c",
+      "wrong_result:b989549396",
+      "wrong_result:c48a5859fe",
+      "wrong_result:c66a319ea7",
+      "wrong_result:c6fe548696",
+      "wrong_result:caea6daae9",
+      "wrong_result:cfad6d3fe8",
+      "wrong_result:df64f9e963",
+      "wrong_result:dfbc799705",
+      "wrong_result:e22e4a8440",
+      "wrong_result:e66ef8fba8",
+      "wrong_result:e9289dd85a",
+      "wrong_result:f2734d7146",
+      "wrong_result:fada401ee0",
+      "wrong_result:fd8203a1c3"
+    ],
+    "example_file": "failed_slice_math_340e3c95d8852699.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#10",
+    "title_zh": "半精度数学内建生成错误；本轮为 hpow/htanh 重载失败",
+    "title_en": "Invalid half-precision math intrinsic codegen; hpow/htanh overloads in this run",
+    "backend": "tilelang",
+    "records": 39,
+    "records_by_port": {
+      "41790": 6,
+      "32906": 33
+    },
+    "diagnostic_buckets": [
+      "tilelang_cuda_compile_error:cc349e2e7e",
+      "tilelang_cuda_compile_error:d9f40cac0e"
+    ],
+    "example_file": "failed_slice_math_efe5843a185ce984.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#11",
+    "title_zh": "缺降级规则的内建到达 codegen",
+    "title_en": "Missing lowering for popcount/copysign/nextafter/ldexp/hypot",
+    "backend": "tilelang",
+    "records": 91,
+    "records_by_port": {
+      "41790": 40,
+      "32906": 51
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:29a1bd9afc",
+      "tilelang_codegen_error:62b8bed51b",
+      "tilelang_codegen_error:6c7a2b5c77",
+      "tilelang_codegen_error:eb548bd2e1",
+      "tilelang_codegen_error:f642c4f8d8"
+    ],
+    "example_file": "failed_slice_math_a00aa5d0f00c3244.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#12",
+    "title_zh": "共享内存取模下标重排丢掉列偏移",
+    "title_en": "Shared-memory remapping incorrectly removes the column offset",
+    "backend": "tilelang",
+    "records": 121,
+    "records_by_port": {
+      "41790": 29,
+      "32906": 92
+    },
+    "diagnostic_buckets": [
+      "wrong_result:038de3b3c9",
+      "wrong_result:0e3ef31ee7",
+      "wrong_result:1d6c189452",
+      "wrong_result:1dcae9a71e",
+      "wrong_result:3b66e91bbc",
+      "wrong_result:3ca07f76e8",
+      "wrong_result:5a0aecc926",
+      "wrong_result:602873d6b6",
+      "wrong_result:62184cf9c3",
+      "wrong_result:7cdba73a64",
+      "wrong_result:7d25cf977f",
+      "wrong_result:7d89a0cc00",
+      "wrong_result:81d8ed8fef",
+      "wrong_result:ac66d66658",
+      "wrong_result:b26b691b9a",
+      "wrong_result:bc614551b7",
+      "wrong_result:c1cd14c63a",
+      "wrong_result:c7810bd216",
+      "wrong_result:cd34e76c5e",
+      "wrong_result:e740469f71",
+      "wrong_result:f3ef2daf81",
+      "wrong_result:f669ed5a41",
+      "wrong_result:f784ec199a"
+    ],
+    "example_file": "failed_slice_layout_0b4e77dabbf97b87.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#13",
+    "title_zh": "区域拷贝降级为 ldmatrix 时丢列偏移",
+    "title_en": "Region-copy lowering to ldmatrix drops the column offset",
+    "backend": "tilelang",
+    "records": 14,
+    "records_by_port": {
+      "41790": 9,
+      "32906": 5
+    },
+    "diagnostic_buckets": [
+      "wrong_result:2a3131ad48",
+      "wrong_result:345015918a",
+      "wrong_result:5a0aecc926",
+      "wrong_result:5f1303e9a2",
+      "wrong_result:848feeb9b2"
+    ],
+    "example_file": "failed_slice_layout_c97950fc64444af3.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#14",
+    "title_zh": "开 `tl.enable_lower_ldgstg` 后向量元素访问失败",
+    "title_en": "ldgstg configuration produces incompatible vector-lane/reinterpret widths",
+    "backend": "tilelang",
+    "records": 8,
+    "records_by_port": {
+      "41790": 3,
+      "32906": 5
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:bdf5d1d1e6"
+    ],
+    "example_file": "failed_slice_math_73d26dea935fb133.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#15",
+    "title_zh": "index64 改写值或向量类型，引发错误结果或 codegen 失败",
+    "title_en": "index64 rewriting changes values or vector types and can break codegen",
+    "backend": "tilelang",
+    "records": 114,
+    "records_by_port": {
+      "41790": 40,
+      "32906": 74
+    },
+    "diagnostic_buckets": [
+      "nondeterminism:7e6d7804c3",
+      "tilelang_codegen_error:31a82d2249",
+      "tilelang_codegen_error:c49344365d",
+      "tilelang_codegen_error:c79df96ed1"
+    ],
+    "example_file": "failed_slice_memory_0bae2955e6ac30e5.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#16",
+    "title_zh": "sm100/sm120 的 256 位 int16/uint16 向量类型无法打印",
+    "title_en": "CUDA codegen cannot print Blackwell 256-bit int16/uint16 vector types",
+    "backend": "tilelang",
+    "records": 103,
+    "records_by_port": {
+      "41790": 35,
+      "32906": 68
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:1853d4062d",
+      "tilelang_codegen_error:6e9b1f1bfa"
+    ],
+    "example_file": "failed_slice_loop_7f7a7540efd22675.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#17",
+    "title_zh": "IEEE 舍入内建在 AMD 上无降级规则",
+    "title_en": "HIP has no lowering rules for tl.ieee_* intrinsics",
+    "backend": "tilelang",
+    "records": 270,
+    "records_by_port": {
+      "41790": 121,
+      "32906": 149
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:1611176474",
+      "tilelang_codegen_error:33718db227",
+      "tilelang_codegen_error:7962b12a8f",
+      "tilelang_codegen_error:7f413422b3",
+      "tilelang_codegen_error:95647648ff",
+      "tilelang_codegen_error:9ba5e7c223",
+      "tilelang_codegen_error:d4c1ee2489",
+      "tilelang_codegen_error:e26c2fc46c"
+    ],
+    "example_file": "failed_slice_math_e6c06477817f21bd.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#18",
+    "title_zh": "编译到 sm_80 的 fp8 `T.gemm` 用了 sm_89 才有的 MMA，运行时 device assert",
+    "title_en": "sm80 fp8 GEMM selects an unsupported MMA and fails at runtime",
+    "backend": "tilelang",
+    "records": 29,
+    "records_by_port": {
+      "41790": 12,
+      "32906": 17
+    },
+    "diagnostic_buckets": [
+      "assertion_failure:2c868c5806"
+    ],
+    "example_file": "failed_slice_gemm_bfa22a309bc741d9.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#19",
+    "title_zh": "窄 N 的 f16 gemm 触发 `Not a canonical GMMA_MN layout` 断言",
+    "title_en": "Narrow-N sm90 WGMMA triggers descriptor-layout assertions",
+    "backend": "tilelang",
+    "records": 3,
+    "records_by_port": {
+      "32906": 3
+    },
+    "diagnostic_buckets": [
+      "assertion_failure:502ce187ea"
+    ],
+    "example_file": "failed_slice_gemm_6c3fcc8bd17e3267.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#20",
+    "title_zh": "HIP 后端 fp8 处理缺口：e5m2 常量无法打印；`float8_e4m3` gemm 报 KeyError",
+    "title_en": "HIP fp8 constants and MFMA datatype tables have coverage gaps",
+    "backend": "tilelang",
+    "records": 115,
+    "records_by_port": {
+      "41790": 47,
+      "32906": 68
+    },
+    "diagnostic_buckets": [
+      "other:84faf0032a",
+      "tilelang_codegen_error:4d603e942c"
+    ],
+    "example_file": "failed_slice_round_8f162c061e50c5c7.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#21",
+    "title_zh": "8 位整数 xor 在 HIP codegen 中 `Check failed: (p)`",
+    "title_en": "HIP int8/uint8 xor fails the codegen Check(p)",
+    "backend": "tilelang",
+    "records": 108,
+    "records_by_port": {
+      "41790": 42,
+      "32906": 66
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:af98545473"
+    ],
+    "example_file": "failed_slice_loop_0d6176296aa057f2.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#22",
+    "title_zh": "bf16 `T.pow` 报 `power only applies to float`",
+    "title_en": "bf16 pow is rejected by the is_float type check",
+    "backend": "tilelang",
+    "records": 16,
+    "records_by_port": {
+      "41790": 5,
+      "32906": 11
+    },
+    "diagnostic_buckets": [
+      "tilelang_codegen_error:b6d1cd79e4"
+    ],
+    "example_file": "failed_slice_math_8bc20a60dd8dbeb7.json",
+    "repro": "repro/tilelang_pow_bf16.py",
+    "evidence": "fresh independent example and controls"
+  },
+  {
+    "id": "TileLang#23",
+    "title_zh": "显式 order/stage 的 `T.Pipelined` 把 fragment 多缓冲，随后报“只允许 fragment[0]”或 `Layout::Forward` 维数不符",
+    "title_en": "Explicit pipeline stage/order multibuffers fragments and breaks layouts",
+    "backend": "tilelang",
+    "records": 129,
+    "records_by_port": {
+      "41790": 58,
+      "32906": 71
+    },
+    "diagnostic_buckets": [
+      "other:92daf2cd75",
+      "tilelang_codegen_error:384c0435f5",
+      "tilelang_codegen_error:5a82478ff1"
+    ],
+    "example_file": "failed_slice_loop_79b6405f7eb7b0b9.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#24",
+    "title_zh": "浮点 `x - x`、`x * 0` 被化简成 0，inf/NaN 输入得 0 而不是 NaN",
+    "title_en": "Floating-point x-x is folded to zero for infinite/NaN inputs",
+    "backend": "tilelang",
+    "records": 2,
+    "records_by_port": {
+      "41790": 1,
+      "32906": 1
+    },
+    "diagnostic_buckets": [
+      "wrong_result:de22bded73",
+      "wrong_result:f62d92c68b"
+    ],
+    "example_file": "failed_extended_control_calls_a9c08fd0decb547c.json",
+    "repro": "repro/tilelang_self_subtract.py",
+    "evidence": "fresh independent example and controls"
+  },
+  {
+    "id": "TileLang#25",
+    "title_zh": "gemm 累加器加上另一个 fragment 的行和时布局推断失败（`has_best`）",
+    "title_en": "GEMM accumulator plus a separate fragment row reduction triggers has_best",
+    "backend": "tilelang",
+    "records": 9,
+    "records_by_port": {
+      "41790": 5,
+      "32906": 4
+    },
+    "diagnostic_buckets": [
+      "layout_inference:065f998191"
+    ],
+    "example_file": "failed_calls_main(f0)__f0()_64c91ebc916ad4a5.json",
+    "repro": null,
+    "evidence": "saved diagnostic/parameters matched to an independently verified mechanism"
+  },
+  {
+    "id": "TileLang#26",
+    "title_zh": "sm75 bf16 atomic_min/max 错选 CUDA 12.4 atomic_ref 分支",
+    "title_en": "sm75 bf16 atomic_min/max selects an incompatible CUDA 12.4 atomic_ref branch",
+    "backend": "tilelang",
+    "records": 21,
+    "records_by_port": {
+      "41790": 8,
+      "32906": 13
+    },
+    "diagnostic_buckets": [
+      "tilelang_cuda_compile_error:11c700332b"
+    ],
+    "example_file": "failed_slice_atomic_f533e4beaf829951.json",
+    "repro": "repro/tilelang_atomic_compile.py",
+    "evidence": "fresh independent example and controls"
+  }
+]

@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.10.19/latest_experiment_audit/repro/fz04_default.py", line 2244, in <module>
+    run_extended(PROGRAM, prepare_extended, 0, 3, reference_programs=REFERENCE_PROGRAMS)
+  File "/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.10.19/latest_experiment_audit/repro/fz04_default.py", line 699, in run_extended
+    raise failure
+  File "/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.10.19/latest_experiment_audit/repro/fz04_default.py", line 585, in judge
+    explained = check_fn(*args)
+  File "/home/lifang535/fdu_lab/project/tile_program_fuzzing/tp_fuzzing/reports/2026.10.19/latest_experiment_audit/repro/fz04_default.py", line 506, in extended_check
+    raise RuntimeError(message)
+RuntimeError: WRONG RESULT: identity:tilelang_8_ident:e32:seed=1:steps=2:limit=256; max_abs=0.00103759765625; index=241; actual=0.00103759765625; expected=0.0
+mismatched=6/512
+WRONG VALUES: e32, e42

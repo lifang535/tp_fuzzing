@@ -1,0 +1,128 @@
+[
+  {
+    "id": "7c40f5b1a54c5f71",
+    "mode": "default",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 9.61,
+    "last_error": "RuntimeError: WRONG RESULT: identity:tilelang_8_ident:e32:seed=1:steps=2:limit=256; max_abs=0.00103759765625; index=241; actual=0.00103759765625; expected=0.0"
+  },
+  {
+    "id": "7c40f5b1a54c5f71",
+    "mode": "no_fma",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 8.25,
+    "last_error": null
+  },
+  {
+    "id": "a23f301088d44736",
+    "mode": "default",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 8.47,
+    "last_error": "RuntimeError: WRONG RESULT: identity:atomic:mem1; max_abs=3.5703182220458984e-05; index=2350; actual=0.12496429681777954; expected=0.125"
+  },
+  {
+    "id": "a23f301088d44736",
+    "mode": "no_fma",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 8.44,
+    "last_error": null
+  },
+  {
+    "id": "df71623661f9d022",
+    "mode": "default",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 17.51,
+    "last_error": "RuntimeError: WRONG RESULT: identity:tilelang_8_ident:e93:seed=0:steps=3:limit=512; max_abs=31.0; index=860; actual=-1605.0; expected=-1636.0"
+  },
+  {
+    "id": "df71623661f9d022",
+    "mode": "no_fma",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 15.71,
+    "last_error": null
+  },
+  {
+    "id": "75e58ea70c54e68d",
+    "mode": "default",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 6.65,
+    "last_error": "RuntimeError: WRONG RESULT: identity:tilelang_8_ident:e32:seed=0:steps=0:limit=1; max_abs=27.461578369140625; index=215; actual=208.5304718017578; expected=181.0688934326172"
+  },
+  {
+    "id": "75e58ea70c54e68d",
+    "mode": "no_fma",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 6.73,
+    "last_error": null
+  },
+  {
+    "id": "28b9308ba2f67002",
+    "mode": "default",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 7.41,
+    "last_error": "RuntimeError: WRONG RESULT: identity:atomic:mem2; max_abs=3.814697265625e-06; index=469; actual=-0.007144927978515625; expected=-0.00714111328125"
+  },
+  {
+    "id": "28b9308ba2f67002",
+    "mode": "no_fma",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 7.36,
+    "last_error": null
+  },
+  {
+    "id": "792b64411a34bba3",
+    "mode": "default",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 7.55,
+    "last_error": "RuntimeError: WRONG RESULT: identity:atomic:mem2; max_abs=1.3828277587890625e-05; index=17; actual=1.3828277587890625e-05; expected=0.0"
+  },
+  {
+    "id": "792b64411a34bba3",
+    "mode": "no_fma",
+    "root": "algebraic_identity",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 7.71,
+    "last_error": null
+  },
+  {
+    "id": "e319928e57793f6e",
+    "mode": "no_fma",
+    "root": "pass_config_mismatch",
+    "status": "completed",
+    "exit": 0,
+    "seconds": 12.48,
+    "last_error": null
+  },
+  {
+    "id": "97cc159ada559d6c",
+    "mode": "no_fma",
+    "root": "pass_config_mismatch",
+    "status": "completed",
+    "exit": 1,
+    "seconds": 204.11,
+    "last_error": "torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 750.00 MiB. GPU 0 has a total capacity of 8.00 GiB of which 0 bytes is free. Including non-PyTorch memory, this process has 17179869184.00 GiB memory in use. Of the allocated memory 11.56 GiB is allocated by PyTorch, and 2.91 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)"
+  }
+]

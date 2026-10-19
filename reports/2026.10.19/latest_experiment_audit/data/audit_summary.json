@@ -1,0 +1,234 @@
+{
+  "experiment_commit": "5a790b0235ec59e927583f7a02ac64763f17ebef",
+  "timezone": "Asia/Shanghai (UTC+08:00)",
+  "failure_snapshot_window": [
+    "2026-10-19T17:35:22+08:00",
+    "2026-10-19T17:35:41+08:00"
+  ],
+  "failure_records": 6176,
+  "distinct_diagnostic_buckets": 267,
+  "real_mechanisms": 43,
+  "categories": {
+    "real_bug": 4669,
+    "fuzzer_defect": 87,
+    "noise_or_rejected": 1393,
+    "toolchain_unresolved": 8,
+    "numeric_unresolved": 19
+  },
+  "categories_by_run": {
+    "41790_tilelang": {
+      "real_bug": 1078,
+      "fuzzer_defect": 23,
+      "noise_or_rejected": 113,
+      "toolchain_unresolved": 5,
+      "numeric_unresolved": 6
+    },
+    "41790_triton": {
+      "real_bug": 755,
+      "fuzzer_defect": 15,
+      "noise_or_rejected": 540,
+      "numeric_unresolved": 2
+    },
+    "32906_tilelang": {
+      "fuzzer_defect": 34,
+      "real_bug": 1940,
+      "noise_or_rejected": 150,
+      "toolchain_unresolved": 3,
+      "numeric_unresolved": 9
+    },
+    "32906_triton": {
+      "real_bug": 896,
+      "fuzzer_defect": 15,
+      "noise_or_rejected": 590,
+      "numeric_unresolved": 2
+    }
+  },
+  "fuzzer_records_by_id": {
+    "Fuzzer#1": 21,
+    "Fuzzer#2": 30,
+    "Fuzzer#4": 7,
+    "Fuzzer#3": 29
+  },
+  "noise_roots": {
+    "shared_memory_overflow": 116,
+    "oracle_unstable": 247,
+    "unsupported_feature": 981,
+    "warp_partition": 11,
+    "timeout": 20,
+    "gpu_oom": 1,
+    "register_limit": 17
+  },
+  "audit_checkpoints": [
+    {
+      "port": 41790,
+      "backend": "tilelang",
+      "timestamp": "2026-10-19T17:26:39.213925+08:00",
+      "tested": 18800,
+      "passed_checkpoint": 17576,
+      "failure_checkpoint": 1224,
+      "failure_saved": 1225,
+      "failure_buckets": 127,
+      "hours": 77.288,
+      "tested_percent_500k": 3.76,
+      "hourly_rate": 245.0,
+      "slice_route_percent": 85.56,
+      "slice_programs": 16118,
+      "default_percent": 29.63,
+      "off_native_percent": 48.55,
+      "native_sm80_percent": 58.24,
+      "min_slice_percent": 5.92,
+      "max_slice_rejection_percent": 1.59,
+      "oracle_unstable_percent": 0.191,
+      "violations": {},
+      "auto_ws_sm90_100_120": [
+        43,
+        43,
+        71
+      ],
+      "compile_lowering_features": 568,
+      "read_errors": []
+    },
+    {
+      "port": 41790,
+      "backend": "triton",
+      "timestamp": "2026-10-19T17:30:52.109921+08:00",
+      "tested": 42100,
+      "passed_checkpoint": 40788,
+      "failure_checkpoint": 1312,
+      "failure_saved": 1312,
+      "failure_buckets": 54,
+      "hours": 77.358,
+      "tested_percent_500k": 8.42,
+      "hourly_rate": 559.7,
+      "slice_route_percent": 85.42,
+      "slice_programs": 35992,
+      "default_percent": 40.91,
+      "off_native_percent": 54.32,
+      "native_sm80_percent": 50.45,
+      "min_slice_percent": 7.16,
+      "max_slice_rejection_percent": 2.72,
+      "oracle_unstable_percent": 0.154,
+      "violations": {},
+      "auto_ws_sm90_100_120": [
+        0,
+        0,
+        0
+      ],
+      "compile_lowering_features": 2142,
+      "read_errors": []
+    },
+    {
+      "port": 32906,
+      "backend": "tilelang",
+      "timestamp": "2026-10-19T17:27:46.635679+08:00",
+      "tested": 31900,
+      "passed_checkpoint": 29766,
+      "failure_checkpoint": 2134,
+      "failure_saved": 2136,
+      "failure_buckets": 150,
+      "hours": 77.296,
+      "tested_percent_500k": 6.38,
+      "hourly_rate": 403.3,
+      "slice_route_percent": 85.76,
+      "slice_programs": 27406,
+      "default_percent": 36.19,
+      "off_native_percent": 43.81,
+      "native_sm80_percent": 62.74,
+      "min_slice_percent": 6.05,
+      "max_slice_rejection_percent": 0.78,
+      "oracle_unstable_percent": 0.141,
+      "violations": {},
+      "auto_ws_sm90_100_120": [
+        58,
+        105,
+        77
+      ],
+      "compile_lowering_features": 606,
+      "read_errors": []
+    },
+    {
+      "port": 32906,
+      "backend": "triton",
+      "timestamp": "2026-10-19T17:33:35.567219+08:00",
+      "tested": 69400,
+      "passed_checkpoint": 67897,
+      "failure_checkpoint": 1503,
+      "failure_saved": 1503,
+      "failure_buckets": 69,
+      "hours": 77.393,
+      "tested_percent_500k": 13.88,
+      "hourly_rate": 881.6,
+      "slice_route_percent": 85.04,
+      "slice_programs": 59042,
+      "default_percent": 43.25,
+      "off_native_percent": 51.19,
+      "native_sm80_percent": 53.18,
+      "min_slice_percent": 7.26,
+      "max_slice_rejection_percent": 1.96,
+      "oracle_unstable_percent": 0.146,
+      "violations": {},
+      "auto_ws_sm90_100_120": [
+        0,
+        0,
+        0
+      ],
+      "compile_lowering_features": 2207,
+      "read_errors": []
+    }
+  ],
+  "live_progress": [
+    {
+      "port": 41790,
+      "backend": "tilelang",
+      "started_at": "2026-10-16T12:09:22.300000+08:00",
+      "observed_at": "2026-10-19T18:25:32.759146+08:00",
+      "wall_seconds": 281770.459146,
+      "checkpoint_tested": 19000,
+      "checkpoint_passed": 17759,
+      "checkpoint_at": "2026-10-19T18:08:53.786862+08:00",
+      "results_directory": "2026.10.16-12.09_tilelang_hard-shape_seed=43"
+    },
+    {
+      "port": 41790,
+      "backend": "triton",
+      "started_at": "2026-10-16T12:09:22.400000+08:00",
+      "observed_at": "2026-10-19T18:25:32.759146+08:00",
+      "wall_seconds": 281770.359146,
+      "checkpoint_tested": 42600,
+      "checkpoint_passed": 41280,
+      "checkpoint_at": "2026-10-19T18:19:25.802169+08:00",
+      "results_directory": "2026.10.16-12.09_triton_hard-shape_seed=43"
+    },
+    {
+      "port": 32906,
+      "backend": "tilelang",
+      "started_at": "2026-10-16T12:10:02.100000+08:00",
+      "observed_at": "2026-10-19T18:25:32.685350+08:00",
+      "wall_seconds": 281730.58535,
+      "checkpoint_tested": 32300,
+      "checkpoint_passed": 30147,
+      "checkpoint_at": "2026-10-19T18:18:12.647373+08:00",
+      "results_directory": "2026.10.16-12.10_tilelang_hard-shape_seed=42"
+    },
+    {
+      "port": 32906,
+      "backend": "triton",
+      "started_at": "2026-10-16T12:10:02.100000+08:00",
+      "observed_at": "2026-10-19T18:25:32.685350+08:00",
+      "wall_seconds": 281730.58535,
+      "checkpoint_tested": 70100,
+      "checkpoint_passed": 68577,
+      "checkpoint_at": "2026-10-19T18:23:15.045054+08:00",
+      "results_directory": "2026.10.16-12.10_triton_hard-shape_seed=42"
+    }
+  ],
+  "live_checkpoint_total": 164000,
+  "remote_versions": {
+    "tilelang": "0.1.15",
+    "triton": "3.8.0",
+    "torch": "2.4.0+cu124",
+    "python": "3.11",
+    "nvcc": "12.4.131",
+    "apache-tvm-ffi": "0.1.11"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "id": "Triton#8",
+  "results": [
+    {
+      "dtype": "torch.int8",
+      "other": -2,
+      "first_masked_row": [
+        -2,
+        -1,
+        -1,
+        -1,
+        -2,
+        -1,
+        -1,
+        -1
+      ],
+      "mismatches": 96,
+      "elements": 128
+    },
+    {
+      "dtype": "torch.int32",
+      "other": -2,
+      "first_masked_row": [
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2,
+        -2
+      ],
+      "mismatches": 0,
+      "elements": 128
+    },
+    {
+      "dtype": "torch.int8",
+      "other": 2,
+      "first_masked_row": [
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2
+      ],
+      "mismatches": 0,
+      "elements": 128
+    }
+  ]
+}

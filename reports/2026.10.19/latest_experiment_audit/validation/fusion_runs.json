@@ -1,0 +1,16 @@
+[
+  {
+    "script": "repro/fz04_default.py",
+    "exit_code": 1,
+    "seconds": 9.678,
+    "finished_at": "2026-10-19T18:25:54.048785+08:00",
+    "output": "validation/fz04_default.py.txt"
+  },
+  {
+    "script": "repro/fz04_no_fma.py",
+    "exit_code": 0,
+    "seconds": 8.286,
+    "finished_at": "2026-10-19T18:26:02.334780+08:00",
+    "output": "validation/fz04_no_fma.py.txt"
+  }
+]
